@@ -5,12 +5,24 @@ REQUIRED_NODE_MAJOR=18
 REQUIRED_NODE_MINOR=18
 RECOMMENDED_NODE_MAJOR=20
 STRICT=0
+INSTALL=0
+INSTALL_PROJECT_DEPS=0
+INSTALL_PLAYWRIGHT=0
 FAILURES=()
 WARNINGS=()
 
-if [[ "${1:-}" == "--strict" ]]; then
-  STRICT=1
-fi
+for arg in "$@"; do
+  case "$arg" in
+    --strict) STRICT=1 ;;
+    --install) INSTALL=1 ;;
+    --install-project-deps) INSTALL_PROJECT_DEPS=1 ;;
+    --install-playwright) INSTALL_PLAYWRIGHT=1 ;;
+    *)
+      printf "Unknown argument: %s\n" "$arg"
+      exit 2
+      ;;
+  esac
+done
 
 print_header() {
   printf "\n== %s ==\n" "$1"
@@ -28,6 +40,10 @@ add_warning() {
 
 add_pass() {
   printf "PASS %s\n" "$1"
+}
+
+add_info() {
+  printf "INFO %s\n" "$1"
 }
 
 has_command() {
@@ -49,13 +65,109 @@ version_minor() {
   printf "%s" "$1" | sed 's/^v//' | cut -d. -f2
 }
 
+run_install() {
+  add_info "$*"
+  "$@"
+}
+
+sudo_prefix() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    printf ""
+    return
+  fi
+
+  if has_command sudo; then
+    printf "sudo"
+    return
+  fi
+
+  printf ""
+}
+
+install_system_package() {
+  local tool_name="$1"
+  local apt_package="$2"
+  local dnf_package="$3"
+  local pacman_package="$4"
+  local brew_package="$5"
+  local sudo_cmd
+  sudo_cmd="$(sudo_prefix)"
+
+  if has_command apt-get; then
+    if [[ -n "$sudo_cmd" ]]; then
+      run_install "$sudo_cmd" apt-get update
+      run_install "$sudo_cmd" apt-get install -y "$apt_package"
+    else
+      run_install apt-get update
+      run_install apt-get install -y "$apt_package"
+    fi
+    return
+  fi
+
+  if has_command dnf; then
+    if [[ -n "$sudo_cmd" ]]; then
+      run_install "$sudo_cmd" dnf install -y "$dnf_package"
+    else
+      run_install dnf install -y "$dnf_package"
+    fi
+    return
+  fi
+
+  if has_command yum; then
+    if [[ -n "$sudo_cmd" ]]; then
+      run_install "$sudo_cmd" yum install -y "$dnf_package"
+    else
+      run_install yum install -y "$dnf_package"
+    fi
+    return
+  fi
+
+  if has_command pacman; then
+    if [[ -n "$sudo_cmd" ]]; then
+      run_install "$sudo_cmd" pacman -S --needed --noconfirm "$pacman_package"
+    else
+      run_install pacman -S --needed --noconfirm "$pacman_package"
+    fi
+    return
+  fi
+
+  if has_command brew; then
+    run_install brew install "$brew_package"
+    return
+  fi
+
+  add_warning "Cannot install $tool_name automatically. No supported package manager was found."
+}
+
+install_npm_global() {
+  local tool_name="$1"
+  local package_name="$2"
+
+  if ! has_command npm; then
+    add_warning "Cannot install $tool_name automatically because npm is missing."
+    return
+  fi
+
+  run_install npm install -g "$package_name"
+}
+
 test_required_tool() {
   local name="$1"
   local install_hint="$2"
+  local apt_package="${3:-$1}"
+  local dnf_package="${4:-$1}"
+  local pacman_package="${5:-$1}"
+  local brew_package="${6:-$1}"
 
   if ! has_command "$name"; then
-    add_failure "$name is missing. $install_hint"
-    return
+    if (( INSTALL == 1 )); then
+      install_system_package "$name" "$apt_package" "$dnf_package" "$pacman_package" "$brew_package"
+    fi
+
+    if ! has_command "$name"; then
+      add_failure "$name is missing. $install_hint"
+      return
+    fi
   fi
 
   local version_text
@@ -71,6 +183,18 @@ test_required_tool() {
 test_optional_tool() {
   local name="$1"
   local install_hint="$2"
+  local install_kind="$3"
+  local install_package="$4"
+
+  if ! has_command "$name"; then
+    if (( INSTALL == 1 )); then
+      if [[ "$install_kind" == "npm" ]]; then
+        install_npm_global "$name" "$install_package"
+      else
+        install_system_package "$name" "$install_package" "$install_package" "$install_package" "$install_package"
+      fi
+    fi
+  fi
 
   if ! has_command "$name"; then
     add_warning "$name is missing. $install_hint"
@@ -120,6 +244,37 @@ test_node_version() {
   add_pass "Node.js $version_text"
 }
 
+install_project_dependencies() {
+  if (( INSTALL_PROJECT_DEPS == 0 )); then
+    return
+  fi
+
+  if [[ ! -f package.json ]]; then
+    add_warning "Cannot install project dependencies because package.json does not exist yet."
+    return
+  fi
+
+  if [[ -f package-lock.json ]]; then
+    run_install npm ci
+    return
+  fi
+
+  run_install npm install
+}
+
+install_playwright_browsers() {
+  if (( INSTALL_PLAYWRIGHT == 0 )); then
+    return
+  fi
+
+  if [[ ! -f package.json ]]; then
+    add_warning "Cannot install Playwright browsers because package.json does not exist yet."
+    return
+  fi
+
+  run_install npx playwright install
+}
+
 test_project_files() {
   if [[ -f package.json ]]; then
     add_pass "package.json found."
@@ -140,7 +295,7 @@ test_project_files() {
   if [[ -d node_modules ]]; then
     add_pass "node_modules found."
   elif [[ -f package.json ]]; then
-    add_warning "node_modules not found. Run npm install."
+    add_warning "node_modules not found. Run this script with --install-project-deps."
   fi
 }
 
@@ -171,19 +326,26 @@ test_project_scripts() {
 }
 
 printf "F1 League Manager developer machine check\n"
+printf "Run with --install to install missing tools.\n"
+printf "Run with --install-project-deps to install npm dependencies.\n"
+printf "Run with --install-playwright to install Playwright browsers.\n"
 printf "Run with --strict to fail on warnings too.\n"
 
 print_header "Required Tools"
-test_required_tool "git" "Install Git from your package manager."
-test_required_tool "node" "Install Node.js LTS from https://nodejs.org/ or nvm."
+test_required_tool "git" "Install Git from your package manager." "git" "git" "git" "git"
+test_required_tool "node" "Install Node.js LTS from https://nodejs.org/ or nvm." "nodejs" "nodejs" "nodejs" "node"
 test_node_version
-test_required_tool "npm" "npm should be installed with Node.js."
+test_required_tool "npm" "npm should be installed with Node.js." "npm" "npm" "npm" "npm"
 
 print_header "Recommended Tools"
-test_optional_tool "gh" "Install GitHub CLI if you want easy repo auth: https://cli.github.com/"
-test_optional_tool "vercel" "Install later with: npm install -g vercel"
-test_optional_tool "supabase" "Install later with: npm install -g supabase"
-test_optional_tool "docker" "Install Docker if you want local Supabase."
+test_optional_tool "gh" "Install GitHub CLI if you want easy repo auth: https://cli.github.com/" "system" "gh"
+test_optional_tool "vercel" "Install later with: npm install -g vercel" "npm" "vercel"
+test_optional_tool "supabase" "Install later with: npm install -g supabase" "npm" "supabase"
+test_optional_tool "docker" "Install Docker if you want local Supabase." "system" "docker"
+
+print_header "Project Dependencies"
+install_project_dependencies
+install_playwright_browsers
 
 print_header "Project Files"
 test_project_files
@@ -196,7 +358,7 @@ if [[ -f package.json ]]; then
     add_warning "Playwright is not available yet. Run npm install after S0 setup."
   else
     add_pass "$playwright_version"
-    add_warning "If E2E tests fail because browsers are missing, run: npx playwright install"
+    add_warning "If E2E tests fail because browsers are missing, run this script with --install-playwright."
   fi
 else
   add_warning "Playwright check skipped because package.json does not exist yet."
