@@ -1,10 +1,9 @@
 import { type NextRequest } from "next/server";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
-import { LEAGUE_ASSETS_BUCKET } from "@/lib/constants";
+import { LEAGUE_ASSETS_BUCKET, MAX_ASSET_UPLOAD_BYTES } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
-const MAX_ASSET_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MIME_TO_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -21,11 +20,15 @@ export async function POST(
     const { id: leagueId } = await params;
     const db = createSupabaseServiceRoleClient();
 
-    const { data: league } = await db
+    const { data: league, error: leagueError } = await db
       .from("leagues")
       .select("id")
       .eq("id", leagueId)
       .single();
+
+    if (leagueError && leagueError.code !== "PGRST116") {
+      return Response.json({ error: "Failed to load league" }, { status: 500 });
+    }
 
     if (!league) {
       return Response.json({ error: "League not found" }, { status: 404 });
@@ -52,7 +55,7 @@ export async function POST(
       return Response.json({ error: "Only JPEG, PNG, and WebP images are allowed" }, { status: 422 });
     }
 
-    if (file.size > MAX_ASSET_BYTES) {
+    if (file.size > MAX_ASSET_UPLOAD_BYTES) {
       return Response.json({ error: "File must be 5 MB or smaller" }, { status: 413 });
     }
 
@@ -78,6 +81,14 @@ export async function POST(
       .eq("id", leagueId);
 
     if (updateError) {
+      const { error: removeError } = await db.storage
+        .from(LEAGUE_ASSETS_BUCKET)
+        .remove([storagePath]);
+
+      if (removeError) {
+        return Response.json({ error: "Upload record update failed and cleanup failed" }, { status: 500 });
+      }
+
       return Response.json({ error: "Upload succeeded but failed to update league record" }, { status: 500 });
     }
 

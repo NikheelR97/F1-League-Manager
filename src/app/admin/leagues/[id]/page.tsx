@@ -7,7 +7,8 @@ import { Plus } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LeagueAssetUpload } from "@/components/admin/LeagueAssetUpload";
 import { LeagueStatusButton } from "@/components/admin/LeagueStatusButton";
-import { MAX_DRIVERS_LIST, MAX_TEAMS_LIST } from "@/lib/constants";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { MAX_DRIVERS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export default async function LeagueDetailPage({
@@ -19,10 +20,10 @@ export default async function LeagueDetailPage({
   const db = createSupabaseServiceRoleClient();
 
   const [
-    { data: league },
-    { data: teams },
-    { data: entries },
-    { data: pointsSystems },
+    { data: league, error: leagueError },
+    { data: teams, error: teamsError },
+    { data: entries, error: entriesError },
+    { data: pointsSystems, error: pointsSystemsError },
   ] = await Promise.all([
     db
       .from("leagues")
@@ -34,7 +35,7 @@ export default async function LeagueDetailPage({
       .select("id, name, slug, kind, color_hex")
       .eq("league_id", leagueId)
       .order("name")
-      .limit(MAX_TEAMS_LIST),
+      .limit(MAX_TEAMS_PER_LEAGUE),
     db
       .from("league_driver_entries")
       .select("id, is_reserve, drivers(display_name, racing_number), driver_team_stints(team_id, ends_on, teams(name, color_hex))")
@@ -48,6 +49,14 @@ export default async function LeagueDetailPage({
       .eq("league_id", leagueId)
       .order("name"),
   ]);
+
+  if (leagueError && leagueError.code !== "PGRST116") {
+    return <ErrorState message="Failed to load league." />;
+  }
+
+  if (teamsError || entriesError || pointsSystemsError) {
+    return <ErrorState message="Failed to load league management data." />;
+  }
 
   if (!league) notFound();
 
@@ -143,7 +152,7 @@ export default async function LeagueDetailPage({
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase text-f1-muted">
-            Teams ({teams?.length ?? 0}/{MAX_TEAMS_LIST})
+            Teams ({teams?.length ?? 0}/{MAX_TEAMS_PER_LEAGUE})
           </h2>
           <Link
             className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"

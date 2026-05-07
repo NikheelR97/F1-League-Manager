@@ -42,10 +42,10 @@ export const MAX_AUDIT_ACTION_LENGTH = 80;
 export const MAX_AUDIT_METADATA_BYTES = 5_000;
 export const MAX_AUTH_COOKIES = 12;
 export const MAX_REQUEST_BODY_BYTES = 50_000;
+export const MAX_ASSET_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const MAX_PRIMARY_DRIVERS_PER_TEAM = 2;
 export const MAX_SEASONS_LIST = 50;
 export const MAX_LEAGUES_LIST = 50;
-export const MAX_TEAMS_LIST = 20;
 export const MAX_DRIVERS_LIST = 100;
 // Storage bucket names — match the migration exactly
 export const LEAGUE_ASSETS_BUCKET = "league-assets";

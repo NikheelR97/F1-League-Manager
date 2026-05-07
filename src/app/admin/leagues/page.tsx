@@ -4,16 +4,21 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { MAX_LEAGUES_LIST } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export default async function LeaguesPage() {
   const db = createSupabaseServiceRoleClient();
-  const { data: leagues } = await db
+  const { data: leagues, error: leaguesError } = await db
     .from("leagues")
     .select("id, name, slug, format, status, seasons(name)")
     .order("created_at", { ascending: false })
     .limit(MAX_LEAGUES_LIST);
+
+  if (leaguesError) {
+    return <ErrorState message="Failed to load leagues." />;
+  }
 
   return (
     <div className="space-y-8">

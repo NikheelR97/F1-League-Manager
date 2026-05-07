@@ -6,9 +6,10 @@ import { z } from "zod";
 
 import {
   MAX_DRIVERS_LIST,
+  MAX_ASSET_UPLOAD_BYTES,
   MAX_POINTS_POSITIONS,
   MAX_PRIMARY_DRIVERS_PER_TEAM,
-  MAX_TEAMS_LIST,
+  MAX_TEAMS_PER_LEAGUE,
 } from "@/lib/constants";
 
 // ─── Schema definitions copied from route files for isolated testing ───────
@@ -66,8 +67,8 @@ describe("S3 constants", () => {
     expect(MAX_PRIMARY_DRIVERS_PER_TEAM).toBe(2);
   });
 
-  it("team list cap is 20", () => {
-    expect(MAX_TEAMS_LIST).toBe(20);
+  it("league team cap is 15", () => {
+    expect(MAX_TEAMS_PER_LEAGUE).toBe(15);
   });
 
   it("driver list cap is 100", () => {
@@ -340,7 +341,6 @@ describe("points system schema", () => {
 // ─── Asset upload constraints ─────────────────────────────────────────────────
 
 describe("asset upload constraints", () => {
-  const MAX_ASSET_BYTES = 5 * 1024 * 1024;
   const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
   const ALLOWED_KIND = new Set(["logo", "car_image"]);
 
@@ -368,6 +368,6 @@ describe("asset upload constraints", () => {
   });
 
   it("5 MB limit is correct", () => {
-    expect(MAX_ASSET_BYTES).toBe(5_242_880);
+    expect(MAX_ASSET_UPLOAD_BYTES).toBe(5_242_880);
   });
 });

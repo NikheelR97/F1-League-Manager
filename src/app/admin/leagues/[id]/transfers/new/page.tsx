@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { TransferForm } from "@/components/admin/TransferForm";
-import { MAX_DRIVERS_LIST, MAX_TEAMS_LIST } from "@/lib/constants";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { MAX_DRIVERS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export default async function NewTransferPage({
@@ -15,7 +16,11 @@ export default async function NewTransferPage({
   const { id: leagueId } = await params;
   const db = createSupabaseServiceRoleClient();
 
-  const [{ data: league }, { data: entries }, { data: teams }] = await Promise.all([
+  const [
+    { data: league, error: leagueError },
+    { data: entries, error: entriesError },
+    { data: teams, error: teamsError },
+  ] = await Promise.all([
     db.from("leagues").select("id, name").eq("id", leagueId).single(),
     db
       .from("league_driver_entries")
@@ -29,8 +34,16 @@ export default async function NewTransferPage({
       .select("id, name")
       .eq("league_id", leagueId)
       .order("name")
-      .limit(MAX_TEAMS_LIST),
+      .limit(MAX_TEAMS_PER_LEAGUE),
   ]);
+
+  if (leagueError && leagueError.code !== "PGRST116") {
+    return <ErrorState message="Failed to load league." />;
+  }
+
+  if (entriesError || teamsError) {
+    return <ErrorState message="Failed to load transfer data." />;
+  }
 
   if (!league) notFound();
 

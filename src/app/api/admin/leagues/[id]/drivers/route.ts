@@ -59,12 +59,16 @@ export async function POST(
     const db = createSupabaseServiceRoleClient();
 
     // Verify team belongs to this league
-    const { data: team } = await db
+    const { data: team, error: teamError } = await db
       .from("teams")
       .select("id, name, league_id")
       .eq("id", team_id)
       .eq("league_id", leagueId)
       .single();
+
+    if (teamError && teamError.code !== "PGRST116") {
+      return Response.json({ error: "Failed to verify team" }, { status: 500 });
+    }
 
     if (!team) {
       return Response.json({ error: "Team not found in this league" }, { status: 422 });
@@ -72,44 +76,56 @@ export async function POST(
 
     // Enforce primary driver limit (only for non-reserve assignments)
     if (!is_reserve) {
-      const { count } = await db
-        .from("league_driver_entries")
-        .select("id", { count: "exact", head: true })
-        .eq("league_id", leagueId)
-        .is("left_on", null)
-        .eq("is_reserve", false)
-        .in(
-          "id",
-          (
-            await db
-              .from("driver_team_stints")
-              .select("league_driver_entry_id")
-              .eq("team_id", team_id)
-              .is("ends_on", null)
-          ).data?.map((s) => s.league_driver_entry_id) ?? [],
-        );
+      const { data: activeStints, error: activeStintsError } = await db
+        .from("driver_team_stints")
+        .select("league_driver_entry_id")
+        .eq("team_id", team_id)
+        .is("ends_on", null);
 
-      if ((count ?? 0) >= MAX_PRIMARY_DRIVERS_PER_TEAM) {
-        return Response.json(
-          { error: `This team already has ${MAX_PRIMARY_DRIVERS_PER_TEAM} primary drivers` },
-          { status: 422 },
-        );
+      if (activeStintsError) {
+        return Response.json({ error: "Failed to load team assignments" }, { status: 500 });
+      }
+
+      const activeEntryIds = activeStints.map((stint) => stint.league_driver_entry_id);
+      if (activeEntryIds.length >= MAX_PRIMARY_DRIVERS_PER_TEAM) {
+        const { count, error: countError } = await db
+          .from("league_driver_entries")
+          .select("id", { count: "exact", head: true })
+          .eq("league_id", leagueId)
+          .is("left_on", null)
+          .eq("is_reserve", false)
+          .in("id", activeEntryIds);
+
+        if (countError) {
+          return Response.json({ error: "Failed to count team drivers" }, { status: 500 });
+        }
+
+        if ((count ?? 0) >= MAX_PRIMARY_DRIVERS_PER_TEAM) {
+          return Response.json(
+            { error: `This team already has ${MAX_PRIMARY_DRIVERS_PER_TEAM} primary drivers` },
+            { status: 422 },
+          );
+        }
       }
     }
 
     // Fetch the current season for this league
-    const { data: league } = await db
+    const { data: league, error: leagueError } = await db
       .from("leagues")
       .select("season_id")
       .eq("id", leagueId)
       .single();
+
+    if (leagueError && leagueError.code !== "PGRST116") {
+      return Response.json({ error: "Failed to load league" }, { status: 500 });
+    }
 
     if (!league?.season_id) {
       return Response.json({ error: "League has no season" }, { status: 422 });
     }
 
     // Check driver isn't already active in this league
-    const { data: existing } = await db
+    const { data: existing, error: existingError } = await db
       .from("league_driver_entries")
       .select("id")
       .eq("league_id", leagueId)
@@ -117,12 +133,14 @@ export async function POST(
       .is("left_on", null)
       .single();
 
+    if (existingError && existingError.code !== "PGRST116") {
+      return Response.json({ error: "Failed to verify driver entry" }, { status: 500 });
+    }
+
     if (existing) {
       return Response.json({ error: "Driver is already active in this league" }, { status: 409 });
     }
 
-    // Create entry + stint atomically via RPC would be ideal, but we use sequential inserts
-    // with service-role (no RLS) — partial failure leaves orphaned entry, acceptable for S3
     const { data: entry, error: entryError } = await db
       .from("league_driver_entries")
       .insert({
@@ -153,6 +171,15 @@ export async function POST(
       });
 
     if (stintError) {
+      const { error: rollbackError } = await db
+        .from("league_driver_entries")
+        .delete()
+        .eq("id", entry.id);
+
+      if (rollbackError) {
+        return Response.json({ error: "Driver assignment failed and rollback failed" }, { status: 500 });
+      }
+
       return Response.json({ error: "Driver added but team assignment failed" }, { status: 500 });
     }
 

@@ -4,16 +4,21 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { MAX_DRIVERS_LIST } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export default async function DriversPage() {
   const db = createSupabaseServiceRoleClient();
-  const { data: drivers } = await db
+  const { data: drivers, error: driversError } = await db
     .from("drivers")
     .select("id, display_name, racing_number, country, is_active")
     .order("display_name")
     .limit(MAX_DRIVERS_LIST);
+
+  if (driversError) {
+    return <ErrorState message="Failed to load drivers." />;
+  }
 
   return (
     <div className="space-y-8">

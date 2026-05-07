@@ -4,16 +4,21 @@ import { Plus } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { SeasonForm } from "@/components/admin/SeasonForm";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import { MAX_SEASONS_LIST } from "@/lib/constants";
 
 export default async function SeasonsPage() {
   const db = createSupabaseServiceRoleClient();
-  const { data: seasons } = await db
+  const { data: seasons, error: seasonsError } = await db
     .from("seasons")
     .select("id, name, starts_on, ends_on, is_current")
     .order("starts_on", { ascending: false })
     .limit(MAX_SEASONS_LIST);
+
+  if (seasonsError) {
+    return <ErrorState message="Failed to load seasons." />;
+  }
 
   return (
     <div className="space-y-8">

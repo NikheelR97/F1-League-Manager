@@ -21,11 +21,15 @@ export async function PATCH(
     const { id: leagueId } = await params;
     const db = createSupabaseServiceRoleClient();
 
-    const { data: league } = await db
+    const { data: league, error: leagueError } = await db
       .from("leagues")
       .select("id, status")
       .eq("id", leagueId)
       .single();
+
+    if (leagueError && leagueError.code !== "PGRST116") {
+      return Response.json({ error: "Failed to load league" }, { status: 500 });
+    }
 
     if (!league) {
       return Response.json({ error: "League not found" }, { status: 404 });

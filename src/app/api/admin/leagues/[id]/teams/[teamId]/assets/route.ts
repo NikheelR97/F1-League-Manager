@@ -1,10 +1,9 @@
 import { type NextRequest } from "next/server";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
-import { TEAM_ASSETS_BUCKET } from "@/lib/constants";
+import { MAX_ASSET_UPLOAD_BYTES, TEAM_ASSETS_BUCKET } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
-const MAX_ASSET_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MIME_TO_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -22,12 +21,16 @@ export async function POST(
     const db = createSupabaseServiceRoleClient();
 
     // Verify team belongs to this league
-    const { data: team } = await db
+    const { data: team, error: teamError } = await db
       .from("teams")
       .select("id")
       .eq("id", teamId)
       .eq("league_id", leagueId)
       .single();
+
+    if (teamError && teamError.code !== "PGRST116") {
+      return Response.json({ error: "Failed to load team" }, { status: 500 });
+    }
 
     if (!team) {
       return Response.json({ error: "Team not found in this league" }, { status: 404 });
@@ -54,7 +57,7 @@ export async function POST(
       return Response.json({ error: "Only JPEG, PNG, and WebP images are allowed" }, { status: 422 });
     }
 
-    if (file.size > MAX_ASSET_BYTES) {
+    if (file.size > MAX_ASSET_UPLOAD_BYTES) {
       return Response.json({ error: "File must be 5 MB or smaller" }, { status: 413 });
     }
 
@@ -77,9 +80,18 @@ export async function POST(
     const { error: updateError } = await db
       .from("teams")
       .update({ [column]: storagePath })
-      .eq("id", teamId);
+      .eq("id", teamId)
+      .eq("league_id", leagueId);
 
     if (updateError) {
+      const { error: removeError } = await db.storage
+        .from(TEAM_ASSETS_BUCKET)
+        .remove([storagePath]);
+
+      if (removeError) {
+        return Response.json({ error: "Upload record update failed and cleanup failed" }, { status: 500 });
+      }
+
       return Response.json({ error: "Upload succeeded but failed to update team record" }, { status: 500 });
     }
 
