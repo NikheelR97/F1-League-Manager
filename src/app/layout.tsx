@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+// S2 replaces these with Titillium Web (body) and JetBrains Mono (numbers/times).
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

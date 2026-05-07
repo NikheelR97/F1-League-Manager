@@ -16,6 +16,7 @@ const secretPatterns = [
   /sk_(live|test|proj)_[A-Za-z0-9_-]+/u,
   /xox[baprs]-[A-Za-z0-9-]+/u,
   /https:\/\/discord\.com\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+/u,
+  /UPSTASH_REDIS_REST_TOKEN\s*[:=]\s*["']?[A-Za-z0-9_-]{20,}/u,
 ];
 
 const findings = [];
