@@ -2,18 +2,14 @@ import "server-only";
 
 import { z } from "zod";
 
+import { publicEnvSchema, readPublicEnv } from "@/lib/env-public";
+
 const optionalUrlSchema = z
   .string()
   .trim()
   .url()
   .or(z.literal(""))
   .optional();
-
-export const publicEnvSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().trim().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().trim().min(1),
-  NEXT_PUBLIC_SITE_URL: z.string().trim().url(),
-});
 
 export const serverEnvSchema = publicEnvSchema.extend({
   SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(1),
@@ -27,14 +23,11 @@ export const serverEnvSchema = publicEnvSchema.extend({
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 });
 
-export type PublicEnv = z.infer<typeof publicEnvSchema>;
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
 type EnvSource = Record<string, string | undefined>;
 
-export function readPublicEnv(source: EnvSource = process.env): PublicEnv {
-  return publicEnvSchema.parse(source);
-}
+export { readPublicEnv };
 
 export function readServerEnv(source: EnvSource = process.env): ServerEnv {
   return serverEnvSchema.parse(source);

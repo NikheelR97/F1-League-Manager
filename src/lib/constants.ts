@@ -32,6 +32,15 @@ export const MAX_LOGIN_ATTEMPTS = 5;
 export const LOGIN_LOCKOUT_MINUTES = 15;
 export const JWT_EXPIRY_SECONDS = 3600;
 export const ADMIN_SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
+export const ADMIN_RATE_LIMIT_REQUESTS = 5;
+export const ADMIN_RATE_LIMIT_WINDOW = "10 s";
+export const AUTH_RATE_LIMIT_REQUESTS = 5;
+export const AUTH_RATE_LIMIT_WINDOW = "15 m";
+export const CSRF_HEADER_NAME = "x-csrf-token";
+export const MAX_ERROR_MESSAGE_LENGTH = 160;
+export const MAX_AUDIT_ACTION_LENGTH = 80;
+export const MAX_AUDIT_METADATA_BYTES = 5_000;
+export const MAX_AUTH_COOKIES = 12;
 
 export const COUNTDOWN_TICK_MS = 1000;
 export const STANDINGS_REFRESH_MS = 30_000;
