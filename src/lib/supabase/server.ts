@@ -4,7 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 import { MAX_AUTH_COOKIES } from "@/lib/constants";
-import { readPublicEnv } from "@/lib/env";
+import { readPublicEnv } from "@/lib/env-public";
 
 export async function createSupabaseServerClient() {
   const env = readPublicEnv();

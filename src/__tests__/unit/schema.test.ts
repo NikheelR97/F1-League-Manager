@@ -46,5 +46,8 @@ describe("S1 database migration", () => {
   it("seeds official teams and the full 2025 circuit library", () => {
     expect(migrationSql.match(/'#[0-9A-Fa-f]{6}'/gu)).toHaveLength(10);
     expect(migrationSql.match(/\(\d+, '[^']+', '[^']+'/gu)).toHaveLength(24);
+    expect(migrationSql).toContain(
+      "'Yas Marina Circuit', 'yas-marina', 'UAE'",
+    );
   });
 });

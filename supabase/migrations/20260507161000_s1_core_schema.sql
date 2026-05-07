@@ -597,7 +597,7 @@ values
   (21, 'Interlagos', 'interlagos', 'Brazil', 'Sao Paulo', 'Sao Paulo Grand Prix', '2025-11-07', '2025-11-09'),
   (22, 'Las Vegas Strip Circuit', 'las-vegas-strip', 'USA', 'Las Vegas', 'Las Vegas Grand Prix', '2025-11-20', '2025-11-22'),
   (23, 'Lusail International Circuit', 'lusail', 'Qatar', 'Lusail', 'Qatar Grand Prix', '2025-11-28', '2025-11-30'),
-  (24, 'Yas Marina Circuit', 'yas-marina', 'Abu Dhabi', 'Yas Marina', 'Abu Dhabi Grand Prix', '2025-12-05', '2025-12-07')
+  (24, 'Yas Marina Circuit', 'yas-marina', 'UAE', 'Yas Marina', 'Abu Dhabi Grand Prix', '2025-12-05', '2025-12-07')
 on conflict (slug) do update
 set round_number = excluded.round_number,
     country = excluded.country,

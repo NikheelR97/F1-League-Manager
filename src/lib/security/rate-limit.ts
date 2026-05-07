@@ -10,12 +10,21 @@ import {
 
 interface RateLimitEnv {
   [key: string]: string | undefined;
+  NODE_ENV?: string;
   UPSTASH_REDIS_REST_TOKEN?: string;
   UPSTASH_REDIS_REST_URL?: string;
 }
 
+function isProduction(env: RateLimitEnv): boolean {
+  return env.NODE_ENV === "production";
+}
+
 function createRedis(env: RateLimitEnv): Redis | null {
   if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
+    if (isProduction(env)) {
+      throw new Error("Rate limiting requires Upstash Redis in production");
+    }
+
     return null;
   }
 

@@ -1,5 +1,6 @@
 import { writeAuditLog, type AuditLogWriter } from "@/lib/audit/audit-log";
 import { MAX_AUDIT_METADATA_BYTES } from "@/lib/constants";
+import { createAdminRateLimiter } from "@/lib/security/rate-limit";
 import { sanitizeError } from "@/lib/security/errors";
 import { verifyCsrfToken } from "@/lib/security/csrf";
 import nextConfig from "../../../next.config";
@@ -80,5 +81,12 @@ describe("security helpers", () => {
 
     expect(headerNames).toContain("Content-Security-Policy");
     expect(headerNames).toContain("Strict-Transport-Security");
+  });
+
+  it("fails closed for missing production rate limit configuration", () => {
+    expect(createAdminRateLimiter({ NODE_ENV: "development" })).toBeNull();
+    expect(() =>
+      createAdminRateLimiter({ NODE_ENV: "production" }),
+    ).toThrow("Rate limiting requires Upstash Redis in production");
   });
 });

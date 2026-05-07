@@ -1,4 +1,5 @@
 import { readPublicEnv, readServerEnv } from "@/lib/env";
+import { readPublicEnv as readClientSafePublicEnv } from "@/lib/env-public";
 
 const validEnv = {
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
@@ -13,6 +14,9 @@ describe("environment validation", () => {
   it("parses required public values", () => {
     expect(readPublicEnv(validEnv).NEXT_PUBLIC_SITE_URL).toBe(
       "http://localhost:3000",
+    );
+    expect(readClientSafePublicEnv(validEnv).NEXT_PUBLIC_SUPABASE_URL).toBe(
+      "http://127.0.0.1:54321",
     );
   });
 
