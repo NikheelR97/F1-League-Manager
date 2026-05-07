@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 
-import { Button } from "@/components/ui/Button";
+import { F1Button } from "@/components/ui/F1Button";
 import { RaceFormatTag } from "@/components/ui/RaceFormatTag";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { LeagueSummary } from "@/lib/ui/league-data";
@@ -35,9 +35,9 @@ export function LeagueCard({ league }: LeagueCardProps) {
             results unlock as admins publish race data.
           </p>
         </div>
-        <Button href={league.href} icon={ArrowRight}>
+        <F1Button href={league.href} icon={ArrowRight}>
           Open League
-        </Button>
+        </F1Button>
       </div>
     </article>
   );

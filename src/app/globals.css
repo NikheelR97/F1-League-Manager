@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
   --f1-red: #e8002d;
@@ -19,8 +23,34 @@
   --team-williams: #005aff;
   --team-rb: #6692ff;
   --team-sauber: #52e252;
+  /* shadcn semantic tokens mapped to F1 dark palette — app is always dark */
   --background: var(--f1-black);
   --foreground: var(--f1-white);
+  --card: var(--f1-dark);
+  --card-foreground: var(--f1-white);
+  --popover: var(--f1-dark);
+  --popover-foreground: var(--f1-white);
+  --primary: var(--f1-red);
+  --primary-foreground: var(--f1-white);
+  --secondary: var(--f1-mid);
+  --secondary-foreground: var(--f1-white);
+  --muted: var(--f1-mid);
+  --muted-foreground: var(--f1-muted);
+  --accent: var(--f1-dark);
+  --accent-foreground: var(--f1-white);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: var(--f1-border);
+  --input: var(--f1-mid);
+  --ring: var(--f1-red);
+  --radius: 0rem;
+  --sidebar: var(--f1-dark);
+  --sidebar-foreground: var(--f1-white);
+  --sidebar-primary: var(--f1-red);
+  --sidebar-primary-foreground: var(--f1-white);
+  --sidebar-accent: var(--f1-mid);
+  --sidebar-accent-foreground: var(--f1-white);
+  --sidebar-border: var(--f1-border);
+  --sidebar-ring: var(--f1-red);
 }
 
 @theme inline {
@@ -38,6 +68,43 @@
   --color-team-sauber: var(--team-sauber);
   --font-mono: var(--font-jetbrains-mono);
   --font-sans: var(--font-titillium);
+  --font-heading: var(--font-titillium);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 * {
@@ -49,8 +116,6 @@ html {
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: var(--font-titillium), Arial, Helvetica, sans-serif;
   margin: 0;
 }
@@ -158,5 +223,18 @@ summary::-webkit-details-marker {
     animation-duration: 1ms !important;
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
+  }
+}
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 }
