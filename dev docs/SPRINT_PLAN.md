@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S1 implementation in progress on `feature/s1-database-auth-security`.
+**Status:** S2 implementation in progress on `feature/s2-ui-foundation`.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -387,6 +387,22 @@ Build the F1-inspired visual foundation and public layout.
 3. No official F1 protected logos are copied.
 4. Mobile layout is usable.
 5. `npm run sprint-verify` passes.
+
+### Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| Branch created | Done | `feature/s2-ui-foundation` from `dev` | None |
+| F1 color tokens added | Done | `src/app/globals.css` defines F1 and team CSS tokens | None |
+| Titillium Web and JetBrains Mono loaded | Done | `src/app/layout.tsx` uses `next/font/google` | None |
+| Public shell added | Done | `PublicHeader`, `PublicFooter`, `PublicShell` | None |
+| Reusable UI components added | Done | Button, status pill, team badge, driver chip, position delta, race format tag, empty state, error state | None |
+| League directory page added | Done | `/` renders Informal and Standard league cards | None |
+| League hub pages added | Done | `/leagues/informal` and `/leagues/standard` | None |
+| Race countdown utility added | Done | `RaceCountdown` and `getCountdownParts` tested | None |
+| Mobile navigation added | Done | Header `details` menu for mobile viewports | None |
+| Playwright screenshots added | Done | E2E writes desktop and mobile screenshots to ignored `test-results` paths | None |
+| S2 verification gate | Done | `npm run sprint-verify` passed; 19 tests passed; E2E captured desktop/mobile screenshots | None |
 
 ---
 

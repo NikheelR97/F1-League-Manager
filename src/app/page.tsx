@@ -1,32 +1,32 @@
+import { LeagueCard } from "@/components/league/LeagueCard";
+import { PublicShell } from "@/components/layout/PublicShell";
+import { TeamBadge } from "@/components/ui/TeamBadge";
+import { getLeagueSummaries } from "@/lib/ui/league-data";
+
 export default function Home() {
+  const leagues = getLeagueSummaries();
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0a0a0a] px-6 py-12 text-white">
-      <section className="w-full max-w-3xl border-l-4 border-[#e8002d] bg-[#15151e] p-8 shadow-2xl">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#c8c8c8]">
-          Sprint 0
-        </p>
-        <h1 className="mt-3 text-4xl font-bold">
-          F1 Esports League Manager
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-[#c8c8c8]">
-          Project foundation is being prepared. League features remain locked
-          behind the approved sprint plan until their sprint begins.
-        </p>
-        <dl className="mt-8 grid gap-4 sm:grid-cols-3">
-          <div className="border border-[#2f2f2f] p-4">
-            <dt className="text-xs uppercase text-[#6c6c6c]">Branch</dt>
-            <dd className="mt-2 font-mono text-sm">dev</dd>
+    <PublicShell>
+      <section className="surface-band">
+        <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:px-8">
+          <div className="max-w-4xl">
+            <TeamBadge color="#E8002D" label="Race Weekend" />
+            <h1 className="mt-5 text-4xl font-black uppercase text-f1-white sm:text-6xl">
+              F1 Esports League Manager
+            </h1>
+            <p className="mt-4 max-w-2xl text-lg leading-8 text-f1-silver">
+              League race hubs bring calendar readiness, standings status,
+              penalties, and wheel state into one race-weekend view.
+            </p>
           </div>
-          <div className="border border-[#2f2f2f] p-4">
-            <dt className="text-xs uppercase text-[#6c6c6c]">Database</dt>
-            <dd className="mt-2 font-mono text-sm">local Supabase</dd>
+          <div className="grid gap-6">
+            {leagues.map((league) => (
+              <LeagueCard key={league.slug} league={league} />
+            ))}
           </div>
-          <div className="border border-[#2f2f2f] p-4">
-            <dt className="text-xs uppercase text-[#6c6c6c]">Gate</dt>
-            <dd className="mt-2 font-mono text-sm">sprint-verify</dd>
-          </div>
-        </dl>
+        </div>
       </section>
-    </main>
+    </PublicShell>
   );
 }
