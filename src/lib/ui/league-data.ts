@@ -10,6 +10,7 @@ export type LeagueTheme = "race-control" | "race-weekend";
 export interface LeagueSummary {
   constructorLeader: string;
   formatLabel: string;
+  heroAlt: string;
   heroImage: string;
   href: string;
   leader: string;
@@ -32,8 +33,8 @@ export const leagueSummaries: readonly LeagueSummary[] = [
   {
     constructorLeader: "Standings pending",
     formatLabel: `2 x ${F1_INFORMAL_RACE_PCT}% races`,
-    heroImage:
-      "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=1400&q=80",
+    heroAlt: "Dusk race circuit pit straight with red timing lights",
+    heroImage: "/images/leagues/race-weekend-hero.png",
     href: "/leagues/informal",
     leader: "Season setup",
     name: "Informal League",
@@ -48,8 +49,8 @@ export const leagueSummaries: readonly LeagueSummary[] = [
   {
     constructorLeader: "Standings pending",
     formatLabel: `${F1_STANDARD_RACE_PCT}% feature race`,
-    heroImage:
-      "https://images.unsplash.com/photo-1533106418989-88406c7cc8ca?auto=format&fit=crop&w=1400&q=80",
+    heroAlt: "Race control garage with timing monitors beside a pit lane",
+    heroImage: "/images/leagues/race-control-hero.png",
     href: "/leagues/standard",
     leader: "Season setup",
     name: "Standard League",

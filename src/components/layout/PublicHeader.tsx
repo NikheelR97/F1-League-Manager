@@ -33,8 +33,11 @@ export function PublicHeader() {
           ))}
         </nav>
         <details className="relative md:hidden">
-          <summary className="flex h-11 w-11 cursor-pointer items-center justify-center border border-f1-border text-f1-white">
-            <Menu aria-label="Open navigation" size={20} />
+          <summary
+            aria-label="Open navigation"
+            className="flex h-11 w-11 cursor-pointer items-center justify-center border border-f1-border text-f1-white"
+          >
+            <Menu aria-hidden="true" size={20} />
           </summary>
           <nav className="absolute right-0 top-12 z-10 grid w-52 gap-1 border border-f1-border bg-f1-panel p-2">
             {leagues.map((league) => (

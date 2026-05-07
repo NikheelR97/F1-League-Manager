@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react";
+import Image from "next/image";
 
 import { Button } from "@/components/ui/Button";
 import { RaceFormatTag } from "@/components/ui/RaceFormatTag";
@@ -12,11 +13,16 @@ interface LeagueCardProps {
 export function LeagueCard({ league }: LeagueCardProps) {
   return (
     <article className="grid min-h-[320px] overflow-hidden border border-f1-border bg-f1-panel md:grid-cols-[1fr_1.2fr]">
-      <div
-        aria-hidden="true"
-        className="min-h-48 bg-cover bg-center"
-        style={{ backgroundImage: `url(${league.heroImage})` }}
-      />
+      <div className="relative min-h-48">
+        <Image
+          alt={league.heroAlt}
+          className="object-cover"
+          fill
+          priority={league.slug === "informal"}
+          sizes="(min-width: 768px) 45vw, 100vw"
+          src={league.heroImage}
+        />
+      </div>
       <div className="flex flex-col justify-between gap-6 p-6">
         <div>
           <div className="flex flex-wrap gap-3">

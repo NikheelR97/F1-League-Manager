@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 
 import { LeagueHub } from "@/components/league/LeagueHub";
 import { RaceCountdown } from "@/components/league/RaceCountdown";
+import { getLeagueSummaries } from "@/lib/ui/league-data";
 
 describe("LeagueHub", () => {
   it("renders meaningful league hub data", () => {
@@ -23,5 +24,14 @@ describe("LeagueHub", () => {
     );
 
     expect(screen.getByText("1d 2h 30m")).toBeInTheDocument();
+  });
+
+  it("uses local project images for league hero assets", () => {
+    const summaries = getLeagueSummaries();
+
+    expect.assertions(summaries.length);
+    for (const league of summaries) {
+      expect(league.heroImage).toMatch(/^\/images\/leagues\//u);
+    }
   });
 });

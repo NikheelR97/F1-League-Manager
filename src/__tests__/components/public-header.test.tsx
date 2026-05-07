@@ -18,5 +18,6 @@ describe("PublicHeader", () => {
       "href",
       "/leagues/standard",
     );
+    expect(screen.getByLabelText("Open navigation")).toBeInTheDocument();
   });
 });

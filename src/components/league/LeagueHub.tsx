@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 
 import { RaceCountdown } from "@/components/league/RaceCountdown";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -20,10 +21,13 @@ export function LeagueHub({ slug }: LeagueHubProps) {
   return (
     <section className="theme-race-weekend">
       <div className="hero-band">
-        <div
-          aria-hidden="true"
-          className="hero-band__media"
-          style={{ backgroundImage: `url(${league.heroImage})` }}
+        <Image
+          alt={league.heroAlt}
+          className="hero-band__media object-cover"
+          fill
+          priority
+          sizes="100vw"
+          src={league.heroImage}
         />
         <div className="hero-band__content">
           <StatusPill tone="red">{league.status}</StatusPill>
