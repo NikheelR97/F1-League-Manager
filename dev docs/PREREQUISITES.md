@@ -1170,13 +1170,13 @@ Checked means done. Unchecked means outstanding. Outstanding items need a reason
 - [x] Git installed.
 - [x] Node.js 20.9 or newer installed.
 - [x] npm installed.
-- [ ] Supabase CLI installed locally with `npm install -D supabase`.
-- [ ] Docker Desktop installed or scheduled.
+- [x] Supabase CLI installed locally with `npm install -D supabase`.
+- [x] Docker Desktop installed or scheduled.
 - [x] Dev check script has no required-tool failures.
 
 ### Supabase
 
-- [ ] Local Supabase is available for daily `dev` work.
+- [x] Local Supabase is available for daily `dev` work.
 - [x] Non-production project exists for shared dev previews and the `staging` branch.
 - [x] Production project exists for the `prod` branch.
 - [x] Non-production Project URL, public key, secret key, and database password are saved.
@@ -1202,9 +1202,9 @@ Checked means done. Unchecked means outstanding. Outstanding items need a reason
 
 ### Environment
 
-- [ ] `.env.local` exists after S0.
-- [ ] `.env.local` is ignored by Git.
-- [ ] `CSRF_SECRET` generated.
+- [x] `.env.local` exists after S0.
+- [x] `.env.local` is ignored by Git.
+- [x] `CSRF_SECRET` generated.
 - [x] Upstash REST URL saved.
 - [x] Upstash REST token saved.
 
