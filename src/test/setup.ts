@@ -1,1 +1,1 @@
-import "@testing-library/jest-dom/vitest";
+// jest-dom matchers are registered via vitest.config.ts setupFiles.

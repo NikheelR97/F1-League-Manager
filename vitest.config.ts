@@ -11,6 +11,11 @@ export default defineConfig({
     },
   },
   test: {
+    server: {
+      deps: {
+        inline: ["@testing-library/jest-dom"],
+      },
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -24,6 +29,6 @@ export default defineConfig({
     environment: "jsdom",
     exclude: ["**/e2e/**", "**/node_modules/**"],
     globals: true,
-    setupFiles: ["./src/test/setup.ts"],
+    setupFiles: ["@testing-library/jest-dom/vitest", "./src/test/setup.ts"],
   },
 });
