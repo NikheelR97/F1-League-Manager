@@ -19,7 +19,6 @@ export const serverEnvSchema = publicEnvSchema.extend({
   SENTRY_DSN: optionalUrlSchema,
   SENTRY_AUTH_TOKEN: z.string().trim().optional(),
   DISCORD_WEBHOOK_URL: optionalUrlSchema,
-  SUPABASE_STORAGE_ASSET_BUCKET: z.string().trim().min(1),
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 });
 

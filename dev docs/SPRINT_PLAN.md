@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S2 implementation in progress on `feature/s2-ui-foundation`.
+**Status:** S3 handover gaps being fixed on `fix/s3-handover-gaps`; PR #5 (S3 core) merged to `dev`.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -455,6 +455,36 @@ Let admins create and manage leagues before results are entered.
 2. Roster history is accurate.
 3. Assets are scoped to the correct league/team.
 4. `npm run sprint-verify` passes.
+
+### Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| Branch created | Done | `feature/s3-league-setup` from `dev` | None |
+| League creation API + form | Done | `POST /api/admin/leagues`, `LeagueForm`, PR #5 | None |
+| Team creation API + form (official template and custom) | Done | `POST /api/admin/leagues/[id]/teams`, `TeamForm`, PR #5 | None |
+| Points system creation API + form | Done | `POST /api/admin/leagues/[id]/points-systems`, `PointsSystemForm`, PR #5 | None |
+| Driver global creation API + form | Done | `POST /api/admin/drivers`, `DriverForm`, PR #5 | None |
+| Add driver to league API + form | Done | `POST /api/admin/leagues/[id]/drivers`, `AddLeagueDriverForm`, PR #5 | None |
+| Reserve driver management | Done | `POST /api/admin/leagues/[id]/reserves`, PR #5 | None |
+| Transfer API | Done | `POST /api/admin/leagues/[id]/transfers`, preserves historical result team, PR #5 | None |
+| Transfer UI form + page | Done | `TransferForm`, `/admin/leagues/[id]/transfers/new`, `fix/s3-handover-gaps` | None |
+| League asset upload API + UI | Done | `POST /api/admin/leagues/[id]/assets`, `LeagueAssetUpload`, `fix/s3-handover-gaps` | None |
+| Team asset upload API | Done | `POST /api/admin/leagues/[id]/teams/[teamId]/assets`, `fix/s3-handover-gaps` | None |
+| League activation endpoint + UI | Done | `PATCH /api/admin/leagues/[id]/status`, `LeagueStatusButton`, `fix/s3-handover-gaps` | None |
+| League admin detail page | Done | `/admin/leagues/[id]`, shows status, assets, points systems, teams, drivers, PR #5 | None |
+| Two primary driver limit enforced | Done | `MAX_PRIMARY_DRIVERS_PER_TEAM = 2` enforced in add-driver and transfer APIs | None |
+| Transfer frozen-history rule enforced | Done | Transfer API closes/opens stints; never touches `race_results` | None |
+| CSRF: HMAC-signed tokens | Done | Rewrote `csrf.ts` with `generateCsrfToken`/`verifyCsrfToken`, `/api/csrf` returns signed token, `fix/s3-handover-gaps` | None |
+| Rate limiter wired into `withAdminGuard` | Done | `createAdminRateLimiter` called in guard pipeline, `fix/s3-handover-gaps` | None |
+| Origin check added to `withAdminGuard` | Done | Compares `Origin`/`Referer` to `NEXT_PUBLIC_SITE_URL`, `fix/s3-handover-gaps` | None |
+| Storage bucket constants (league-assets, team-assets) | Done | `LEAGUE_ASSETS_BUCKET`, `TEAM_ASSETS_BUCKET` in `constants.ts`, routes updated, `fix/s3-handover-gaps` | None |
+| Admin changes write audit logs | Done | All admin APIs call `writeAdminAuditLog` after mutations | None |
+| S3 schema unit tests | Done | `src/__tests__/unit/s3-admin.test.ts` — 40 tests for team, driver, transfer, points, asset schemas | None |
+| Security negative tests (401, 403, CSRF) | Done | `src/__tests__/unit/api-guard.test.ts` — 8 guard pipeline tests including CSRF rejection | None |
+| 68 tests passing, lint clean | Done | `npm run test` 68/68; `npm run lint` zero warnings | None |
+| E2E tests | Outstanding | No E2E for S3 admin flows yet | Requires local Supabase seeded with admin user; deferred to S10 regression sprint |
+| `npm run sprint-verify` full gate | Outstanding | Build and E2E not run on fix branch | Blocked on E2E; unit/lint/type-check pass |
 
 ---
 

@@ -7,7 +7,6 @@ const validEnv = {
   NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
   SUPABASE_SERVICE_ROLE_KEY: "local-service-role-key",
   CSRF_SECRET: "a".repeat(64),
-  SUPABASE_STORAGE_ASSET_BUCKET: "league-assets",
 };
 
 describe("environment validation", () => {

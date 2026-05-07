@@ -2,26 +2,49 @@ import { writeAuditLog, type AuditLogWriter } from "@/lib/audit/audit-log";
 import { MAX_AUDIT_METADATA_BYTES } from "@/lib/constants";
 import { createAdminRateLimiter } from "@/lib/security/rate-limit";
 import { sanitizeError } from "@/lib/security/errors";
-import { verifyCsrfToken } from "@/lib/security/csrf";
+import { generateCsrfToken, verifyCsrfToken } from "@/lib/security/csrf";
 import nextConfig from "../../../next.config";
 
 const actorId = "00000000-0000-4000-8000-000000000010";
 
 describe("security helpers", () => {
   it("requires valid CSRF tokens for mutating requests", () => {
-    const request = new Request("http://localhost/api/admin", {
-      headers: { "x-csrf-token": "expected-token" },
+    const secret = "a".repeat(64);
+    const token = generateCsrfToken(secret);
+
+    const validRequest = new Request("http://localhost/api/admin", {
+      headers: { "x-csrf-token": token },
       method: "POST",
     });
+    expect(verifyCsrfToken(validRequest, secret)).toBe(true);
 
-    expect(verifyCsrfToken(request, "expected-token")).toBe(true);
-    expect(verifyCsrfToken(request, "wrong-token")).toBe(false);
-    expect(verifyCsrfToken(new Request("http://localhost/api"), "")).toBe(true);
+    // Wrong secret must fail
+    expect(verifyCsrfToken(validRequest, "b".repeat(64))).toBe(false);
+
+    // GET skips CSRF
+    expect(verifyCsrfToken(new Request("http://localhost/api"), secret)).toBe(true);
+
+    // Mutating requests with no token must fail
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
       expect(
-        verifyCsrfToken(new Request("http://localhost/api", { method }), ""),
+        verifyCsrfToken(new Request("http://localhost/api", { method }), secret),
       ).toBe(false);
     }
+
+    // Tampered token (wrong hmac) must fail
+    const [ts] = token.split(".");
+    const tampered = new Request("http://localhost/api/admin", {
+      headers: { "x-csrf-token": `${ts}.deadbeef` },
+      method: "POST",
+    });
+    expect(verifyCsrfToken(tampered, secret)).toBe(false);
+
+    // Malformed token (no dot) must fail
+    const malformed = new Request("http://localhost/api/admin", {
+      headers: { "x-csrf-token": "nodot" },
+      method: "POST",
+    });
+    expect(verifyCsrfToken(malformed, secret)).toBe(false);
   });
 
   it("sanitizes production errors without leaking stack details", () => {
