@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { LeagueAssetUpload } from "@/components/admin/LeagueAssetUpload";
+import { LeagueStatusButton } from "@/components/admin/LeagueStatusButton";
 import { MAX_DRIVERS_LIST, MAX_TEAMS_LIST } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -53,20 +55,23 @@ export default async function LeagueDetailPage({
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <AdminPageHeader
           description={`${league.format} · ${seasonName}`}
           title={league.name}
         />
-        <span
-          className={`border px-2 py-0.5 text-xs font-bold uppercase ${
-            league.status === "active"
-              ? "border-team-sauber text-team-sauber"
-              : "border-f1-muted text-f1-muted"
-          }`}
-        >
-          {league.status}
-        </span>
+        <div className="flex flex-col items-end gap-2 pt-1 shrink-0">
+          <span
+            className={`border px-2 py-0.5 text-xs font-bold uppercase ${
+              league.status === "active"
+                ? "border-team-sauber text-team-sauber"
+                : "border-f1-muted text-f1-muted"
+            }`}
+          >
+            {league.status}
+          </span>
+          <LeagueStatusButton currentStatus={league.status} leagueId={leagueId} />
+        </div>
       </div>
 
       {/* Meta */}
@@ -90,6 +95,15 @@ export default async function LeagueDetailPage({
               .filter(Boolean)
               .join(" · ") || "None"}
           </p>
+        </div>
+      </section>
+
+      {/* Assets */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-bold uppercase text-f1-muted">Assets</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <LeagueAssetUpload kind="logo" label="League Logo" leagueId={leagueId} />
+          <LeagueAssetUpload kind="hero_image" label="Hero Image" leagueId={leagueId} />
         </div>
       </section>
 
@@ -173,13 +187,21 @@ export default async function LeagueDetailPage({
           <h2 className="text-sm font-bold uppercase text-f1-muted">
             Drivers ({entries?.length ?? 0})
           </h2>
-          <Link
-            className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
-            href={`/admin/leagues/${leagueId}/drivers/new`}
-          >
-            <Plus aria-hidden="true" size={12} />
-            Add Driver
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              className="flex items-center gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              href={`/admin/leagues/${leagueId}/transfers/new`}
+            >
+              Record Transfer
+            </Link>
+            <Link
+              className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+              href={`/admin/leagues/${leagueId}/drivers/new`}
+            >
+              <Plus aria-hidden="true" size={12} />
+              Add Driver
+            </Link>
+          </div>
         </div>
 
         {!entries?.length ? (

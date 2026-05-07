@@ -47,6 +47,10 @@ export const MAX_SEASONS_LIST = 50;
 export const MAX_LEAGUES_LIST = 50;
 export const MAX_TEAMS_LIST = 20;
 export const MAX_DRIVERS_LIST = 100;
+// Storage bucket names — match the migration exactly
+export const LEAGUE_ASSETS_BUCKET = "league-assets";
+export const TEAM_ASSETS_BUCKET = "team-assets";
+
 export const MAX_PUBLIC_LEAGUE_CARDS = 6;
 export const MAX_NAV_LINKS = 8;
 export const MAX_HUB_STAT_ITEMS = 6;
