@@ -1,0 +1,58 @@
+{
+  "name": "f1-league-manager",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:regression": "vitest run && playwright test",
+    "qa": "npm run type-check && npm run lint && npm run test && npm run build",
+    "sprint-verify": "npm run type-check && npm run lint && npm run test && npm run test:coverage && npm run build && npm run test:e2e",
+    "audit:security": "npm audit --audit-level=high",
+    "audit:secrets": "node scripts/audit-secrets.mjs",
+    "deploy:check": "npm run sprint-verify && npm run audit:security && npm run audit:secrets"
+  },
+  "dependencies": {
+    "@sentry/nextjs": "^10.52.0",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.105.3",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
+    "lucide-react": "^1.14.0",
+    "next": "16.2.5",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-hook-form": "^7.75.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.5",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.5",
+    "jsdom": "^29.1.1",
+    "msw": "^2.14.3",
+    "supabase": "^2.98.2",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.5"
+  }
+}

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -u
 
-REQUIRED_NODE_MAJOR=18
-REQUIRED_NODE_MINOR=18
+REQUIRED_NODE_MAJOR=20
+REQUIRED_NODE_MINOR=9
 RECOMMENDED_NODE_MAJOR=20
 STRICT=0
 INSTALL=0
@@ -325,6 +325,69 @@ test_project_scripts() {
   done
 }
 
+test_supabase_cli() {
+  local local_version=""
+
+  if [[ -f package.json ]]; then
+    local_version="$(npx supabase --version 2>/dev/null | head -n 1 || true)"
+  fi
+
+  if [[ -n "$local_version" ]]; then
+    add_pass "supabase CLI $local_version via local project dependency."
+    return
+  fi
+
+  if (( INSTALL_PROJECT_DEPS == 1 )) && [[ -f package.json ]]; then
+    run_install npm install -D supabase
+    local_version="$(npx supabase --version 2>/dev/null | head -n 1 || true)"
+    if [[ -n "$local_version" ]]; then
+      add_pass "supabase CLI $local_version via local project dependency."
+      return
+    fi
+  fi
+
+  if has_command supabase; then
+    local global_version
+    global_version="$(command_text supabase --version || true)"
+    add_pass "supabase CLI $global_version via global install."
+    return
+  fi
+
+  add_warning "supabase CLI is missing. Install it locally with: npm install -D supabase"
+}
+
+test_branch_mapping() {
+  if [[ ! -d .git ]]; then
+    add_warning "Git repository metadata was not found. Branch mapping check skipped."
+    return
+  fi
+
+  local branch_name
+  branch_name="$(git branch --show-current 2>/dev/null || true)"
+  if [[ -z "$branch_name" ]]; then
+    add_warning "Could not read current Git branch."
+    return
+  fi
+
+  case "$branch_name" in
+    dev)
+      add_pass "Current branch is dev. Use local Supabase by default. Dev previews may use f1-league-manager-nonprod."
+      ;;
+    feature/*|fix/*)
+      add_pass "Current branch is $branch_name. Treat it as dev-targeted work using local Supabase by default."
+      ;;
+    staging)
+      add_pass "Current branch is staging. Use Supabase project f1-league-manager-nonprod."
+      ;;
+    prod)
+      add_warning "Current branch is prod. Use only production env vars and avoid local experiments."
+      ;;
+    *)
+      add_warning "Current branch is '$branch_name'. Confirm whether it should target dev, staging, or prod before changing env vars, migrations, seeds, imports, or deploy settings."
+      ;;
+  esac
+}
+
 printf "F1 League Manager developer machine check\n"
 printf "Run with --install to install missing tools.\n"
 printf "Run with --install-project-deps to install npm dependencies.\n"
@@ -340,7 +403,7 @@ test_required_tool "npm" "npm should be installed with Node.js." "npm" "npm" "np
 print_header "Recommended Tools"
 test_optional_tool "gh" "Install GitHub CLI if you want easy repo auth: https://cli.github.com/" "system" "gh"
 test_optional_tool "vercel" "Install later with: npm install -g vercel" "npm" "vercel"
-test_optional_tool "supabase" "Install later with: npm install -g supabase" "npm" "supabase"
+test_supabase_cli
 test_optional_tool "docker" "Install Docker if you want local Supabase." "system" "docker"
 
 print_header "Project Dependencies"
@@ -350,6 +413,9 @@ install_playwright_browsers
 print_header "Project Files"
 test_project_files
 test_project_scripts
+
+print_header "Branch Mapping"
+test_branch_mapping
 
 print_header "Playwright"
 if [[ -f package.json ]]; then

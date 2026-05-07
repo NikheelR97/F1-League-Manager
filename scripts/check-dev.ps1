@@ -7,8 +7,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$RequiredNodeMajor = 18
-$RequiredNodeMinor = 18
+$RequiredNodeMajor = 20
+$RequiredNodeMinor = 9
 $RecommendedNodeMajor = 20
 
 $failures = New-Object System.Collections.Generic.List[string]
@@ -308,6 +308,66 @@ function Test-ProjectScripts {
   }
 }
 
+function Test-SupabaseCli {
+  $localVersion = $null
+  if (Test-Path "package.json") {
+    $localVersion = Get-CommandText "npx" @("supabase", "--version")
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($localVersion)) {
+    Add-Pass "supabase CLI $localVersion via local project dependency."
+    return
+  }
+
+  if ($InstallProjectDeps -and (Test-Path "package.json")) {
+    Invoke-CheckedCommand "npm" @("install", "-D", "supabase") "Installing Supabase CLI as a local dev dependency..." | Out-Null
+    $localVersion = Get-CommandText "npx" @("supabase", "--version")
+    if (-not [string]::IsNullOrWhiteSpace($localVersion)) {
+      Add-Pass "supabase CLI $localVersion via local project dependency."
+      return
+    }
+  }
+
+  if (Test-Command "supabase") {
+    $globalVersion = Get-CommandText "supabase" @("--version")
+    Add-Pass "supabase CLI $globalVersion via global install."
+    return
+  }
+
+  Add-Warning "supabase CLI is missing. Install it locally with: npm install -D supabase"
+}
+
+function Test-BranchMapping {
+  if (-not (Test-Path ".git")) {
+    Add-Warning "Git repository metadata was not found. Branch mapping check skipped."
+    return
+  }
+
+  $branchName = Get-CommandText "git" @("branch", "--show-current")
+  if ([string]::IsNullOrWhiteSpace($branchName)) {
+    Add-Warning "Could not read current Git branch."
+    return
+  }
+
+  switch ($branchName) {
+    "dev" {
+      Add-Pass "Current branch is dev. Use local Supabase by default. Dev previews may use f1-league-manager-nonprod."
+    }
+    { $_ -like "feature/*" -or $_ -like "fix/*" } {
+      Add-Pass "Current branch is $branchName. Treat it as dev-targeted work using local Supabase by default."
+    }
+    "staging" {
+      Add-Pass "Current branch is staging. Use Supabase project f1-league-manager-nonprod."
+    }
+    "prod" {
+      Add-Warning "Current branch is prod. Use only production env vars and avoid local experiments."
+    }
+    default {
+      Add-Warning "Current branch is '$branchName'. Confirm whether it should target dev, staging, or prod before changing env vars, migrations, seeds, imports, or deploy settings."
+    }
+  }
+}
+
 Write-Host "F1 League Manager developer machine check" -ForegroundColor White
 Write-Host "Run with -Install to install missing tools."
 Write-Host "Run with -InstallProjectDeps to install npm dependencies."
@@ -323,7 +383,7 @@ Test-RequiredTool "npm" "npm should be installed with Node.js."
 Write-Header "Recommended Tools"
 Test-OptionalTool "gh" "Install GitHub CLI if you want easy repo auth: https://cli.github.com/" "GitHub.cli"
 Test-OptionalTool "vercel" "Install later with: npm install -g vercel" "" "vercel"
-Test-OptionalTool "supabase" "Install later with: npm install -g supabase" "" "supabase"
+Test-SupabaseCli
 Test-OptionalTool "docker" "Install Docker Desktop if you want local Supabase: https://www.docker.com/products/docker-desktop/" "Docker.DockerDesktop"
 
 Write-Header "Project Dependencies"
@@ -333,6 +393,9 @@ Install-PlaywrightBrowsers
 Write-Header "Project Files"
 Test-ProjectFiles
 Test-ProjectScripts
+
+Write-Header "Branch Mapping"
+Test-BranchMapping
 
 Write-Header "Playwright"
 if (Test-Path "package.json") {
