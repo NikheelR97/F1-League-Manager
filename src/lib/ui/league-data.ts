@@ -16,7 +16,6 @@ export interface LeagueSummary {
   leader: string;
   name: string;
   nextRace: string;
-  nextRaceAt: string;
   penaltyWatch: string;
   slug: "informal" | "standard";
   status: string;
@@ -39,7 +38,6 @@ export const leagueSummaries: readonly LeagueSummary[] = [
     leader: "Season setup",
     name: "Informal League",
     nextRace: "Calendar population",
-    nextRaceAt: "Admin scheduled",
     penaltyWatch: "Manual review",
     slug: "informal",
     status: "Setup",
@@ -55,7 +53,6 @@ export const leagueSummaries: readonly LeagueSummary[] = [
     leader: "Season setup",
     name: "Standard League",
     nextRace: "Wheel pool setup",
-    nextRaceAt: "Admin scheduled",
     penaltyWatch: "Manual review",
     slug: "standard",
     status: "Setup",
