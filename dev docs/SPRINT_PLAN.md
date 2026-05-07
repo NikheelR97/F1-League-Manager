@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S0 implementation in progress after owner approval.
+**Status:** S1 implementation in progress on `feature/s1-database-auth-security`.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -255,8 +255,8 @@ Get planning approved and create a clean Next.js project that can pass the empty
 | Developer machine check | Done | `scripts/check-dev.ps1` passed with no failures | Warnings remain for missing `.env.local` and optional Playwright browser reminder |
 | GitHub branch protection | Done | `dev`, `staging`, and `prod` protection checked on GitHub; `dev` review requirement removed for owner merges | None |
 | Local Supabase CLI availability | Done | `npx supabase --version` reports `2.98.2`; dev check script detects local CLI | None |
-| Local Supabase stack running | Outstanding | None | Start local Supabase during S1 database setup after migrations are introduced |
-| Local `.env.local` | Outstanding | `.env.example` exists | Create `.env.local` after local Supabase starts and real local keys are available |
+| Local Supabase stack running | Done | `npx supabase status` confirms local Supabase is running | None |
+| Local `.env.local` | Done | `.env.local` exists and dev check passes | None |
 | PR creation and merge | Done | PR #1 merged into `dev` on 2026-05-07 after CI passed and local Codex review completed | None |
 
 ---
@@ -319,7 +319,20 @@ Create the secure data foundation before building UI features.
 
 | Task | Status | Evidence | Outstanding reason / next action |
 |------|--------|----------|----------------------------------|
-| S1 not started | Not started | None | Waiting for S0 completion |
+| Branch and local environment confirmed | Done | `feature/s1-database-auth-security`, local `.env.local`, local Supabase running | None |
+| Core schema migration created | Done | `supabase/migrations/20260507161000_s1_core_schema.sql` | None |
+| RLS enabled on every core table | Done | Local DB query found 24 of 24 public tables with RLS enabled | None |
+| Public read and admin write policies added | Done | Migration includes public read policies and admin manage policies | None |
+| Racer setup owner policies added | Done | `vehicle_setups` owner policies and `owns_driver` helper added | None |
+| Official team templates seeded | Done | Local DB query found 10 templates | None |
+| Circuit library seeded | Done | Local DB query found 24 2025 circuits; source: Formula 1 2025 calendar | None |
+| Storage buckets added | Done | Migration creates `league-assets` and `team-assets` buckets | None |
+| Supabase clients added | Done | Browser, server, and service role client modules added | None |
+| Admin auth guard added | Done | `requireAdminContext`, admin health route, and unit tests | None |
+| CSRF, rate limit, sanitized errors, audit helper added | Done | Security helper modules and unit tests | None |
+| Local migration applied | Done | `npx supabase migration up --local` succeeded | None |
+| Schema diff clean | Done | `npx supabase db diff --local` returned no schema changes | None |
+| S1 full verification gate | Done | `npm run sprint-verify` passed; 15 tests passed; branch coverage 96.55% | None |
 
 ---
 

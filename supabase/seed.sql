@@ -1,0 +1,1 @@
+-- Seed data is intentionally handled by versioned migrations for S1.
