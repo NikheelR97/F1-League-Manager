@@ -2,7 +2,7 @@ import { type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
-import { MAX_PRIMARY_DRIVERS_PER_TEAM, MAX_TEAMS_LIST } from "@/lib/constants";
+import { MAX_TEAMS_LIST } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 const createTeamSchema = z.object({

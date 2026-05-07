@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -39,13 +39,13 @@ interface TeamFormProps {
 export function TeamForm({ leagueId, officialTemplates }: TeamFormProps) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
+  const [kind, setKind] = useState<"custom" | "official">("custom");
   const {
     formState: { errors, isSubmitting },
     handleSubmit,
     register,
     setError,
     setValue,
-    watch,
   } = useForm<TeamFields>({
     defaultValues: {
       color_hex: "#E8002D",
@@ -55,25 +55,24 @@ export function TeamForm({ leagueId, officialTemplates }: TeamFormProps) {
     resolver: zodResolver(teamSchema),
   });
 
-  const kind = watch("kind");
-  const templateId = watch("official_template_id");
+  function handleKindChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const next = e.target.value as "custom" | "official";
+    setKind(next);
+    if (next === "custom") {
+      setValue("official_template_id", null);
+    }
+  }
 
-  // When an official template is selected, pre-fill name and colour
-  useEffect(() => {
-    if (kind !== "official" || !templateId) return;
-    const tpl = officialTemplates.find((t) => t.id === templateId);
+  function handleTemplateChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const id = e.target.value;
+    setValue("official_template_id", id || null);
+    if (!id) return;
+    const tpl = officialTemplates.find((t) => t.id === id);
     if (!tpl) return;
     setValue("name", tpl.name, { shouldValidate: false });
     setValue("color_hex", tpl.color_hex, { shouldValidate: false });
     setValue("slug", tpl.slug, { shouldValidate: false });
-  }, [kind, templateId, officialTemplates, setValue]);
-
-  // Clear template when switching back to custom
-  useEffect(() => {
-    if (kind === "custom") {
-      setValue("official_template_id", null);
-    }
-  }, [kind, setValue]);
+  }
 
   function handleNameChange(e: React.ChangeEvent<HTMLInputElement>) {
     const slug = e.target.value
@@ -117,7 +116,7 @@ export function TeamForm({ leagueId, officialTemplates }: TeamFormProps) {
                 className="accent-f1-red"
                 type="radio"
                 value={k}
-                {...register("kind")}
+                {...register("kind", { onChange: handleKindChange })}
               />
               {k === "official" ? "Official F1 team" : "Custom team"}
             </label>
@@ -132,7 +131,7 @@ export function TeamForm({ leagueId, officialTemplates }: TeamFormProps) {
           <select
             className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none"
             id="team-template"
-            {...register("official_template_id")}
+            {...register("official_template_id", { onChange: handleTemplateChange })}
           >
             <option value="">Select a template…</option>
             {officialTemplates.map((t) => (

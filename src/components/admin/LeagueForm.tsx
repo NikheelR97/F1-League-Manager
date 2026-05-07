@@ -44,7 +44,6 @@ export function LeagueForm({ seasons }: LeagueFormProps) {
     register,
     setError,
     setValue,
-    watch,
   } = useForm<LeagueFields>({
     defaultValues: {
       constructor_championship_enabled: true,
@@ -87,8 +86,6 @@ export function LeagueForm({ seasons }: LeagueFormProps) {
     router.push(`/admin/leagues/${league.id}`);
     router.refresh();
   }
-
-  const format = watch("format");
 
   return (
     <form className="space-y-5" noValidate onSubmit={handleSubmit(onSubmit)}>
