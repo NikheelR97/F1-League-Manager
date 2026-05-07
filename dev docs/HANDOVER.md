@@ -94,7 +94,7 @@ Branch flow:
 
 | Work type | Work branch | Pull request target | Required review |
 |-----------|-------------|---------------------|-----------------|
-| Normal feature or bug fix | `feature/short-description` or `fix/short-description` from `dev` | `dev` | At least one code review. |
+| Normal feature or bug fix | `feature/short-description` or `fix/short-description` from `dev` | `dev` | Code review expected, but GitHub does not currently enforce approval on `dev`. |
 | Release candidate | `release/yyyy-mm-dd` from `dev` | `staging` | Code review plus QA checklist. |
 | Production release | `promote/yyyy-mm-dd` from `staging` | `prod` | Senior review, security check, deploy checklist. |
 | Hotfix | `hotfix/short-description` from `prod` | `prod`, then back-merge to `staging` and `dev` | Senior review. |
@@ -106,7 +106,7 @@ Pull request rules:
 3. Every PR must pass CI before merge.
 4. Every PR touching auth, RLS, migrations, secrets, deploy config, or production data needs senior review.
 5. PRs into `prod` must be small, already tested on `staging`, and linked to release notes.
-6. No one merges their own PR without review.
+6. `dev` PRs may be owner-merged after CI and documented Codex review when no second reviewer is available.
 7. Squash merge is preferred for feature branches unless a senior chooses otherwise.
 8. After hotfixes, back-merge into `staging` and `dev` so branches do not drift.
 

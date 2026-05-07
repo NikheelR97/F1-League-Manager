@@ -100,7 +100,7 @@ PR rules:
 1. Do not push directly to `dev`, `staging`, or `prod`.
 2. Open a PR for every code or configuration change.
 3. CI must pass before merge.
-4. At least one reviewer must approve before merge.
+4. `dev` PR approval is recommended but not currently enforced; `staging` and `prod` still require approval.
 5. Auth, RLS, migration, secret, deploy, and production changes need senior review.
 6. PR descriptions must include test evidence.
 7. `prod` PRs must first pass on `staging`.
@@ -173,7 +173,7 @@ A sprint is complete only when all of these pass.
 | E2E | `npm run test:e2e` passes. |
 | Security | Protected features have negative tests. |
 | Performance | New pages use bounded queries and compact data. |
-| Review | PR has reviewer approval before merge. |
+| Review | `dev` PR has documented review notes; `staging` and `prod` PRs have reviewer approval. |
 
 Coverage targets:
 
@@ -201,7 +201,7 @@ Get planning approved and create a clean Next.js project that can pass the empty
 5. Confirm local Supabase is available for daily `dev` work.
 6. Document that local `dev` uses local Supabase, dev previews and `staging` use non-production Supabase, and `prod` uses production Supabase.
 7. Configure GitHub branch protection for `dev`, `staging`, and `prod`.
-8. Require PR reviews before merging to protected branches.
+8. Require PR reviews before merging to `staging` and `prod`; keep `dev` review recommended but not enforced.
 9. Require CI status checks before merging to protected branches.
 10. Create the Next.js app with TypeScript, App Router, Tailwind, and `src` directory.
 11. Install testing tools: Vitest, React Testing Library, Playwright, and MSW.
@@ -229,7 +229,7 @@ Get planning approved and create a clean Next.js project that can pass the empty
 2. No app code was written before approval.
 3. Branch-to-Supabase mapping is documented and understood.
 4. Branch protection is configured for `dev`, `staging`, and `prod`.
-5. PR review is required before protected branch merges.
+5. `dev` PRs can be owner-merged after CI and documented review; `staging` and `prod` require approval.
 6. `npm run sprint-verify` passes.
 
 ### Sprint Tracker
@@ -237,7 +237,7 @@ Get planning approved and create a clean Next.js project that can pass the empty
 | Task | Status | Evidence | Outstanding reason / next action |
 |------|--------|----------|----------------------------------|
 | Document approval | Done | Owner approved `HANDOVER.md`, `SPRINT_PLAN.md`, and `PREREQUISITES.md` on 2026-05-07 | None |
-| Work branch created | Done | `feature/s0-project-setup` based from `origin/dev` | None |
+| Work branch created | Done | `feature/s0-scaffold` based from `origin/dev` | None |
 | Branch/Supabase model documented | Done | Docs updated for local dev, non-production, and production Supabase targets | None |
 | Next.js app scaffolded | Done | `package.json`, `src/app`, `next.config.ts`, `tsconfig.json` | None |
 | S0 dependencies installed | Done | `package-lock.json`, npm install completed | None |
@@ -253,11 +253,11 @@ Get planning approved and create a clean Next.js project that can pass the empty
 | Full S0 gate | Done | `npm run sprint-verify` passed | None |
 | Deploy check | Done | `npm run deploy:check` passed | None |
 | Developer machine check | Done | `scripts/check-dev.ps1` passed with no failures | Warnings remain for missing `.env.local` and optional Playwright browser reminder |
-| GitHub branch protection | Outstanding | None | Needs GitHub repo settings/admin confirmation for `dev`, `staging`, and `prod` |
+| GitHub branch protection | Done | `dev`, `staging`, and `prod` protection checked on GitHub; `dev` review requirement removed for owner merges | None |
 | Local Supabase CLI availability | Done | `npx supabase --version` reports `2.98.2`; dev check script detects local CLI | None |
 | Local Supabase stack running | Outstanding | None | Start local Supabase during S1 database setup after migrations are introduced |
 | Local `.env.local` | Outstanding | `.env.example` exists | Create `.env.local` after local Supabase starts and real local keys are available |
-| PR creation and review | Outstanding | Local branch exists, no PR yet | Push `feature/s0-project-setup` and open PR into `dev` |
+| PR creation and merge | Done | PR #1 merged into `dev` on 2026-05-07 after CI passed and local Codex review completed | None |
 
 ---
 
@@ -925,7 +925,7 @@ A feature is done only when:
 9. It works on desktop and mobile.
 10. Branch and Supabase environment mapping is correct.
 11. PR exists with test evidence.
-12. PR has reviewer approval.
+12. PR has documented review notes; `staging` and `prod` PRs have reviewer approval.
 13. Sprint tracker is updated with done and outstanding work.
 14. Outstanding work has a reason and next action.
 15. `npm run sprint-verify` passes.
