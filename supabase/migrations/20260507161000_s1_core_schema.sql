@@ -151,7 +151,7 @@ create table public.race_sessions (
   circuit_id uuid not null references public.circuits (id) on delete restrict,
   points_system_id uuid not null references public.points_systems (id) on delete restrict,
   name text not null check (char_length(name) between 1 and 120),
-  session_code text not null check (char_length(session_code) = 6),
+  session_code text not null check (session_code ~ '^[A-Z0-9]{6}$'),
   race_number integer not null default 1 check (race_number between 1 and 2),
   race_length_percent integer not null check (race_length_percent in (25, 50, 100)),
   scheduled_at timestamptz not null,
@@ -397,6 +397,40 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
 
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger set_profiles_updated_at
+  before update on public.profiles
+  for each row execute function public.set_updated_at();
+
+create trigger set_leagues_updated_at
+  before update on public.leagues
+  for each row execute function public.set_updated_at();
+
+create trigger set_vehicle_setups_updated_at
+  before update on public.vehicle_setups
+  for each row execute function public.set_updated_at();
+
+create trigger set_driver_standings_updated_at
+  before update on public.driver_standings
+  for each row execute function public.set_updated_at();
+
+create trigger set_team_standings_updated_at
+  before update on public.team_standings
+  for each row execute function public.set_updated_at();
+
+create trigger set_driver_penalty_totals_updated_at
+  before update on public.driver_penalty_totals
+  for each row execute function public.set_updated_at();
+
 alter table public.profiles enable row level security;
 alter table public.seasons enable row level security;
 alter table public.leagues enable row level security;
@@ -506,8 +540,8 @@ create policy audit_logs_admin_insert on public.audit_logs
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values
-  ('league-assets', 'league-assets', true, 5242880, array['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']),
-  ('team-assets', 'team-assets', true, 5242880, array['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
+  ('league-assets', 'league-assets', true, 5242880, array['image/png', 'image/jpeg', 'image/webp']),
+  ('team-assets', 'team-assets', true, 5242880, array['image/png', 'image/jpeg', 'image/webp'])
 on conflict (id) do update
 set public = excluded.public,
     file_size_limit = excluded.file_size_limit,

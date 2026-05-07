@@ -16,9 +16,11 @@ describe("security helpers", () => {
     expect(verifyCsrfToken(request, "expected-token")).toBe(true);
     expect(verifyCsrfToken(request, "wrong-token")).toBe(false);
     expect(verifyCsrfToken(new Request("http://localhost/api"), "")).toBe(true);
-    expect(
-      verifyCsrfToken(new Request("http://localhost/api", { method: "POST" }), ""),
-    ).toBe(false);
+    for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+      expect(
+        verifyCsrfToken(new Request("http://localhost/api", { method }), ""),
+      ).toBe(false);
+    }
   });
 
   it("sanitizes production errors without leaking stack details", () => {
