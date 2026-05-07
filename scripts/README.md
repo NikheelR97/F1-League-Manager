@@ -74,7 +74,20 @@ They check:
 2. Recommended tools: GitHub CLI, Vercel CLI, Supabase CLI, Docker.
 3. Project files: `package.json`, `.env.local`, `node_modules`.
 4. Required npm scripts after S0 setup.
-5. Playwright availability after dependencies are installed.
+5. Current Git branch and the expected Supabase project.
+6. Playwright availability after dependencies are installed.
+
+## Branch Reminder
+
+The scripts print a branch reminder every time they run.
+
+| Git branch | Supabase target |
+|------------|-----------------|
+| `dev` | Local Supabase by default. Dev previews may use `f1-league-manager-nonprod`. |
+| `staging` | `f1-league-manager-nonprod` |
+| `prod` | `f1-league-manager-prod` |
+
+Stop and check with a senior if your branch does not match the Supabase target you are about to use.
 
 Warnings are acceptable before S0 because the app has not been scaffolded yet.
 

@@ -325,6 +325,35 @@ test_project_scripts() {
   done
 }
 
+test_branch_mapping() {
+  if [[ ! -d .git ]]; then
+    add_warning "Git repository metadata was not found. Branch mapping check skipped."
+    return
+  fi
+
+  local branch_name
+  branch_name="$(git branch --show-current 2>/dev/null || true)"
+  if [[ -z "$branch_name" ]]; then
+    add_warning "Could not read current Git branch."
+    return
+  fi
+
+  case "$branch_name" in
+    dev)
+      add_pass "Current branch is dev. Use local Supabase by default. Dev previews may use f1-league-manager-nonprod."
+      ;;
+    staging)
+      add_pass "Current branch is staging. Use Supabase project f1-league-manager-nonprod."
+      ;;
+    prod)
+      add_warning "Current branch is prod. Use only production env vars and avoid local experiments."
+      ;;
+    *)
+      add_warning "Current branch is '$branch_name'. Confirm whether it should target dev, staging, or prod before changing env vars, migrations, seeds, imports, or deploy settings."
+      ;;
+  esac
+}
+
 printf "F1 League Manager developer machine check\n"
 printf "Run with --install to install missing tools.\n"
 printf "Run with --install-project-deps to install npm dependencies.\n"
@@ -350,6 +379,9 @@ install_playwright_browsers
 print_header "Project Files"
 test_project_files
 test_project_scripts
+
+print_header "Branch Mapping"
+test_branch_mapping
 
 print_header "Playwright"
 if [[ -f package.json ]]; then

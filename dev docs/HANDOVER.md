@@ -59,6 +59,65 @@ These decisions are confirmed and should not be changed without updating this do
 
 ---
 
+## Branch And Environment Model
+
+This project uses three long-lived GitHub branches and two cloud Supabase projects.
+
+Daily local development should use local Supabase when possible. Shared integration and staging testing use the non-production Supabase project. Production uses its own isolated Supabase project.
+
+| GitHub branch | Supabase target | Vercel target | Purpose |
+|---------------|-----------------|---------------|---------|
+| `dev` | Local Supabase by default. Dev previews may use `f1-league-manager-nonprod`. | Development/preview | Daily development and disposable integration testing. |
+| `staging` | `f1-league-manager-nonprod` | Staging/preview | Release candidate testing before production. |
+| `prod` | `f1-league-manager-prod` | Production | Real league data and public release. |
+
+Standing rules:
+
+1. Normal local work happens on `dev` using local Supabase.
+2. Shared dev previews and release testing use `f1-league-manager-nonprod`.
+3. Production deploys happen from `prod` using `f1-league-manager-prod`.
+4. Never put production Supabase keys in dev or staging environments.
+5. Never point local development at production unless a senior approves a controlled smoke test.
+6. Before running migrations, confirm the current Git branch and Supabase target match.
+7. Before deployment, confirm Vercel environment variables match the branch target.
+8. Non-production data may be reset; production data must never be reset.
+
+Every developer and AI assistant must keep this mapping in mind when making code, docs, migration, or deployment changes.
+
+---
+
+## Pull Request And Review Model
+
+All project work must happen through branches and pull requests. Do not commit directly to `dev`, `staging`, or `prod`.
+
+Branch flow:
+
+| Work type | Work branch | Pull request target | Required review |
+|-----------|-------------|---------------------|-----------------|
+| Normal feature or bug fix | `feature/short-description` or `fix/short-description` from `dev` | `dev` | At least one code review. |
+| Release candidate | `release/yyyy-mm-dd` from `dev` | `staging` | Code review plus QA checklist. |
+| Production release | `promote/yyyy-mm-dd` from `staging` | `prod` | Senior review, security check, deploy checklist. |
+| Hotfix | `hotfix/short-description` from `prod` | `prod`, then back-merge to `staging` and `dev` | Senior review. |
+
+Pull request rules:
+
+1. Every code change must have a PR.
+2. Every PR must describe what changed, why it changed, and how it was tested.
+3. Every PR must pass CI before merge.
+4. Every PR touching auth, RLS, migrations, secrets, deploy config, or production data needs senior review.
+5. PRs into `prod` must be small, already tested on `staging`, and linked to release notes.
+6. No one merges their own PR without review.
+7. Squash merge is preferred for feature branches unless a senior chooses otherwise.
+8. After hotfixes, back-merge into `staging` and `dev` so branches do not drift.
+
+AI assistant rule:
+
+```text
+When working on code, Codex must ask or confirm the intended branch and PR target before making changes that are meant to be merged.
+```
+
+---
+
 ## 3. User Roles
 
 | Role | Can do |
@@ -490,6 +549,15 @@ npm run sprint-verify
 
 ## 14. Environment Variables
 
+Environment values must be different for local/dev, staging, and production.
+
+| Context | Supabase values to use |
+|---------|------------------------|
+| Local `dev` work | Local Supabase values, or non-production values only when testing shared integrations. |
+| `dev` Vercel preview | Non-production Supabase URL, public key, and secret key. |
+| `staging` | Non-production Supabase URL, public key, and secret key. |
+| `prod` | Production Supabase URL, public key, and secret key. |
+
 | Variable | Scope | Purpose |
 |----------|-------|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Public | Supabase URL. |
@@ -507,6 +575,8 @@ npm run sprint-verify
 
 Never prefix server-only secrets with `NEXT_PUBLIC_`.
 
+Never reuse production secrets in dev or staging.
+
 ---
 
 ## 15. Deployment
@@ -520,14 +590,26 @@ Target deployment:
 | Rate limiting | Upstash |
 | Monitoring | Sentry |
 
+Branch deployment rule:
+
+| Action | Branch | Supabase project |
+|--------|--------|------------------|
+| Local daily development | `dev` | Local Supabase |
+| Shared dev preview | `dev` | `f1-league-manager-nonprod` |
+| Release testing | `staging` | `f1-league-manager-nonprod` |
+| Production release | `prod` | `f1-league-manager-prod` |
+
 Before production:
 
 1. `npm run sprint-verify`
 2. `npm audit --audit-level=high`
 3. Secret scan.
-4. Production build.
-5. E2E tests.
-6. Manual smoke tests.
+4. Confirm current branch is `prod`.
+5. Confirm Vercel production branch is `prod`.
+6. Confirm production env vars point to `f1-league-manager-prod`.
+7. Production build.
+8. E2E tests.
+9. Manual smoke tests.
 
 Production smoke tests:
 
@@ -559,5 +641,7 @@ A feature is done only when:
 8. Supabase errors are checked before data is used.
 9. Admin state changes write audit logs.
 10. No secrets leak to client code.
-11. `npm run sprint-verify` passes.
-
+11. Branch and Supabase environment mapping is correct.
+12. A PR exists with review notes and test evidence.
+13. CI passes on the PR.
+14. `npm run sprint-verify` passes.

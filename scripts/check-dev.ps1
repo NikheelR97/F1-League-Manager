@@ -308,6 +308,34 @@ function Test-ProjectScripts {
   }
 }
 
+function Test-BranchMapping {
+  if (-not (Test-Path ".git")) {
+    Add-Warning "Git repository metadata was not found. Branch mapping check skipped."
+    return
+  }
+
+  $branchName = Get-CommandText "git" @("branch", "--show-current")
+  if ([string]::IsNullOrWhiteSpace($branchName)) {
+    Add-Warning "Could not read current Git branch."
+    return
+  }
+
+  switch ($branchName) {
+    "dev" {
+      Add-Pass "Current branch is dev. Use local Supabase by default. Dev previews may use f1-league-manager-nonprod."
+    }
+    "staging" {
+      Add-Pass "Current branch is staging. Use Supabase project f1-league-manager-nonprod."
+    }
+    "prod" {
+      Add-Warning "Current branch is prod. Use only production env vars and avoid local experiments."
+    }
+    default {
+      Add-Warning "Current branch is '$branchName'. Confirm whether it should target dev, staging, or prod before changing env vars, migrations, seeds, imports, or deploy settings."
+    }
+  }
+}
+
 Write-Host "F1 League Manager developer machine check" -ForegroundColor White
 Write-Host "Run with -Install to install missing tools."
 Write-Host "Run with -InstallProjectDeps to install npm dependencies."
@@ -333,6 +361,9 @@ Install-PlaywrightBrowsers
 Write-Header "Project Files"
 Test-ProjectFiles
 Test-ProjectScripts
+
+Write-Header "Branch Mapping"
+Test-BranchMapping
 
 Write-Header "Playwright"
 if (Test-Path "package.json") {
