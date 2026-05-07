@@ -29,7 +29,7 @@ export async function POST(
     const db = createSupabaseServiceRoleClient();
 
     // Verify entry belongs to this league and is still active
-    const { data: entry } = await db
+    const { data: entry, error: entryError } = await db
       .from("league_driver_entries")
       .select("id, driver_id, is_reserve")
       .eq("id", driver_entry_id)
@@ -37,17 +37,25 @@ export async function POST(
       .is("left_on", null)
       .single();
 
+    if (entryError && entryError.code !== "PGRST116") {
+      return Response.json({ error: "Failed to load driver entry" }, { status: 500 });
+    }
+
     if (!entry) {
       return Response.json({ error: "Driver entry not found or already inactive" }, { status: 404 });
     }
 
     // Find the current active team stint
-    const { data: currentStint } = await db
+    const { data: currentStint, error: currentStintError } = await db
       .from("driver_team_stints")
       .select("id, team_id, starts_on")
       .eq("league_driver_entry_id", driver_entry_id)
       .is("ends_on", null)
       .single();
+
+    if (currentStintError && currentStintError.code !== "PGRST116") {
+      return Response.json({ error: "Failed to load current team stint" }, { status: 500 });
+    }
 
     if (!currentStint) {
       return Response.json({ error: "No active team stint found for this driver" }, { status: 404 });
@@ -62,12 +70,16 @@ export async function POST(
 
     if (new_team_id) {
       // Verify new team belongs to this league
-      const { data: newTeam } = await db
+      const { data: newTeam, error: newTeamError } = await db
         .from("teams")
         .select("id")
         .eq("id", new_team_id)
         .eq("league_id", leagueId)
         .single();
+
+      if (newTeamError && newTeamError.code !== "PGRST116") {
+        return Response.json({ error: "Failed to verify new team" }, { status: 500 });
+      }
 
       if (!newTeam) {
         return Response.json({ error: "New team not found in this league" }, { status: 422 });
@@ -75,29 +87,37 @@ export async function POST(
 
       // Enforce primary driver limit on the destination team
       if (!entry.is_reserve) {
-        const { count } = await db
-          .from("league_driver_entries")
-          .select("id", { count: "exact", head: true })
-          .eq("league_id", leagueId)
-          .is("left_on", null)
-          .eq("is_reserve", false)
-          .neq("id", driver_entry_id)
-          .in(
-            "id",
-            (
-              await db
-                .from("driver_team_stints")
-                .select("league_driver_entry_id")
-                .eq("team_id", new_team_id)
-                .is("ends_on", null)
-            ).data?.map((s) => s.league_driver_entry_id) ?? [],
-          );
+        const { data: activeStints, error: activeStintsError } = await db
+          .from("driver_team_stints")
+          .select("league_driver_entry_id")
+          .eq("team_id", new_team_id)
+          .is("ends_on", null);
 
-        if ((count ?? 0) >= MAX_PRIMARY_DRIVERS_PER_TEAM) {
-          return Response.json(
-            { error: `Destination team already has ${MAX_PRIMARY_DRIVERS_PER_TEAM} primary drivers` },
-            { status: 422 },
-          );
+        if (activeStintsError) {
+          return Response.json({ error: "Failed to load destination team assignments" }, { status: 500 });
+        }
+
+        const activeEntryIds = activeStints.map((stint) => stint.league_driver_entry_id);
+        if (activeEntryIds.length >= MAX_PRIMARY_DRIVERS_PER_TEAM) {
+          const { count, error: countError } = await db
+            .from("league_driver_entries")
+            .select("id", { count: "exact", head: true })
+            .eq("league_id", leagueId)
+            .is("left_on", null)
+            .eq("is_reserve", false)
+            .neq("id", driver_entry_id)
+            .in("id", activeEntryIds);
+
+          if (countError) {
+            return Response.json({ error: "Failed to count destination team drivers" }, { status: 500 });
+          }
+
+          if ((count ?? 0) >= MAX_PRIMARY_DRIVERS_PER_TEAM) {
+            return Response.json(
+              { error: `Destination team already has ${MAX_PRIMARY_DRIVERS_PER_TEAM} primary drivers` },
+              { status: 422 },
+            );
+          }
         }
       }
     }
@@ -124,6 +144,15 @@ export async function POST(
         });
 
       if (stintError) {
+        const { error: rollbackError } = await db
+          .from("driver_team_stints")
+          .update({ ends_on: null, transfer_reason: null })
+          .eq("id", currentStint.id);
+
+        if (rollbackError) {
+          return Response.json({ error: "Transfer failed and rollback failed" }, { status: 500 });
+        }
+
         return Response.json({ error: "Failed to open new team stint" }, { status: 500 });
       }
     } else {
@@ -134,6 +163,15 @@ export async function POST(
         .eq("id", driver_entry_id);
 
       if (leaveError) {
+        const { error: rollbackError } = await db
+          .from("driver_team_stints")
+          .update({ ends_on: null, transfer_reason: null })
+          .eq("id", currentStint.id);
+
+        if (rollbackError) {
+          return Response.json({ error: "Departure failed and rollback failed" }, { status: 500 });
+        }
+
         return Response.json({ error: "Failed to mark driver as departed" }, { status: 500 });
       }
     }

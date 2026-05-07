@@ -18,6 +18,7 @@ import { type NextRequest } from "next/server";
 import { withAdminGuard } from "@/lib/admin/api-guard";
 import { requireAdminContext } from "@/lib/auth/admin";
 import { generateCsrfToken } from "@/lib/security/csrf";
+import { createAdminRateLimiter } from "@/lib/security/rate-limit";
 import { MAX_REQUEST_BODY_BYTES } from "@/lib/constants";
 
 const CSRF_SECRET = "a".repeat(64);
@@ -73,7 +74,7 @@ afterAll(() => {
   }
 });
 
-const neverCalled = vi.fn(() => Response.json({ ok: true }));
+const neverCalled = vi.fn(async () => Response.json({ ok: true }));
 
 describe("withAdminGuard security pipeline", () => {
   it("rejects oversized payloads with 413 before touching auth", async () => {
@@ -97,7 +98,7 @@ describe("withAdminGuard security pipeline", () => {
     vi.mocked(requireAdminContext).mockResolvedValueOnce(mockAuthOk);
     // GET with no CSRF token should still pass CSRF (non-mutating method)
     const req = makeReq("GET", {});
-    const handler = vi.fn(() => Response.json({ ok: true }));
+    const handler = vi.fn(async () => Response.json({ ok: true }));
     const res = await withAdminGuard(req, handler, { skipCsrf: true });
     expect(res.status).toBe(200);
   });
@@ -134,10 +135,47 @@ describe("withAdminGuard security pipeline", () => {
       contentLength: 100,
       csrfToken: token,
     });
-    const handler = vi.fn(() => Response.json({ ok: true }));
+    const handler = vi.fn(async () => Response.json({ ok: true }));
     const res = await withAdminGuard(req, handler);
     expect(res.status).toBe(200);
     expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it("returns 429 when the admin rate limit is exceeded", async () => {
+    vi.mocked(requireAdminContext).mockResolvedValueOnce(mockAuthOk);
+    vi.mocked(createAdminRateLimiter).mockReturnValueOnce({
+      limit: vi.fn(async () => ({ success: false })),
+    } as unknown as ReturnType<typeof createAdminRateLimiter>);
+
+    const token = generateCsrfToken(CSRF_SECRET);
+    const req = makeReq("POST", {
+      contentLength: 100,
+      csrfToken: token,
+      origin: "http://localhost:3000",
+    });
+
+    const res = await withAdminGuard(req, neverCalled);
+    expect(res.status).toBe(429);
+    expect(neverCalled).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes thrown handler errors", async () => {
+    vi.mocked(requireAdminContext).mockResolvedValueOnce(mockAuthOk);
+    const token = generateCsrfToken(CSRF_SECRET);
+    const req = makeReq("POST", {
+      contentLength: 100,
+      csrfToken: token,
+      origin: "http://localhost:3000",
+    });
+    const handler = vi.fn(async () => {
+      throw new Error("database exploded with internal details");
+    });
+
+    const res = await withAdminGuard(req, handler);
+    const body = (await res.json()) as { error: string };
+
+    expect(res.status).toBe(500);
+    expect(body.error).toContain("database exploded");
   });
 
   it("returns 401 when auth check fails", async () => {

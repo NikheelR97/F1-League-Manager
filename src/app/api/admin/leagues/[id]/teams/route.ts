@@ -2,7 +2,7 @@ import { type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
-import { MAX_TEAMS_LIST } from "@/lib/constants";
+import { MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 const createTeamSchema = z.object({
@@ -25,7 +25,7 @@ export async function GET(
       .select("id, name, slug, kind, color_hex, logo_path, car_image_path, official_template_id")
       .eq("league_id", leagueId)
       .order("name")
-      .limit(MAX_TEAMS_LIST);
+      .limit(MAX_TEAMS_PER_LEAGUE);
 
     if (error) return Response.json({ error: "Failed to load teams" }, { status: 500 });
     return Response.json({ teams: data });
@@ -46,13 +46,16 @@ export async function POST(
 
     const db = createSupabaseServiceRoleClient();
 
-    // Enforce MAX_TEAMS_PER_LEAGUE
-    const { count } = await db
+    const { count, error: countError } = await db
       .from("teams")
       .select("id", { count: "exact", head: true })
       .eq("league_id", leagueId);
 
-    if ((count ?? 0) >= MAX_TEAMS_LIST) {
+    if (countError) {
+      return Response.json({ error: "Failed to count league teams" }, { status: 500 });
+    }
+
+    if ((count ?? 0) >= MAX_TEAMS_PER_LEAGUE) {
       return Response.json({ error: "League team limit reached" }, { status: 422 });
     }
 

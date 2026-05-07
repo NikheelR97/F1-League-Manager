@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S3 handover gaps being fixed on `fix/s3-handover-gaps`; PR #5 (S3 core) merged to `dev`.
+**Status:** S3 gate and handover compliance fixes are on `fix/s3-gate-and-handover-compliance`; PR #5 and PR #6 are merged to `dev`.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -482,9 +482,9 @@ Let admins create and manage leagues before results are entered.
 | Admin changes write audit logs | Done | All admin APIs call `writeAdminAuditLog` after mutations | None |
 | S3 schema unit tests | Done | `src/__tests__/unit/s3-admin.test.ts` — 40 tests for team, driver, transfer, points, asset schemas | None |
 | Security negative tests (401, 403, CSRF) | Done | `src/__tests__/unit/api-guard.test.ts` — 8 guard pipeline tests including CSRF rejection | None |
-| 68 tests passing, lint clean | Done | `npm run test` 68/68; `npm run lint` zero warnings | None |
-| E2E tests | Outstanding | No E2E for S3 admin flows yet | Requires local Supabase seeded with admin user; deferred to S10 regression sprint |
-| `npm run sprint-verify` full gate | Outstanding | Build and E2E not run on fix branch | Blocked on E2E; unit/lint/type-check pass |
+| 71 tests passing, lint clean | Done | `npm run test` 71/71; `npm run lint` zero warnings on `fix/s3-gate-and-handover-compliance` | None |
+| S3 admin E2E tests | Outstanding | Smoke E2E passes, but no seeded admin browser flow yet | Requires local Supabase admin seed and authenticated Playwright storage state before S4 public work expands |
+| `npm run sprint-verify` full gate | Done | `npm run deploy:check` passed on `fix/s3-gate-and-handover-compliance`; includes type-check, lint, tests, coverage, build, E2E, audit, and secret scan | None |
 
 ---
 

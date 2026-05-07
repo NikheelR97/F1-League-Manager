@@ -1,6 +1,8 @@
 import {
   FASTEST_LAP_BONUS,
+  MAX_ASSET_UPLOAD_BYTES,
   MAX_DRIVERS_PER_RACE,
+  MAX_TEAMS_PER_LEAGUE,
   MAX_WHEEL_CIRCUITS,
   STANDARD_POINTS,
 } from "@/lib/constants";
@@ -8,7 +10,12 @@ import {
 describe("project constants", () => {
   it("keeps race and wheel bounds aligned to F1 league limits", () => {
     expect(MAX_DRIVERS_PER_RACE).toBe(20);
+    expect(MAX_TEAMS_PER_LEAGUE).toBe(15);
     expect(MAX_WHEEL_CIRCUITS).toBe(24);
+  });
+
+  it("keeps upload allocations bounded", () => {
+    expect(MAX_ASSET_UPLOAD_BYTES).toBe(5_242_880);
   });
 
   it("defines the default standard F1 points and fastest lap bonus", () => {
