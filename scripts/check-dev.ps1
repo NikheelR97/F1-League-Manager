@@ -7,8 +7,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$RequiredNodeMajor = 18
-$RequiredNodeMinor = 18
+$RequiredNodeMajor = 20
+$RequiredNodeMinor = 9
 $RecommendedNodeMajor = 20
 
 $failures = New-Object System.Collections.Generic.List[string]

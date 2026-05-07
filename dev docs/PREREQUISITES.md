@@ -128,7 +128,7 @@ You need these tools:
 | Tool | Required | Why |
 |------|----------|-----|
 | Git | Yes | Source control. |
-| Node.js LTS | Yes | Runs the app and tools. |
+| Node.js 20.9 or newer | Yes | Required by the Next.js version used by this project. |
 | npm | Yes | Installs packages. |
 | Supabase CLI | Yes | Installed as a local dev dependency and run with `npx supabase`. |
 | Docker Desktop | Recommended | Needed for local Supabase. |
@@ -1159,7 +1159,7 @@ Checked means done. Unchecked means outstanding. Outstanding items need a reason
 ### Local Machine
 
 - [x] Git installed.
-- [x] Node.js installed.
+- [x] Node.js 20.9 or newer installed.
 - [x] npm installed.
 - [ ] Supabase CLI installed locally with `npm install -D supabase`.
 - [ ] Docker Desktop installed or scheduled.

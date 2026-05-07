@@ -70,7 +70,7 @@ bash scripts/check-dev.sh --strict
 
 They check:
 
-1. Required tools: Git, Node.js, npm.
+1. Required tools: Git, Node.js 20.9 or newer, npm.
 2. Recommended tools: GitHub CLI, Vercel CLI, Supabase CLI, Docker.
 3. Project files: `package.json`, `.env.local`, `node_modules`.
 4. Required npm scripts after S0 setup.
