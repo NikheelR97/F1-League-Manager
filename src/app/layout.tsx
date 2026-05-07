@@ -1,21 +1,23 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { JetBrains_Mono, Titillium_Web } from "next/font/google";
+
 import "./globals.css";
 
-// S2 replaces these with Titillium Web (body) and JetBrains Mono (numbers/times).
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const titillium = Titillium_Web({
   subsets: ["latin"],
+  variable: "--font-titillium",
+  weight: ["400", "600", "700", "900"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetBrainsMono = JetBrains_Mono({
   subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "F1 Esports League Manager",
   description: "Secure league operations for F1 esports seasons.",
+  title: "F1 Esports League Manager",
 };
 
 export default function RootLayout({
@@ -25,10 +27,10 @@ export default function RootLayout({
 }>) {
   return (
     <html
+      className={`${titillium.variable} ${jetBrainsMono.variable} h-full antialiased`}
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

@@ -41,6 +41,10 @@ export const MAX_ERROR_MESSAGE_LENGTH = 160;
 export const MAX_AUDIT_ACTION_LENGTH = 80;
 export const MAX_AUDIT_METADATA_BYTES = 5_000;
 export const MAX_AUTH_COOKIES = 12;
+export const MAX_PUBLIC_LEAGUE_CARDS = 6;
+export const MAX_NAV_LINKS = 8;
+export const MAX_HUB_STAT_ITEMS = 6;
+export const MAX_TEAM_BADGE_LABEL_LENGTH = 24;
 
 export const COUNTDOWN_TICK_MS = 1000;
 export const STANDINGS_REFRESH_MS = 30_000;
