@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** Planning only. Do not write application code until the owner approves `HANDOVER.md` and this file.
+**Status:** S0 implementation in progress after owner approval.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -16,7 +16,8 @@ For every sprint:
 2. Build only the listed scope.
 3. Add the required tests.
 4. Run the sprint gate.
-5. Ask for review before moving to the next sprint.
+5. Update the sprint tracker with done and outstanding work.
+6. Ask for review before moving to the next sprint.
 
 Do not skip a sprint. Later sprints depend on earlier database, security, UI, and testing foundations.
 
@@ -66,10 +67,79 @@ Follow these rules every day.
 8. Keep public pages fast by using server-rendered data and compact DTOs.
 9. Do not change old migrations after they are reviewed.
 10. Ask a senior before changing auth, RLS, points, standings, or migration rules.
+11. Always confirm your Git branch before touching env vars, migrations, or deploy settings.
+12. Never mix Supabase keys between `dev`, `staging`, and `prod`.
+
+Branch and environment mapping:
+
+| GitHub branch | Supabase target | Use for |
+|---------------|-----------------|---------|
+| `dev` | Local Supabase by default. Dev previews may use `f1-league-manager-nonprod`. | Daily development. |
+| `staging` | `f1-league-manager-nonprod` | Release candidate testing. |
+| `prod` | `f1-league-manager-prod` | Production releases only. |
+
+Before any migration, deploy, seed, import, or environment change:
+
+1. Run `git branch --show-current`.
+2. Confirm the matching Supabase target.
+3. Confirm the matching Vercel environment.
+4. Stop if the branch and Supabase target do not match.
+
+Pull request workflow:
+
+| Change type | Branch from | Branch name | PR target |
+|-------------|-------------|-------------|-----------|
+| Feature | `dev` | `feature/short-description` | `dev` |
+| Bug fix | `dev` | `fix/short-description` | `dev` |
+| Release candidate | `dev` | `release/yyyy-mm-dd` | `staging` |
+| Production promotion | `staging` | `promote/yyyy-mm-dd` | `prod` |
+| Hotfix | `prod` | `hotfix/short-description` | `prod`, then back-merge |
+
+PR rules:
+
+1. Do not push directly to `dev`, `staging`, or `prod`.
+2. Open a PR for every code or configuration change.
+3. CI must pass before merge.
+4. At least one reviewer must approve before merge.
+5. Auth, RLS, migration, secret, deploy, and production changes need senior review.
+6. PR descriptions must include test evidence.
+7. `prod` PRs must first pass on `staging`.
 
 ---
 
-## 4. Sprint Calendar
+## 4. Sprint Tracking Rules
+
+Every sprint must be tracked as work happens.
+
+Status values:
+
+| Status | Use when |
+|--------|----------|
+| `Not started` | No work has started. |
+| `In progress` | Work has started but is not complete. |
+| `Done` | Work is complete, tested, reviewed, and accepted. |
+| `Outstanding` | Work is incomplete and still required. |
+| `Blocked` | Work cannot continue until another action happens. |
+
+Rules:
+
+1. Mark tasks as `Done` only after tests and review pass.
+2. Mark tasks as `Outstanding` when they are not done by sprint review.
+3. Every `Outstanding` item needs a clear reason.
+4. Every `Blocked` item needs a blocker owner or next action.
+5. Every `Done` item needs evidence.
+6. Update this file at sprint review before starting the next sprint.
+
+Use this tracker format at the end of each sprint section:
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| Example | Done | PR #1, `npm run sprint-verify` | None |
+| Example | Outstanding | None | Waiting for environment variable |
+
+---
+
+## 5. Sprint Calendar
 
 | Sprint | Theme | Main outcome |
 |--------|-------|--------------|
@@ -89,7 +159,7 @@ Follow these rules every day.
 
 ---
 
-## 5. Sprint Gate
+## 6. Sprint Gate
 
 A sprint is complete only when all of these pass.
 
@@ -103,6 +173,7 @@ A sprint is complete only when all of these pass.
 | E2E | `npm run test:e2e` passes. |
 | Security | Protected features have negative tests. |
 | Performance | New pages use bounded queries and compact data. |
+| Review | PR has reviewer approval before merge. |
 
 Coverage targets:
 
@@ -115,7 +186,7 @@ Coverage targets:
 
 ---
 
-## 6. S0 - Approval And Project Setup
+## 7. S0 - Approval And Project Setup
 
 ### Goal
 
@@ -125,17 +196,24 @@ Get planning approved and create a clean Next.js project that can pass the empty
 
 1. Get written approval for `HANDOVER.md`.
 2. Get written approval for `SPRINT_PLAN.md`.
-3. Create the Next.js app with TypeScript, App Router, Tailwind, and `src` directory.
-4. Install testing tools: Vitest, React Testing Library, Playwright, and MSW.
-5. Install app tools: Zod, Supabase JS, Supabase SSR helper, React Hook Form, lucide-react, Sentry, and Upstash client.
-6. Configure `tsconfig.json` with strict mode.
-7. Configure ESLint with zero-warning policy.
-8. Configure Vitest coverage thresholds.
-9. Configure Playwright with the local base URL.
-10. Add `.env.example` with no real secrets.
-11. Add `src/lib/constants.ts` for all shared limits and magic numbers.
-12. Add `src/lib/env.ts` for server-side environment validation.
-13. Add GitHub Actions CI for type-check, lint, tests, build, E2E, audit, and secret scan.
+3. Confirm GitHub branches exist: `dev`, `staging`, and `prod`.
+4. Confirm cloud Supabase projects exist: `f1-league-manager-nonprod` and `f1-league-manager-prod`.
+5. Confirm local Supabase is available for daily `dev` work.
+6. Document that local `dev` uses local Supabase, dev previews and `staging` use non-production Supabase, and `prod` uses production Supabase.
+7. Configure GitHub branch protection for `dev`, `staging`, and `prod`.
+8. Require PR reviews before merging to protected branches.
+9. Require CI status checks before merging to protected branches.
+10. Create the Next.js app with TypeScript, App Router, Tailwind, and `src` directory.
+11. Install testing tools: Vitest, React Testing Library, Playwright, and MSW.
+12. Install app tools: Zod, Supabase JS, Supabase SSR helper, React Hook Form, lucide-react, Sentry, and Upstash client.
+13. Configure `tsconfig.json` with strict mode.
+14. Configure ESLint with zero-warning policy.
+15. Configure Vitest coverage thresholds.
+16. Configure Playwright with the local base URL.
+17. Add `.env.example` with no real secrets.
+18. Add `src/lib/constants.ts` for all shared limits and magic numbers.
+19. Add `src/lib/env.ts` for server-side environment validation.
+20. Add GitHub Actions CI for type-check, lint, tests, build, E2E, audit, and secret scan.
 
 ### Tests To Add
 
@@ -149,11 +227,41 @@ Get planning approved and create a clean Next.js project that can pass the empty
 
 1. Both documents are approved.
 2. No app code was written before approval.
-3. `npm run sprint-verify` passes.
+3. Branch-to-Supabase mapping is documented and understood.
+4. Branch protection is configured for `dev`, `staging`, and `prod`.
+5. PR review is required before protected branch merges.
+6. `npm run sprint-verify` passes.
+
+### Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| Document approval | Done | Owner approved `HANDOVER.md`, `SPRINT_PLAN.md`, and `PREREQUISITES.md` on 2026-05-07 | None |
+| Work branch created | Done | `feature/s0-project-setup` based from `origin/dev` | None |
+| Branch/Supabase model documented | Done | Docs updated for local dev, non-production, and production Supabase targets | None |
+| Next.js app scaffolded | Done | `package.json`, `src/app`, `next.config.ts`, `tsconfig.json` | None |
+| S0 dependencies installed | Done | `package-lock.json`, npm install completed | None |
+| Quality scripts configured | Done | `package.json` scripts include `sprint-verify` and `deploy:check` | None |
+| TypeScript strict mode configured | Done | `tsconfig.json`, `npm run type-check` passed | None |
+| ESLint zero-warning gate configured | Done | `eslint.config.mjs`, `npm run lint` passed | None |
+| Vitest and coverage configured | Done | `vitest.config.ts`, `npm run test:coverage` passed at 100% | None |
+| Playwright configured | Done | `playwright.config.ts`, `npm run test:e2e` passed | None |
+| `.env.example` created | Done | `.env.example` added with local Supabase defaults | None |
+| Constants module created | Done | `src/lib/constants.ts`, unit test passed | None |
+| Server env validation created | Done | `src/lib/env.ts`, unit test passed | None |
+| CI workflow created | Done | `.github/workflows/ci.yml` | None |
+| Full S0 gate | Done | `npm run sprint-verify` passed | None |
+| Deploy check | Done | `npm run deploy:check` passed | None |
+| Developer machine check | Done | `scripts/check-dev.ps1` passed with no failures | Warnings remain for missing `.env.local` and optional Playwright browser reminder |
+| GitHub branch protection | Outstanding | None | Needs GitHub repo settings/admin confirmation for `dev`, `staging`, and `prod` |
+| Local Supabase CLI availability | Done | `npx supabase --version` reports `2.98.2`; dev check script detects local CLI | None |
+| Local Supabase stack running | Outstanding | None | Start local Supabase during S1 database setup after migrations are introduced |
+| Local `.env.local` | Outstanding | `.env.example` exists | Create `.env.local` after local Supabase starts and real local keys are available |
+| PR creation and review | Outstanding | Local branch exists, no PR yet | Push `feature/s0-project-setup` and open PR into `dev` |
 
 ---
 
-## 7. S1 - Database And Security Foundation
+## 8. S1 - Database And Security Foundation
 
 ### Goal
 
@@ -161,27 +269,30 @@ Create the secure data foundation before building UI features.
 
 ### Build Steps
 
-1. Create Supabase project.
-2. Create database migrations for all core tables from `HANDOVER.md`.
-3. Enable RLS on every table.
-4. Add public read policies for public data.
-5. Add racer owner policies for private setup data.
-6. Add admin write policies where needed.
-7. Add profiles with roles: racer, admin, super_admin.
-8. Add official team templates.
-9. Add circuit library.
-10. Add storage buckets for league and team assets.
-11. Add indexes for all common public queries.
-12. Create browser Supabase client using anon key only.
-13. Create server Supabase client for authenticated server routes.
-14. Create server-only service role client.
-15. Add admin auth guard that reads role from `profiles`.
-16. Add racer auth guard that checks ownership.
-17. Add CSRF protection for all mutating routes.
-18. Add rate limiting for auth and admin APIs.
-19. Add security headers.
-20. Add sanitized error helper.
-21. Add audit log service.
+1. Confirm the current branch is `dev` for normal development.
+2. Confirm local env vars point to local Supabase for daily development.
+3. Confirm `f1-league-manager-nonprod` exists for shared dev previews and staging.
+4. Confirm `f1-league-manager-prod` exists but is not used for local development.
+5. Create database migrations for all core tables from `HANDOVER.md`.
+6. Enable RLS on every table.
+7. Add public read policies for public data.
+8. Add racer owner policies for private setup data.
+9. Add admin write policies where needed.
+10. Add profiles with roles: racer, admin, super_admin.
+11. Add official team templates.
+12. Add circuit library.
+13. Add storage buckets for league and team assets.
+14. Add indexes for all common public queries.
+15. Create browser Supabase client using anon key only.
+16. Create server Supabase client for authenticated server routes.
+17. Create server-only service role client.
+18. Add admin auth guard that reads role from `profiles`.
+19. Add racer auth guard that checks ownership.
+20. Add CSRF protection for all mutating routes.
+21. Add rate limiting for auth and admin APIs.
+22. Add security headers.
+23. Add sanitized error helper.
+24. Add audit log service.
 
 ### Tests To Add
 
@@ -204,9 +315,15 @@ Create the secure data foundation before building UI features.
 4. Security headers are tested.
 5. `npm run sprint-verify` passes.
 
+### Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| S1 not started | Not started | None | Waiting for S0 completion |
+
 ---
 
-## 8. S2 - UI Foundation
+## 9. S2 - UI Foundation
 
 ### Goal
 
@@ -260,7 +377,7 @@ Build the F1-inspired visual foundation and public layout.
 
 ---
 
-## 9. S3 - League Setup, Teams, Drivers, Reserves, Transfers, And Assets
+## 10. S3 - League Setup, Teams, Drivers, Reserves, Transfers, And Assets
 
 ### Goal
 
@@ -312,7 +429,7 @@ Let admins create and manage leagues before results are entered.
 
 ---
 
-## 10. S4 - Public Standings, Results, Penalties, Reports, And Statistics
+## 11. S4 - Public Standings, Results, Penalties, Reports, And Statistics
 
 ### Goal
 
@@ -361,7 +478,7 @@ Build the public pages viewers and drivers use after results are published.
 
 ---
 
-## 11. S5 - Result Publishing, Points, Penalties, And Standings
+## 12. S5 - Result Publishing, Points, Penalties, And Standings
 
 ### Goal
 
@@ -422,7 +539,7 @@ Build the admin result publishing workflow and the calculation engine.
 
 ---
 
-## 12. S6 - Calendar And Digital Wheel
+## 13. S6 - Calendar And Digital Wheel
 
 ### Goal
 
@@ -465,7 +582,7 @@ Build calendar management and the server-confirmed digital wheel.
 
 ---
 
-## 13. S7 - Racer Garage
+## 14. S7 - Racer Garage
 
 ### Goal
 
@@ -505,7 +622,7 @@ Let racers manage private vehicle setups.
 
 ---
 
-## 14. S8 - Admin Operations, Seasons, Carry-Overs, And Audit
+## 15. S8 - Admin Operations, Seasons, Carry-Overs, And Audit
 
 ### Goal
 
@@ -547,7 +664,7 @@ Build the operational tools needed to run multiple seasons safely.
 
 ---
 
-## 15. S9 - Spreadsheet Import
+## 16. S9 - Spreadsheet Import
 
 ### Goal
 
@@ -609,7 +726,7 @@ c:\Users\rajma\OneDrive\F1 2025\4QM8 F1 2025 Season 2.xlsx
 
 ---
 
-## 16. S10 - Regression And Security Audit
+## 17. S10 - Regression And Security Audit
 
 ### Goal
 
@@ -655,7 +772,7 @@ Freeze features, run the full test suite, and attempt common attacks before poli
 
 ---
 
-## 17. S11 - Performance, Accessibility, And UX Polish
+## 18. S11 - Performance, Accessibility, And UX Polish
 
 ### Goal
 
@@ -700,7 +817,7 @@ Make the app fast, accessible, and comfortable to use on race night.
 
 ---
 
-## 18. S12 - Production Deployment
+## 19. S12 - Production Deployment
 
 ### Goal
 
@@ -709,19 +826,25 @@ Deploy the app and prove the production release works.
 ### Build Steps
 
 1. Run `npm run deploy:check` locally.
-2. Create production Supabase project.
-3. Apply production migrations.
-4. Create storage buckets.
-5. Seed official team templates.
-6. Seed circuit library.
-7. Create first super admin account.
-8. Add Vercel environment variables.
-9. Deploy preview.
-10. Run Playwright smoke tests against preview.
-11. Promote to production.
-12. Run production smoke tests.
-13. Record release notes.
-14. Record rollback plan.
+2. Open release PR from `dev` to `staging`.
+3. Confirm staging deploy points to `f1-league-manager-nonprod`.
+4. Apply migrations to staging first.
+5. Run Playwright smoke tests against staging.
+6. Get release PR reviewed and merged to `staging`.
+7. Open production promotion PR from `staging` to `prod`.
+8. Confirm production branch is `prod`.
+9. Confirm production deploy points to `f1-league-manager-prod`.
+10. Confirm production PR has senior review.
+11. Apply production migrations.
+12. Create production storage buckets.
+13. Seed official team templates.
+14. Seed circuit library.
+15. Create first super admin account.
+16. Add Vercel production environment variables.
+17. Merge production PR and promote to production.
+18. Run production smoke tests.
+19. Record release notes.
+20. Record rollback plan.
 
 ### Production Smoke Tests
 
@@ -748,11 +871,14 @@ Deploy the app and prove the production release works.
 3. Admin publish flow works.
 4. Public standings update.
 5. Racer garage works privately.
-6. Rollback plan exists.
+6. Production deploy is from `prod`.
+7. Production env vars point only to `f1-league-manager-prod`.
+8. Production PR was reviewed and approved.
+9. Rollback plan exists.
 
 ---
 
-## 19. Required Test Files
+## 20. Required Test Files
 
 Create these test groups as the related features are built.
 
@@ -784,7 +910,7 @@ Create these test groups as the related features are built.
 
 ---
 
-## 20. Definition Of Done
+## 21. Definition Of Done
 
 A feature is done only when:
 
@@ -797,6 +923,11 @@ A feature is done only when:
 7. It does not leak secrets.
 8. It uses bounded queries and payloads.
 9. It works on desktop and mobile.
-10. `npm run sprint-verify` passes.
+10. Branch and Supabase environment mapping is correct.
+11. PR exists with test evidence.
+12. PR has reviewer approval.
+13. Sprint tracker is updated with done and outstanding work.
+14. Outstanding work has a reason and next action.
+15. `npm run sprint-verify` passes.
 
 That is the finish line every time.

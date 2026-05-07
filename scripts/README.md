@@ -85,11 +85,15 @@ The scripts are read-only unless you pass an install flag.
 Windows installs use:
 
 1. `winget` for Git, Node.js, GitHub CLI, and Docker Desktop.
-2. `npm install -g` for Vercel CLI and Supabase CLI.
+2. `npm install -g` for Vercel CLI.
+3. `npm install -D supabase` for the project-local Supabase CLI.
 
 Linux/macOS installs use:
 
 1. `apt-get`, `dnf`, `yum`, `pacman`, or `brew` when available.
-2. `npm install -g` for Vercel CLI and Supabase CLI.
+2. `npm install -g` for Vercel CLI.
+3. `npm install -D supabase` for the project-local Supabase CLI.
+
+Do not install Supabase CLI globally through npm. Supabase does not support `npm install -g supabase`.
 
 Some installers update `PATH`. If a tool installs successfully but the script still cannot find it, open a new terminal and run the script again.
