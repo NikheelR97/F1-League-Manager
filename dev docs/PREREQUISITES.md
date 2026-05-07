@@ -182,7 +182,16 @@ In GitHub:
 5. Repeat for `staging`.
 6. Repeat for `prod`.
 
-Recommended settings for `dev` and `staging`:
+Recommended settings for `dev`:
+
+1. Require a pull request before merging.
+2. Do not require approval for solo-owner velocity.
+3. Require status checks to pass before merging.
+4. Require branches to be up to date before merging.
+5. Do not allow force pushes.
+6. Do not allow deletions.
+
+Recommended settings for `staging`:
 
 1. Require a pull request before merging.
 2. Require at least one approval.
@@ -221,7 +230,7 @@ Done when:
 Rules:
 
 1. Every code change uses a PR.
-2. Every PR needs a review before merge.
+2. `dev` PR review is recommended but not enforced; `staging` and `prod` PRs need review before merge.
 3. CI must pass before merge.
 4. PR descriptions must include test evidence.
 5. Production PRs must already be tested on staging.
@@ -1150,7 +1159,7 @@ Checked means done. Unchecked means outstanding. Outstanding items need a reason
 - [x] GitHub access works.
 - [x] GitHub `dev`, `staging`, and `prod` branches exist.
 - [x] GitHub branch protection is configured for `dev`, `staging`, and `prod`.
-- [x] GitHub PR review is required before protected branch merges.
+- [x] GitHub PR review is enforced on `staging` and `prod`; `dev` review is recommended but not enforced.
 - [x] Supabase access works.
 - [x] Upstash access works.
 - [ ] Vercel access works or is scheduled.
