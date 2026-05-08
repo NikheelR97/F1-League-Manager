@@ -1,7 +1,6 @@
 import {
   F1_INFORMAL_RACE_PCT,
   F1_STANDARD_RACE_PCT,
-  MAX_HUB_STAT_ITEMS,
   MAX_PUBLIC_LEAGUE_CARDS,
 } from "@/lib/constants";
 
@@ -21,11 +20,6 @@ export interface LeagueSummary {
   status: string;
   theme: LeagueTheme;
   wheelStatus: string;
-}
-
-export interface HubStat {
-  label: string;
-  value: string;
 }
 
 export const leagueSummaries: readonly LeagueSummary[] = [
@@ -63,24 +57,4 @@ export const leagueSummaries: readonly LeagueSummary[] = [
 
 export function getLeagueSummaries(): readonly LeagueSummary[] {
   return leagueSummaries.slice(0, MAX_PUBLIC_LEAGUE_CARDS);
-}
-
-export function getLeagueBySlug(slug: string): LeagueSummary | null {
-  const summaries = getLeagueSummaries();
-  const league = summaries.find((summary) => summary.slug === slug);
-
-  return league ?? null;
-}
-
-export function getHubStats(league: LeagueSummary): readonly HubStat[] {
-  const stats: readonly HubStat[] = [
-    { label: "Format", value: league.formatLabel },
-    { label: "Next race", value: league.nextRace },
-    { label: "Driver leader", value: league.leader },
-    { label: "Constructors", value: league.constructorLeader },
-    { label: "Penalties", value: league.penaltyWatch },
-    { label: "Wheel", value: league.wheelStatus },
-  ];
-
-  return stats.slice(0, MAX_HUB_STAT_ITEMS);
 }

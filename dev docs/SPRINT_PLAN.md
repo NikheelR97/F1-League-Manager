@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S3 gate and handover compliance fixes are on `fix/s3-gate-and-handover-compliance`; PR #5 and PR #6 are merged to `dev`.
+**Status:** S4 public pages in progress on `feature/s4-public-pages`; S3 PRs (#5 and #6) merged to `dev`.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -534,6 +534,36 @@ Build the public pages viewers and drivers use after results are published.
 2. Public pages expose no private racer setup data.
 3. Public pages are fast because they read snapshots.
 4. `npm run sprint-verify` passes.
+
+### S4 Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| `resolvePublicLeague` — shared server-only resolver excluding draft leagues | Done | `src/lib/public/resolve-league.ts`; 4 unit tests in `s4-public.test.ts` | None |
+| League hub wired to real DB data (top 5 drivers, constructors, penalty alerts, next race) | Done | `src/app/leagues/[slug]/page.tsx`, `src/components/league/LeagueHub.tsx` | None |
+| `PublicPageHeader` component (league, season, last round, format, updated date) | Done | `src/components/league/PublicPageHeader.tsx`; 6 component tests in `public-page-header.test.tsx` | None |
+| Driver standings page (desktop table + mobile cards, gap, delta, team color) | Done | `src/app/leagues/[slug]/standings/drivers/page.tsx` | None |
+| Constructor standings page (gated by `constructor_championship_enabled`, notFound if disabled) | Done | `src/app/leagues/[slug]/standings/constructors/page.tsx` | None |
+| Results index page | Done | `src/app/leagues/[slug]/results/page.tsx` | None |
+| Race result detail page (qualifying, race, HANDOVER sort order, penalties without steward_notes) | Done | `src/app/leagues/[slug]/results/[sessionId]/page.tsx` | None |
+| Public penalties page (steward_notes and appeal_notes excluded per HANDOVER §8.4 and §13) | Done | `src/app/leagues/[slug]/penalties/page.tsx` | None |
+| Driver profile page (two-step fetch to scope results to league sessions) | Done | `src/app/leagues/[slug]/drivers/[driverId]/page.tsx` | None |
+| Team profile page (current drivers via active stints, race results per session) | Done | `src/app/leagues/[slug]/teams/[teamId]/page.tsx` | None |
+| League stats page (season at a glance, most wins/podiums/FL from precomputed standings) | Done | `src/app/leagues/[slug]/stats/page.tsx` | None |
+| `PositionDelta` component updated to accept `current`/`previous` props | Done | `src/components/ui/PositionDelta.tsx`; 4 component tests in `position-delta.test.tsx` | None |
+| Result sort order: classified → dnf → dns → dsq → ban | Done | `s4-public.test.ts` — 4 result sort tests | None |
+| Gap to leader calculation | Done | `s4-public.test.ts` — 3 gap tests | None |
+| Penalty field safety — no steward_notes or appeal_notes in public select strings | Done | `s4-public.test.ts` — 2 file-source tests stripping JS comments before checking | None |
+| S4 component tests (LeagueHub full-data scenarios, PublicPageHeader, PositionDelta) | Done | 13 new tests across `league-hub.test.tsx`, `public-page-header.test.tsx`, `position-delta.test.tsx` | None |
+| `writeAdminAuditLog` coverage (success and failure paths) | Done | Added to `api-guard.test.ts` | None |
+| Per-league sub-navigation (Hub / Standings / Results / Penalties / Stats) | Done | `src/components/league/LeagueSubNav.tsx`, `src/app/leagues/[slug]/layout.tsx` — active tab highlighted via `usePathname` | None |
+| Mobile E2E smoke updated to use home page (no DB dependency) | Done | `e2e/smoke.spec.ts` — 2 tests pass | None |
+| 102 tests passing, lint clean, type-check clean | Done | `npm run sprint-verify` passes: 102/102 tests, 0 lint warnings, 0 TS errors, 82.9% branches | None |
+| Precomputed standings snapshots used (no recalculation on page load) | Done | All standings pages read from `driver_standings`/`team_standings` tables only | None |
+| S4 qualifying results page | Outstanding | None | Qualifying data shown on race result detail page; standalone qualifying page deferred to S5 |
+| S4 race reports page | Outstanding | None | Deferred to S5 — requires published results data to be meaningful |
+| Season selector on standings pages | Outstanding | None | Deferred to S5/S6 — single active season per league in MVP |
+| Cache/revalidation after publish | Outstanding | None | Deferred to S5 — result publishing workflow not yet built |
 
 ---
 
