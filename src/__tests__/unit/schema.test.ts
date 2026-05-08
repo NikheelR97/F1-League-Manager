@@ -7,7 +7,7 @@ const migrationSql = readFileSync(
 const allMigrationSql = readdirSync("supabase/migrations")
   .filter((fileName) => fileName.endsWith(".sql"))
   .sort()
-  .map((fileName) => readFileSync(`supabase/migrations/${fileName}`, "utf8"))
+  .map((fileName) => readFileSync(`supabase/migrations/${fileName}`, "utf8").replace(/\r\n/g, "\n"))
   .join("\n");
 
 const coreTables = [
