@@ -4,20 +4,13 @@ import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { comparePublicRaceResults } from "@/lib/public/result-sort";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
 
 // HANDOVER sort order: finished → lap down → dnf → dsq → ban → dnp
-const STATUS_SORT: Record<string, number> = {
-  classified: 0,
-  dnf: 1,
-  dns: 2,
-  dsq: 3,
-  ban: 4,
-};
-
 export default async function TeamProfilePage({
   params,
 }: {
@@ -93,7 +86,7 @@ export default async function TeamProfilePage({
       ? db
           .from("race_results")
           .select(
-            "race_session_id, finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, drivers(id, display_name), race_sessions(name, circuits(name, grand_prix_name))",
+            "race_session_id, finishing_position, result_status, raw_result, fastest_lap, points_awarded, manual_points_adjustment, drivers(id, display_name), race_sessions(name, circuits(name, grand_prix_name))",
           )
           .eq("team_id", teamId)
           .in("race_session_id", sessionIds)
@@ -117,12 +110,7 @@ export default async function TeamProfilePage({
   type Circuit = { name: string; grand_prix_name: string };
   type Driver = { id: string; display_name: string };
 
-  const sortedResults = [...(raceResults ?? [])].sort((a, b) => {
-    const aStatus = STATUS_SORT[a.result_status] ?? 0;
-    const bStatus = STATUS_SORT[b.result_status] ?? 0;
-    if (aStatus !== bStatus) return aStatus - bStatus;
-    return (a.finishing_position ?? 99) - (b.finishing_position ?? 99);
-  });
+  const sortedResults = [...(raceResults ?? [])].sort(comparePublicRaceResults);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">

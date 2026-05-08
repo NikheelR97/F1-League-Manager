@@ -5,26 +5,16 @@
 
 // ─── Result sort order (mirrors STATUS_SORT in result pages) ─────────────────
 
-const STATUS_SORT: Record<string, number> = {
-  classified: 0,
-  dnf: 1,
-  dns: 2,
-  dsq: 3,
-  ban: 4,
-};
+import { comparePublicRaceResults } from "@/lib/public/result-sort";
 
 type ResultRow = {
   result_status: string;
   finishing_position: number | null;
+  raw_result?: string | null;
 };
 
 function sortResults(rows: ResultRow[]): ResultRow[] {
-  return [...rows].sort((a, b) => {
-    const aStatus = STATUS_SORT[a.result_status] ?? 0;
-    const bStatus = STATUS_SORT[b.result_status] ?? 0;
-    if (aStatus !== bStatus) return aStatus - bStatus;
-    return (a.finishing_position ?? 99) - (b.finishing_position ?? 99);
-  });
+  return [...rows].sort(comparePublicRaceResults);
 }
 
 describe("result sort order", () => {
@@ -56,22 +46,24 @@ describe("result sort order", () => {
     const rows: ResultRow[] = [
       { result_status: "ban", finishing_position: null },
       { result_status: "dns", finishing_position: null },
-      { result_status: "classified", finishing_position: 1 },
+      { result_status: "classified", finishing_position: 2, raw_result: "1 Lap - 1" },
+      { result_status: "classified", finishing_position: 1, raw_result: "0" },
       { result_status: "dsq", finishing_position: null },
-      { result_status: "dnf", finishing_position: null },
+      { result_status: "dnf", finishing_position: null, raw_result: "DNF - 1" },
     ];
     const sorted = sortResults(rows);
     const statuses = sorted.map((r) => r.result_status);
-    expect(statuses).toEqual(["classified", "dnf", "dns", "dsq", "ban"]);
+    expect(statuses).toEqual(["classified", "classified", "dnf", "dsq", "ban", "dns"]);
+    expect(sorted[1].raw_result).toBe("1 Lap - 1");
   });
 
-  it("treats an unknown status as classified-priority (sort order 0)", () => {
+  it("sorts dnf rows by workbook retirement order", () => {
     const rows: ResultRow[] = [
-      { result_status: "dnf", finishing_position: null },
-      { result_status: "unknown_future_status", finishing_position: 99 },
+      { result_status: "dnf", finishing_position: null, raw_result: "DNF - 2" },
+      { result_status: "dnf", finishing_position: null, raw_result: "DNF - 1" },
     ];
     const sorted = sortResults(rows);
-    expect(sorted[0].result_status).toBe("unknown_future_status");
+    expect(sorted.map((r) => r.raw_result)).toEqual(["DNF - 1", "DNF - 2"]);
   });
 });
 

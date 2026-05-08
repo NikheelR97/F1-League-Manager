@@ -67,8 +67,8 @@ describe("LeagueHub", () => {
             previous_position: null,
             total_points: 150,
             wins: 3,
-            drivers: { display_name: "Max Verstappen", racing_number: 1 },
-            teams: { name: "Red Bull", color_hex: "#1E41FF" },
+            drivers: { id: "driver-1", display_name: "Max Verstappen", racing_number: 1 },
+            teams: { id: "team-1", name: "Red Bull", color_hex: "#1E41FF" },
           },
         ]}
       />,
@@ -115,7 +115,7 @@ describe("LeagueHub", () => {
             previous_position: null,
             total_points: 200,
             wins: 5,
-            teams: { name: "Ferrari", color_hex: "#DC0000" },
+            teams: { id: "team-2", name: "Ferrari", color_hex: "#DC0000" },
           },
         ]}
       />,
@@ -138,6 +138,28 @@ describe("LeagueHub", () => {
       />,
     );
     expect(screen.getByText(/Last result: Monaco/i)).toBeInTheDocument();
+  });
+
+  it("uses uploaded league hero images when configured", () => {
+    const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
+
+    render(
+      <LeagueHub
+        {...baseProps}
+        league={{ ...mockLeague, hero_image_path: "leagues/league-1/hero_image.webp" }}
+      />,
+    );
+
+    expect(screen.getByAltText("Standard League hero").getAttribute("src")).toContain(
+      "storage",
+    );
+
+    if (originalUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
+    }
   });
 
   it("uses local project images for league hero assets", () => {

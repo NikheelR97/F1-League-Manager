@@ -4,20 +4,13 @@ import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { comparePublicRaceResults } from "@/lib/public/result-sort";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
 
 // HANDOVER sort order: finished → lap down → dnf → dsq → ban → dnp
-const STATUS_SORT: Record<string, number> = {
-  classified: 0,
-  dnf: 1,
-  dns: 2,
-  dsq: 3,
-  ban: 4,
-};
-
 export default async function RaceResultPage({
   params,
 }: {
@@ -72,12 +65,7 @@ export default async function RaceResultPage({
 
   const circuit = session.circuits as unknown as Circuit | null;
 
-  const sortedResults = [...(raceResults ?? [])].sort((a, b) => {
-    const aStatus = STATUS_SORT[a.result_status] ?? 0;
-    const bStatus = STATUS_SORT[b.result_status] ?? 0;
-    if (aStatus !== bStatus) return aStatus - bStatus;
-    return (a.finishing_position ?? 99) - (b.finishing_position ?? 99);
-  });
+  const sortedResults = [...(raceResults ?? [])].sort(comparePublicRaceResults);
 
   const fastestLapRow = sortedResults.find((r) => r.fastest_lap);
 

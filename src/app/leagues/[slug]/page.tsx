@@ -46,14 +46,14 @@ export default async function LeaguePage({ params }: LeaguePageProps) {
       .maybeSingle(),
     db
       .from("driver_standings")
-      .select("position, previous_position, total_points, wins, drivers(display_name, racing_number), teams(name, color_hex)")
+      .select("position, previous_position, total_points, wins, drivers(id, display_name, racing_number), teams(id, name, color_hex)")
       .eq("league_id", league.id)
       .eq("season_id", league.season.id)
       .order("position")
       .limit(5),
     db
       .from("team_standings")
-      .select("position, previous_position, total_points, wins, teams(name, color_hex)")
+      .select("position, previous_position, total_points, wins, teams(id, name, color_hex)")
       .eq("league_id", league.id)
       .eq("season_id", league.season.id)
       .order("position")

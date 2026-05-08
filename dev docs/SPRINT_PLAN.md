@@ -554,11 +554,12 @@ Build the public pages viewers and drivers use after results are published.
 | Result sort order: classified → dnf → dns → dsq → ban | Done | `s4-public.test.ts` — 4 result sort tests | None |
 | Gap to leader calculation | Done | `s4-public.test.ts` — 3 gap tests | None |
 | Penalty field safety — no steward_notes or appeal_notes in public select strings | Done | `s4-public.test.ts` — 2 file-source tests stripping JS comments before checking | None |
+| Public read hardening for draft leagues and penalty audit fields | Done | `supabase/migrations/20260508123000_s4_public_security_boundaries.sql`; schema regression test | None |
 | S4 component tests (LeagueHub full-data scenarios, PublicPageHeader, PositionDelta) | Done | 13 new tests across `league-hub.test.tsx`, `public-page-header.test.tsx`, `position-delta.test.tsx` | None |
 | `writeAdminAuditLog` coverage (success and failure paths) | Done | Added to `api-guard.test.ts` | None |
 | Per-league sub-navigation (Hub / Standings / Results / Penalties / Stats) | Done | `src/components/league/LeagueSubNav.tsx`, `src/app/leagues/[slug]/layout.tsx` — active tab highlighted via `usePathname` | None |
 | Mobile E2E smoke updated to use home page (no DB dependency) | Done | `e2e/smoke.spec.ts` — 2 tests pass | None |
-| 102 tests passing, lint clean, type-check clean | Done | `npm run sprint-verify` passes: 102/102 tests, 0 lint warnings, 0 TS errors, 82.9% branches | None |
+| 105 tests passing, lint clean, type-check clean | Done | `npm run test` passes: 105/105 tests; `npm run test:coverage`, `npm run lint`, `npm run type-check`, `npm run build`, and `npm run test:e2e` pass | None |
 | Precomputed standings snapshots used (no recalculation on page load) | Done | All standings pages read from `driver_standings`/`team_standings` tables only | None |
 | S4 qualifying results page | Outstanding | None | Qualifying data shown on race result detail page; standalone qualifying page deferred to S5 |
 | S4 race reports page | Outstanding | None | Deferred to S5 — requires published results data to be meaningful |

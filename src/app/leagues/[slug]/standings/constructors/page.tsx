@@ -1,10 +1,11 @@
 import "server-only";
 
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
-import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -65,12 +66,11 @@ export default async function ConstructorStandingsPage({
         <EmptyState message="Constructor standings will appear once results are published." title="No standings yet" />
       ) : (
         <>
-          {/* Desktop table */}
           <table className="hidden w-full text-sm md:table">
             <thead>
               <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
-                <th className="pb-2 pr-4 w-10">Pos</th>
-                <th className="pb-2 pr-4 w-6" aria-label="Change" />
+                <th className="w-10 pb-2 pr-4">Pos</th>
+                <th className="w-6 pb-2 pr-4" aria-label="Change" />
                 <th className="pb-2 pr-4">Constructor</th>
                 <th className="pb-2 pr-4 text-right">Pts</th>
                 <th className="pb-2 pr-4 text-right">Gap</th>
@@ -81,7 +81,7 @@ export default async function ConstructorStandingsPage({
             <tbody>
               {standings.map((row) => {
                 const team = row.teams as unknown as TeamRow | null;
-                const gap = row.position === 1 ? "—" : `−${leaderPoints - row.total_points}`;
+                const gap = row.position === 1 ? "-" : `-${leaderPoints - row.total_points}`;
                 return (
                   <tr key={row.position} className="border-b border-f1-border/40 hover:bg-f1-dark">
                     <td className="py-2 pr-4 font-mono font-bold text-f1-white">{row.position}</td>
@@ -95,7 +95,16 @@ export default async function ConstructorStandingsPage({
                           className="h-3 w-1 shrink-0"
                           style={{ backgroundColor: team?.color_hex ?? "#444" }}
                         />
-                        <span className="font-bold text-f1-white">{team?.name ?? "—"}</span>
+                        {team ? (
+                          <Link
+                            className="font-bold text-f1-white hover:text-f1-red"
+                            href={`/leagues/${league.slug}/teams/${team.id}`}
+                          >
+                            {team.name}
+                          </Link>
+                        ) : (
+                          <span className="font-bold text-f1-white">TBD</span>
+                        )}
                       </div>
                     </td>
                     <td className="py-2 pr-4 text-right font-mono font-bold text-f1-white">{row.total_points}</td>
@@ -108,11 +117,10 @@ export default async function ConstructorStandingsPage({
             </tbody>
           </table>
 
-          {/* Mobile cards */}
           <ul className="space-y-2 md:hidden">
             {standings.map((row) => {
               const team = row.teams as unknown as TeamRow | null;
-              const gap = row.position === 1 ? "Leader" : `−${leaderPoints - row.total_points} pts`;
+              const gap = row.position === 1 ? "Leader" : `-${leaderPoints - row.total_points} pts`;
               return (
                 <li key={row.position} className="border border-f1-border bg-f1-dark p-3">
                   <div className="flex items-center justify-between">
@@ -125,7 +133,16 @@ export default async function ConstructorStandingsPage({
                           className="h-4 w-1 shrink-0"
                           style={{ backgroundColor: team?.color_hex ?? "#444" }}
                         />
-                        <span className="font-bold text-f1-white">{team?.name ?? "—"}</span>
+                        {team ? (
+                          <Link
+                            className="font-bold text-f1-white"
+                            href={`/leagues/${league.slug}/teams/${team.id}`}
+                          >
+                            {team.name}
+                          </Link>
+                        ) : (
+                          <span className="font-bold text-f1-white">TBD</span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
