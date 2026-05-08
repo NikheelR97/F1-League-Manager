@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
+import { validateWheelConfirmation } from "@/lib/wheel/wheel-service";
 
 const SESSION_CODE_RE = /^[A-Z0-9]{6}$/;
 
@@ -70,14 +71,13 @@ export async function POST(
         .eq("id", body.wheel_spin_id)
         .single();
         
-      if (spinError || !spin) {
-        return Response.json({ error: "Wheel spin not found" }, { status: 404 });
+      if (spinError && spinError.code !== "PGRST116") {
+        return Response.json({ error: "Failed to fetch wheel spin" }, { status: 500 });
       }
-      if (spin.status !== "pending") {
-        return Response.json({ error: "Wheel spin is not pending" }, { status: 400 });
-      }
-      if (spin.circuit_id !== body.circuit_id) {
-        return Response.json({ error: "Circuit mismatch with wheel spin" }, { status: 400 });
+      
+      const validationError = validateWheelConfirmation(spin, body.circuit_id);
+      if (validationError) {
+        return Response.json({ error: validationError.error }, { status: validationError.status });
       }
     }
 

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { selectWheelCircuit, validateWheelConfirmation } from "@/lib/wheel/wheel-service";
+
 const SESSION_CODE_RE = /^[A-Z0-9]{6}$/;
 
 const createSessionSchema = z.object({
@@ -57,25 +59,46 @@ describe("S6 Calendar and Wheel", () => {
     it("selects only eligible circuits (simulation)", () => {
       const circuits = [
         { id: "1", is_available: true },
-        { id: "2", is_available: false },
-        { id: "3", is_available: true },
+        { id: "2", is_available: true },
       ];
-      const eligible = circuits.filter((c) => c.is_available);
-      expect(eligible).toHaveLength(2);
-      expect(eligible.some((c) => c.id === "2")).toBe(false);
       
-      const chosen = eligible[Math.floor(Math.random() * eligible.length)];
+      const chosen = selectWheelCircuit(circuits);
       expect(chosen).toBeDefined();
       expect(chosen.is_available).toBe(true);
     });
 
     it("throws when pool is empty (simulation)", () => {
-      const circuits = [{ id: "1", is_available: false }];
-      const eligible = circuits.filter((c) => c.is_available);
-      
-      expect(() => {
-        if (eligible.length === 0) throw new Error("No circuits available in the pool.");
-      }).toThrowError("No circuits available in the pool.");
+      expect(() => selectWheelCircuit([])).toThrowError("No circuits available in the pool.");
+    });
+    
+    it("never returns null", () => {
+      const circuits = [{ id: "1" }];
+      const chosen = selectWheelCircuit(circuits);
+      expect(chosen).not.toBeNull();
+    });
+  });
+
+  describe("Wheel confirmation logic", () => {
+    const validSpin = { circuit_id: "c1", status: "pending" };
+
+    it("rejects when spin is null", () => {
+      const res = validateWheelConfirmation(null, "c1");
+      expect(res).toMatchObject({ ok: false, status: 404 });
+    });
+
+    it("rejects double confirmation (status not pending)", () => {
+      const res = validateWheelConfirmation({ ...validSpin, status: "confirmed" }, "c1");
+      expect(res).toMatchObject({ ok: false, status: 400, error: "Wheel spin is not pending" });
+    });
+
+    it("client cannot forge wheel result (circuit mismatch)", () => {
+      const res = validateWheelConfirmation(validSpin, "c2");
+      expect(res).toMatchObject({ ok: false, status: 400, error: "Circuit mismatch with wheel spin" });
+    });
+
+    it("allows valid confirmation", () => {
+      const res = validateWheelConfirmation(validSpin, "c1");
+      expect(res).toBeNull();
     });
   });
 });

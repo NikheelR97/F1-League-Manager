@@ -2,6 +2,7 @@ import { type NextRequest } from "next/server";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
+import { selectWheelCircuit } from "@/lib/wheel/wheel-service";
 
 export async function POST(
   req: NextRequest,
@@ -40,13 +41,12 @@ export async function POST(
       .eq("league_id", leagueId)
       .eq("is_available", true);
 
-    if (!availableCircuits || availableCircuits.length === 0) {
-      return Response.json({ error: "No circuits available in the pool." }, { status: 400 });
+    let chosen;
+    try {
+      chosen = selectWheelCircuit(availableCircuits);
+    } catch (e) {
+      return Response.json({ error: (e as Error).message }, { status: 400 });
     }
-
-    // Server-side random choice
-    const randomIndex = Math.floor(Math.random() * availableCircuits.length);
-    const chosen = availableCircuits[randomIndex];
 
     // Create pending spin
     const { data: spin, error: spinError } = await db
