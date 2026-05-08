@@ -27,7 +27,7 @@ export async function PUT(
     let body: z.infer<typeof savePoolSchema>;
     try {
       body = savePoolSchema.parse(await req.json());
-    } catch (e) {
+    } catch {
       return Response.json({ error: "Invalid request body" }, { status: 422 });
     }
 
