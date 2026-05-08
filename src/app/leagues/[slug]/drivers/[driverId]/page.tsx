@@ -23,6 +23,7 @@ export default async function DriverProfilePage({
   // Step 1: parallel fetches that don't depend on each other
   const [
     { data: driver },
+    { data: leagueEntry },
     { data: standing },
     { data: completedSessions },
     { data: lastSession },
@@ -32,6 +33,13 @@ export default async function DriverProfilePage({
       .select("id, display_name, racing_number, country")
       .eq("id", driverId)
       .single(),
+    db
+      .from("league_driver_entries")
+      .select("id")
+      .eq("league_id", league.id)
+      .eq("season_id", league.season.id)
+      .eq("driver_id", driverId)
+      .maybeSingle(),
     db
       .from("driver_standings")
       .select("position, previous_position, total_points, wins, podiums, fastest_laps")
@@ -57,7 +65,7 @@ export default async function DriverProfilePage({
       .maybeSingle(),
   ]);
 
-  if (!driver) notFound();
+  if (!driver || !leagueEntry) notFound();
 
   // Step 2: fetch results scoped to this league's completed sessions
   const sessionIds = (completedSessions ?? []).map((s) => s.id);
@@ -66,7 +74,7 @@ export default async function DriverProfilePage({
       ? await db
           .from("race_results")
           .select(
-            "finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, race_sessions(name, circuits(name))",
+            "race_session_id, finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, race_sessions(name, circuits(name))",
           )
           .eq("driver_id", driverId)
           .in("race_session_id", sessionIds)
@@ -127,14 +135,14 @@ export default async function DriverProfilePage({
           <EmptyState message="No results published yet." title="No results" />
         ) : (
           <ul className="space-y-1">
-            {results.map((r, i) => {
+            {results.map((r) => {
               const race = r.race_sessions as unknown as RaceSession | null;
               const circuit = race?.circuits as unknown as Circuit | null;
               const isClassified = r.result_status === "classified";
               const totalPts = r.points_awarded + r.manual_points_adjustment;
               return (
                 <li
-                  key={i}
+                  key={r.race_session_id}
                   className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm"
                 >
                   <div>

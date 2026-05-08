@@ -83,6 +83,7 @@ describe("LeagueHub", () => {
         {...baseProps}
         penaltyAlerts={[
           {
+            driver_id: "00000000-0000-4000-8000-000000000099",
             penalty_points: 12,
             drivers: { display_name: "Test Driver" },
           },

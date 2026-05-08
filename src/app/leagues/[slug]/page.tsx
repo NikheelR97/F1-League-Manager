@@ -60,7 +60,7 @@ export default async function LeaguePage({ params }: LeaguePageProps) {
       .limit(5),
     db
       .from("driver_penalty_totals")
-      .select("penalty_points, drivers(display_name)")
+      .select("driver_id, penalty_points, drivers(display_name)")
       .eq("league_id", league.id)
       .eq("season_id", league.season.id)
       .eq("ban_threshold_reached", true)

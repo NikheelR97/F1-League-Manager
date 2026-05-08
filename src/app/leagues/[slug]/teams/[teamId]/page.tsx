@@ -41,6 +41,7 @@ export default async function TeamProfilePage({
       .from("teams")
       .select("id, name, color_hex, logo_path")
       .eq("id", teamId)
+      .eq("league_id", league.id)
       .single(),
     db
       .from("team_standings")
@@ -92,7 +93,7 @@ export default async function TeamProfilePage({
       ? db
           .from("race_results")
           .select(
-            "finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, drivers(id, display_name), race_sessions(name, circuits(name, grand_prix_name))",
+            "race_session_id, finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, drivers(id, display_name), race_sessions(name, circuits(name, grand_prix_name))",
           )
           .eq("team_id", teamId)
           .in("race_session_id", sessionIds)
@@ -196,14 +197,14 @@ export default async function TeamProfilePage({
                 </tr>
               </thead>
               <tbody>
-                {sortedResults.map((r, i) => {
+                {sortedResults.map((r) => {
                   const race = r.race_sessions as unknown as RaceSession | null;
                   const circuit = race?.circuits as unknown as Circuit | null;
                   const driver = r.drivers as unknown as Driver | null;
                   const isClassified = r.result_status === "classified";
                   const totalPts = r.points_awarded + r.manual_points_adjustment;
                   return (
-                    <tr key={i} className="border-b border-f1-border/40 hover:bg-f1-dark">
+                    <tr key={`${r.race_session_id}-${driver?.id}`} className="border-b border-f1-border/40 hover:bg-f1-dark">
                       <td className="py-2 pr-4 text-f1-white">
                         {circuit?.grand_prix_name ?? race?.name ?? "—"}
                         {r.fastest_lap && (
@@ -223,7 +224,7 @@ export default async function TeamProfilePage({
 
             {/* Mobile cards */}
             <ul className="space-y-1 md:hidden">
-              {sortedResults.map((r, i) => {
+              {sortedResults.map((r) => {
                 const race = r.race_sessions as unknown as RaceSession | null;
                 const circuit = race?.circuits as unknown as Circuit | null;
                 const driver = r.drivers as unknown as Driver | null;
@@ -231,7 +232,7 @@ export default async function TeamProfilePage({
                 const totalPts = r.points_awarded + r.manual_points_adjustment;
                 return (
                   <li
-                    key={i}
+                    key={`${r.race_session_id}-${driver?.id}`}
                     className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm"
                   >
                     <div>

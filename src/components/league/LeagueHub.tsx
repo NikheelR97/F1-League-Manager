@@ -40,6 +40,7 @@ interface TopConstructor {
 }
 
 interface PenaltyAlert {
+  driver_id: string;
   penalty_points: number;
   drivers: unknown;
 }
@@ -74,9 +75,7 @@ export function LeagueHub({
   topConstructors,
   penaltyAlerts,
 }: LeagueHubProps) {
-  const heroImage = league.hero_image_path
-    ? `/images/leagues/race-control-hero.png`
-    : "/images/leagues/race-weekend-hero.png";
+  const heroImage = "/images/leagues/race-control-hero.png";
 
   const nextRaceCircuit = castCircuit(nextRace?.circuits);
   const latestCircuit = castCircuit(latestSession?.circuits);
@@ -232,10 +231,10 @@ export function LeagueHub({
               </Link>
             </div>
             <ul className="space-y-1">
-              {penaltyAlerts.map((alert, i) => {
+              {penaltyAlerts.map((alert) => {
                 const driver = castPenaltyDriver(alert.drivers);
                 return (
-                  <li key={i} className="flex items-center justify-between border border-f1-red/30 bg-f1-dark px-4 py-2">
+                  <li key={alert.driver_id} className="flex items-center justify-between border border-f1-red/30 bg-f1-dark px-4 py-2">
                     <span className="text-sm text-f1-white">{driver?.display_name ?? "—"}</span>
                     <span className="font-mono text-xs text-f1-red">{alert.penalty_points} penalty pts — threshold reached</span>
                   </li>

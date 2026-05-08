@@ -118,7 +118,7 @@ export default async function LeagueStatsPage({
                   const driver = row.drivers as unknown as DriverRow | null;
                   return (
                     <li
-                      key={i}
+                      key={driver?.id ?? row.position}
                       className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm"
                     >
                       <div className="flex items-center gap-2">
@@ -140,7 +140,7 @@ export default async function LeagueStatsPage({
                   const driver = row.drivers as unknown as DriverRow | null;
                   return (
                     <li
-                      key={i}
+                      key={driver?.id ?? row.position}
                       className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm"
                     >
                       <div className="flex items-center gap-2">
@@ -165,7 +165,7 @@ export default async function LeagueStatsPage({
                     const driver = row.drivers as unknown as DriverRow | null;
                     return (
                       <li
-                        key={i}
+                        key={driver?.id ?? row.position}
                         className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm"
                       >
                         <div className="flex items-center gap-2">

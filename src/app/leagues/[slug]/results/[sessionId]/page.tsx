@@ -51,7 +51,7 @@ export default async function RaceResultPage({
     db
       .from("race_results")
       .select(
-        "finishing_position, result_status, fastest_lap, points_awarded, penalty_points, manual_points_adjustment, raw_result, drivers(id, display_name, racing_number), teams(name, color_hex)",
+        "id, finishing_position, result_status, fastest_lap, points_awarded, penalty_points, manual_points_adjustment, raw_result, drivers(id, display_name, racing_number), teams(name, color_hex)",
       )
       .eq("race_session_id", sessionId)
       .limit(20),
@@ -173,13 +173,13 @@ export default async function RaceResultPage({
                 </tr>
               </thead>
               <tbody>
-                {sortedResults.map((r, i) => {
+                {sortedResults.map((r) => {
                   const driver = r.drivers as unknown as Driver | null;
                   const team = r.teams as unknown as Team | null;
                   const isClassified = r.result_status === "classified";
                   const totalPts = r.points_awarded + r.manual_points_adjustment;
                   return (
-                    <tr key={i} className="border-b border-f1-border/40 hover:bg-f1-dark">
+                    <tr key={r.id} className="border-b border-f1-border/40 hover:bg-f1-dark">
                       <td className="py-2 pr-4 font-mono font-bold text-f1-white">
                         {isClassified ? r.finishing_position : "—"}
                       </td>
@@ -208,13 +208,13 @@ export default async function RaceResultPage({
             </table>
             {/* Mobile */}
             <ul className="space-y-1 md:hidden">
-              {sortedResults.map((r, i) => {
+              {sortedResults.map((r) => {
                 const driver = r.drivers as unknown as Driver | null;
                 const team = r.teams as unknown as Team | null;
                 const isClassified = r.result_status === "classified";
                 const totalPts = r.points_awarded + r.manual_points_adjustment;
                 return (
-                  <li key={i} className="border border-f1-border/40 bg-f1-dark px-3 py-2">
+                  <li key={r.id} className="border border-f1-border/40 bg-f1-dark px-3 py-2">
                     <div className="flex items-center gap-3">
                       <span className="w-6 font-mono font-bold text-f1-white">
                         {isClassified ? r.finishing_position : "—"}

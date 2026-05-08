@@ -12,11 +12,11 @@ export function LeagueSubNav({ slug }: LeagueSubNavProps) {
   const base = `/leagues/${slug}`;
 
   const links = [
-    { href: base, label: "Hub" },
-    { href: `${base}/standings/drivers`, label: "Standings" },
-    { href: `${base}/results`, label: "Results" },
-    { href: `${base}/penalties`, label: "Penalties" },
-    { href: `${base}/stats`, label: "Stats" },
+    { href: base, label: "Hub", activePath: base },
+    { href: `${base}/standings/drivers`, label: "Standings", activePath: `${base}/standings` },
+    { href: `${base}/results`, label: "Results", activePath: `${base}/results` },
+    { href: `${base}/penalties`, label: "Penalties", activePath: `${base}/penalties` },
+    { href: `${base}/stats`, label: "Stats", activePath: `${base}/stats` },
   ];
 
   return (
@@ -27,9 +27,9 @@ export function LeagueSubNav({ slug }: LeagueSubNavProps) {
       <div className="mx-auto flex w-full max-w-7xl gap-0 overflow-x-auto px-4 sm:px-6 lg:px-8">
         {links.map((link) => {
           const isActive =
-            link.href === base
+            link.activePath === base
               ? pathname === base
-              : pathname.startsWith(link.href);
+              : pathname === link.activePath || pathname.startsWith(link.activePath + "/");
           return (
             <Link
               key={link.href}
