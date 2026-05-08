@@ -1,15 +1,18 @@
 import { ArrowDown, ArrowRight, ArrowUp } from "lucide-react";
 
 interface PositionDeltaProps {
-  value: -1 | 0 | 1;
+  current: number;
+  previous: number | null;
 }
 
-export function PositionDelta({ value }: PositionDeltaProps) {
-  if (value > 0) {
+export function PositionDelta({ current, previous }: PositionDeltaProps) {
+  const delta = previous === null ? 0 : previous - current;
+
+  if (delta > 0) {
     return <ArrowUp aria-label="Position gained" className="text-team-sauber" />;
   }
 
-  if (value < 0) {
+  if (delta < 0) {
     return <ArrowDown aria-label="Position lost" className="text-f1-red" />;
   }
 

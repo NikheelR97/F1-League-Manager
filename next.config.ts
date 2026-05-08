@@ -1,5 +1,27 @@
 import type { NextConfig } from "next";
 
+export function getSupabaseRemotePatterns(): NonNullable<NextConfig["images"]>["remotePatterns"] {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return [];
+
+  try {
+    const url = new URL(supabaseUrl);
+    const protocol = url.protocol.replace(":", "");
+    if (protocol !== "http" && protocol !== "https") return [];
+
+    return [
+      {
+        hostname: url.hostname,
+        pathname: "/storage/v1/object/public/**",
+        port: url.port,
+        protocol,
+      },
+    ];
+  } catch {
+    return [];
+  }
+}
+
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
   {
@@ -18,6 +40,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
+  images: {
+    remotePatterns: getSupabaseRemotePatterns(),
+  },
   async headers() {
     return [
       {

@@ -1,9 +1,14 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 const migrationSql = readFileSync(
   "supabase/migrations/20260507161000_s1_core_schema.sql",
   "utf8",
 );
+const allMigrationSql = readdirSync("supabase/migrations")
+  .filter((fileName) => fileName.endsWith(".sql"))
+  .sort()
+  .map((fileName) => readFileSync(`supabase/migrations/${fileName}`, "utf8"))
+  .join("\n");
 
 const coreTables = [
   "profiles",
@@ -48,6 +53,19 @@ describe("S1 database migration", () => {
     expect(migrationSql.match(/\(\d+, '[^']+', '[^']+'/gu)).toHaveLength(24);
     expect(migrationSql).toContain(
       "'Yas Marina Circuit', 'yas-marina', 'UAE'",
+    );
+  });
+
+  it("keeps public reads scoped to non-draft leagues and safe penalty columns", () => {
+    expect(allMigrationSql).toContain(
+      "create policy public_read_leagues on public.leagues\n  for select using (status <> 'draft');",
+    );
+    expect(allMigrationSql).toContain("public.is_public_league(league_id)");
+    expect(allMigrationSql).toContain(
+      "revoke select on table public.penalties from anon, authenticated;",
+    );
+    expect(allMigrationSql).toContain(
+      "grant select (\n  id,\n  league_id,\n  season_id,\n  driver_id,\n  race_session_id,\n  penalty_points,\n  reason,\n  status,\n  created_at\n) on public.penalties to anon, authenticated;",
     );
   });
 });

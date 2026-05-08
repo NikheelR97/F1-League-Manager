@@ -3,7 +3,7 @@ import { MAX_AUDIT_METADATA_BYTES } from "@/lib/constants";
 import { createAdminRateLimiter } from "@/lib/security/rate-limit";
 import { sanitizeError } from "@/lib/security/errors";
 import { generateCsrfToken, verifyCsrfToken } from "@/lib/security/csrf";
-import nextConfig from "../../../next.config";
+import nextConfig, { getSupabaseRemotePatterns } from "../../../next.config";
 
 const actorId = "00000000-0000-4000-8000-000000000010";
 
@@ -104,6 +104,29 @@ describe("security helpers", () => {
 
     expect(headerNames).toContain("Content-Security-Policy");
     expect(headerNames).toContain("Strict-Transport-Security");
+  });
+
+  it("allows Supabase storage images when a public Supabase URL is configured", () => {
+    const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
+    expect(getSupabaseRemotePatterns()).toEqual([
+      {
+        hostname: "127.0.0.1",
+        pathname: "/storage/v1/object/public/**",
+        port: "54321",
+        protocol: "http",
+      },
+    ]);
+
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "not a url";
+    expect(getSupabaseRemotePatterns()).toEqual([]);
+
+    if (originalUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
+    }
   });
 
   it("fails closed for missing production rate limit configuration", () => {

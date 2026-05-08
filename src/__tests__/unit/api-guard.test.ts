@@ -4,6 +4,9 @@ import { vi, beforeAll, afterAll } from "vitest";
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: vi.fn(),
 }));
+vi.mock("@/lib/supabase/service-role", () => ({
+  createSupabaseServiceRoleClient: vi.fn(),
+}));
 vi.mock("@/lib/supabase/admin-reader", () => ({
   createSupabaseAdminAuthReader: vi.fn(() => ({})),
 }));
@@ -15,10 +18,11 @@ vi.mock("@/lib/security/rate-limit", () => ({
 }));
 
 import { type NextRequest } from "next/server";
-import { withAdminGuard } from "@/lib/admin/api-guard";
+import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { requireAdminContext } from "@/lib/auth/admin";
 import { generateCsrfToken } from "@/lib/security/csrf";
 import { createAdminRateLimiter } from "@/lib/security/rate-limit";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import { MAX_REQUEST_BODY_BYTES } from "@/lib/constants";
 
 const CSRF_SECRET = "a".repeat(64);
@@ -210,5 +214,38 @@ describe("withAdminGuard security pipeline", () => {
     const res = await withAdminGuard(req, neverCalled);
     expect(res.status).toBe(403);
     expect(neverCalled).not.toHaveBeenCalled();
+  });
+});
+
+describe("writeAdminAuditLog", () => {
+  const actorId = "00000000-0000-4000-8000-000000000001";
+  const baseEntry = {
+    action: "league.created" as const,
+    actorId,
+    entityId: null,
+    entityType: "league" as const,
+    metadata: { name: "Test League" },
+  };
+
+  function makeDbChain(error: string | null) {
+    const insertFn = vi.fn().mockResolvedValue({ error: error ? { message: error } : null });
+    return {
+      from: vi.fn().mockReturnValue({ insert: insertFn }),
+      insert: insertFn,
+    };
+  }
+
+  it("resolves without error when the insert succeeds", async () => {
+    vi.mocked(createSupabaseServiceRoleClient).mockReturnValue(
+      makeDbChain(null) as unknown as ReturnType<typeof createSupabaseServiceRoleClient>,
+    );
+    await expect(writeAdminAuditLog(baseEntry)).resolves.toBeUndefined();
+  });
+
+  it("throws when the insert fails", async () => {
+    vi.mocked(createSupabaseServiceRoleClient).mockReturnValue(
+      makeDbChain("insert failed") as unknown as ReturnType<typeof createSupabaseServiceRoleClient>,
+    );
+    await expect(writeAdminAuditLog(baseEntry)).rejects.toThrow("Audit log write failed");
   });
 });
