@@ -21,10 +21,24 @@ interface PointsSystem {
   name: string;
 }
 
+interface Session {
+  circuit_id: string;
+  id: string;
+  name: string;
+  points_system_id: string;
+  race_length_percent: 25 | 50 | 100;
+  race_number: 1 | 2;
+  scheduled_at: string;
+  session_code: string;
+}
+
 interface SessionFormProps {
   circuits: Circuit[];
+  initialCircuitId?: string;
   leagueId: string;
   pointsSystems: PointsSystem[];
+  session?: Session;
+  wheelSpinId?: string;
 }
 
 function generateCode(): string {
@@ -32,17 +46,22 @@ function generateCode(): string {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormProps) {
+export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystems, session, wheelSpinId }: SessionFormProps) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
 
-  const [name, setName] = useState("");
-  const [sessionCode, setSessionCode] = useState(generateCode);
-  const [circuitId, setCircuitId] = useState("");
-  const [pointsSystemId, setPointsSystemId] = useState(pointsSystems[0]?.id ?? "");
-  const [raceNumber, setRaceNumber] = useState<1 | 2>(1);
-  const [raceLengthPercent, setRaceLengthPercent] = useState<25 | 50 | 100>(100);
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [name, setName] = useState(session?.name ?? "");
+  const [sessionCode, setSessionCode] = useState(session?.session_code ?? generateCode);
+  const [circuitId, setCircuitId] = useState(session?.circuit_id ?? initialCircuitId ?? "");
+  const [pointsSystemId, setPointsSystemId] = useState(session?.points_system_id ?? pointsSystems[0]?.id ?? "");
+  const [raceNumber, setRaceNumber] = useState<1 | 2>(session?.race_number ?? 1);
+  const [raceLengthPercent, setRaceLengthPercent] = useState<25 | 50 | 100>(session?.race_length_percent ?? 100);
+  
+  // Format the existing scheduled_at to YYYY-MM-DDThh:mm so it fits the datetime-local input
+  const initialDate = session?.scheduled_at 
+    ? new Date(session.scheduled_at).toISOString().slice(0, 16) 
+    : "";
+  const [scheduledAt, setScheduledAt] = useState(initialDate);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -79,7 +98,11 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/admin/leagues/${leagueId}/sessions`, {
+      const url = session 
+        ? `/api/admin/sessions/${session.id}`
+        : `/api/admin/leagues/${leagueId}/sessions`;
+        
+      const res = await fetch(url, {
         body: JSON.stringify({
           circuit_id: circuitId,
           name,
@@ -88,17 +111,18 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
           race_number: raceNumber,
           scheduled_at: new Date(scheduledAt).toISOString(),
           session_code: sessionCode,
+          wheel_spin_id: wheelSpinId,
         }),
         headers: {
           "content-type": "application/json",
           "x-csrf-token": csrfToken,
         },
-        method: "POST",
+        method: session ? "PATCH" : "POST",
       });
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError((body as { error?: string }).error ?? "Failed to create session.");
+        setError((body as { error?: string }).error ?? `Failed to ${session ? "update" : "create"} session.`);
         return;
       }
 
@@ -115,7 +139,8 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
       <div className="space-y-1">
         <Label htmlFor="circuit">Circuit</Label>
         <select
-          className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+          className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none disabled:opacity-50"
+          disabled={!!wheelSpinId}
           id="circuit"
           required
           value={circuitId}
@@ -243,7 +268,7 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
         disabled={submitting || !circuitId || !name || !pointsSystemId || !scheduledAt}
         type="submit"
       >
-        {submitting ? "Creating…" : "Create Session"}
+        {submitting ? (session ? "Updating…" : "Creating…") : (session ? "Update Session" : "Create Session")}
       </button>
     </form>
   );

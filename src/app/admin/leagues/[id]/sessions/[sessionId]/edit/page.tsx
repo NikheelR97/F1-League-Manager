@@ -7,25 +7,26 @@ import { SessionForm } from "@/components/admin/SessionForm";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
-export default async function NewSessionPage({
+export default async function EditSessionPage({
   params,
-  searchParams,
 }: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  params: Promise<{ id: string; sessionId: string }>;
 }) {
-  const { id: leagueId } = await params;
-  const resolvedSearchParams = await searchParams;
-  const wheelSpinId = resolvedSearchParams.spin_id as string | undefined;
-  const initialCircuitId = resolvedSearchParams.circuit_id as string | undefined;
+  const { id: leagueId, sessionId } = await params;
   const db = createSupabaseServiceRoleClient();
 
   const [
     { data: league },
+    { data: session, error: sessionError },
     { data: circuits, error: circuitsError },
     { data: pointsSystems, error: pointsSystemsError },
   ] = await Promise.all([
     db.from("leagues").select("id, name").eq("id", leagueId).single(),
+    db
+      .from("race_sessions")
+      .select("id, circuit_id, name, points_system_id, race_length_percent, race_number, scheduled_at, session_code")
+      .eq("id", sessionId)
+      .single(),
     db.from("circuits").select("id, name, country").order("name"),
     db
       .from("points_systems")
@@ -34,8 +35,8 @@ export default async function NewSessionPage({
       .order("name"),
   ]);
 
-  if (!league) notFound();
-  if (circuitsError || pointsSystemsError) {
+  if (!league || !session) notFound();
+  if (sessionError || circuitsError || pointsSystemsError) {
     return <ErrorState message="Failed to load form data." />;
   }
 
@@ -43,21 +44,14 @@ export default async function NewSessionPage({
     <div className="space-y-8">
       <AdminPageHeader
         description={league.name}
-        title="New Race Session"
+        title={`Edit ${session.name}`}
       />
-      {!pointsSystems?.length ? (
-        <p className="text-sm text-f1-muted">
-          You must add a points system to this league before creating sessions.
-        </p>
-      ) : (
-        <SessionForm
-          circuits={circuits ?? []}
-          initialCircuitId={initialCircuitId}
-          leagueId={leagueId}
-          pointsSystems={pointsSystems}
-          wheelSpinId={wheelSpinId}
-        />
-      )}
+      <SessionForm
+        circuits={circuits ?? []}
+        leagueId={leagueId}
+        pointsSystems={pointsSystems ?? []}
+        session={session}
+      />
     </div>
   );
 }

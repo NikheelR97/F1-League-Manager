@@ -13,6 +13,8 @@ export function LeagueSubNav({ slug }: LeagueSubNavProps) {
 
   const links = [
     { href: base, label: "Hub", activePath: base },
+    { href: `${base}/calendar`, label: "Calendar", activePath: `${base}/calendar` },
+    { href: `${base}/wheel`, label: "Wheel", activePath: `${base}/wheel` },
     { href: `${base}/standings/drivers`, label: "Standings", activePath: `${base}/standings` },
     { href: `${base}/results`, label: "Results", activePath: `${base}/results` },
     { href: `${base}/penalties`, label: "Penalties", activePath: `${base}/penalties` },

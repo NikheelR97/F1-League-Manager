@@ -687,6 +687,24 @@ Build calendar management and the server-confirmed digital wheel.
 3. Wheel result is server-authoritative.
 4. `npm run sprint-verify` passes.
 
+### Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| Admin calendar CRUD | Done | `PATCH/DELETE` APIs + UI `SessionDeleteButton`, `npm run sprint-verify` | None |
+| Pre-populate races | Done | `SessionForm` supports creating and editing upcoming sessions | None |
+| Circuit picker | Done | `SessionForm` dropdown uses `circuits` table | None |
+| Public calendar page | Done | `src/app/leagues/[slug]/calendar/page.tsx` | None |
+| Wheel circuit pool setup | Done | `WheelManager` UI + `PUT` API to update `league_circuit_pools` | None |
+| Digital wheel animation | Done | Client-side visual delay + loader in `WheelManager.tsx` | None |
+| Server choose candidate | Done | `POST /api/admin/leagues/[id]/wheel/spin` randomly selects and creates pending spin | None |
+| Admin confirm wheel result | Done | Confirmation passes `spin_id` to `SessionForm` | None |
+| Create race session | Done | Session API handles `wheel_spin_id` and creates race session | None |
+| Remove used circuit | Done | Session API updates pool `is_available = false` on confirmation | None |
+| Public wheel history | Done | `src/app/leagues/[slug]/wheel/page.tsx` | None |
+| Audit wheel spins | Done | `wheel.spun`, `wheel.confirmed`, `wheel.voided` audit logs implemented | None |
+| `npm run sprint-verify` | Done | Passed full suite (type-check, lint, test, coverage, build, e2e) | None |
+
 ---
 
 ## 14. S7 - Racer Garage

@@ -2,11 +2,12 @@ import "server-only";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LeagueAssetUpload } from "@/components/admin/LeagueAssetUpload";
 import { LeagueStatusButton } from "@/components/admin/LeagueStatusButton";
+import { SessionDeleteButton } from "@/components/admin/SessionDeleteButton";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { MAX_DRIVERS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -163,13 +164,21 @@ export default async function LeagueDetailPage({
           <h2 className="text-sm font-bold uppercase text-f1-muted">
             Race Sessions ({sessions?.length ?? 0})
           </h2>
-          <Link
-            className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
-            href={`/admin/leagues/${leagueId}/sessions/new`}
-          >
-            <Plus aria-hidden="true" size={12} />
-            Add Session
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              className="flex items-center gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              href={`/admin/leagues/${leagueId}/wheel`}
+            >
+              Digital Wheel
+            </Link>
+            <Link
+              className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+              href={`/admin/leagues/${leagueId}/sessions/new`}
+            >
+              <Plus aria-hidden="true" size={12} />
+              Add Session
+            </Link>
+          </div>
         </div>
         {!sessions?.length ? (
           <p className="text-sm text-f1-muted">No sessions yet. Add one to start entering results.</p>
@@ -208,6 +217,14 @@ export default async function LeagueDetailPage({
                           Enter Results
                         </Link>
                       )}
+                      <Link
+                        className="p-1 text-f1-muted transition-colors hover:text-f1-white"
+                        href={`/admin/leagues/${leagueId}/sessions/${session.id}/edit`}
+                        title="Edit Session"
+                      >
+                        <Pencil aria-hidden="true" size={16} />
+                      </Link>
+                      {isPublishable && <SessionDeleteButton sessionId={session.id} />}
                     </div>
                   </div>
                 </li>

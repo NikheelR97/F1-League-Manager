@@ -14,6 +14,7 @@ const createSessionSchema = z.object({
   race_number: z.union([z.literal(1), z.literal(2)]),
   scheduled_at: z.string().datetime({ offset: true }),
   session_code: z.string().regex(SESSION_CODE_RE, "Must be 6 uppercase letters/digits"),
+  wheel_spin_id: z.string().uuid().optional(),
 });
 
 export async function GET(
@@ -62,6 +63,24 @@ export async function POST(
       return Response.json({ error: "Invalid request body" }, { status: 422 });
     }
 
+    if (body.wheel_spin_id) {
+      const { data: spin, error: spinError } = await db
+        .from("wheel_spins")
+        .select("status, circuit_id")
+        .eq("id", body.wheel_spin_id)
+        .single();
+        
+      if (spinError || !spin) {
+        return Response.json({ error: "Wheel spin not found" }, { status: 404 });
+      }
+      if (spin.status !== "pending") {
+        return Response.json({ error: "Wheel spin is not pending" }, { status: 400 });
+      }
+      if (spin.circuit_id !== body.circuit_id) {
+        return Response.json({ error: "Circuit mismatch with wheel spin" }, { status: 400 });
+      }
+    }
+
     const { data, error } = await db
       .from("race_sessions")
       .insert({
@@ -83,6 +102,28 @@ export async function POST(
         return Response.json({ error: "A session with that code already exists in this league" }, { status: 409 });
       }
       return Response.json({ error: "Failed to create session" }, { status: 500 });
+    }
+
+    if (body.wheel_spin_id) {
+      await db.from("wheel_spins").update({
+        status: "confirmed",
+        confirmed_at: new Date().toISOString(),
+        confirmed_by: auth.user.id,
+        race_session_id: data.id,
+      }).eq("id", body.wheel_spin_id);
+
+      await db.from("league_circuit_pools").update({
+        is_available: false,
+        used_at: new Date().toISOString(),
+      }).eq("league_id", leagueId).eq("circuit_id", body.circuit_id);
+      
+      await writeAdminAuditLog({
+        action: "wheel.confirmed",
+        actorId: auth.user.id,
+        entityId: body.wheel_spin_id,
+        entityType: "wheel_spin",
+        metadata: { league_id: leagueId, race_session_id: data.id },
+      });
     }
 
     await writeAdminAuditLog({
