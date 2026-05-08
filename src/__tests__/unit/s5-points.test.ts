@@ -7,6 +7,7 @@ import {
 } from "@/lib/results/points";
 import {
   checkPublishPreconditions,
+  validatePublishResults,
   type RaceResultEntry,
 } from "@/lib/results/publish-service";
 import {
@@ -441,7 +442,54 @@ describe("checkPublishPreconditions — duplicate publish returns conflict (test
   });
 });
 
-describe("RaceResultEntry — client-supplied points are rejected (test 10)", () => {
+describe("validatePublishResults — server-side cross-field validation (test 10)", () => {
+  const base: RaceResultEntry = {
+    driver_id: "d1",
+    team_id: "t1",
+    finishing_position: 1,
+    result_status: "classified",
+    fastest_lap: false,
+    manual_points_adjustment: 0,
+    penalty_points: 0,
+    raw_result: null,
+    notes: null,
+  };
+
+  it("returns null when results are valid", () => {
+    expect(validatePublishResults([base])).toBeNull();
+  });
+
+  it("returns 422 when no driver is classified with a position", () => {
+    const result = validatePublishResults([{ ...base, result_status: "dnf", finishing_position: null }]);
+    expect(result).toMatchObject({ ok: false, status: 422 });
+  });
+
+  it("returns 422 for duplicate classified finishing positions", () => {
+    const result = validatePublishResults([
+      { ...base, driver_id: "d1", finishing_position: 1 },
+      { ...base, driver_id: "d2", finishing_position: 1 },
+    ]);
+    expect(result).toMatchObject({ ok: false, status: 422 });
+  });
+
+  it("returns 422 when more than one driver has fastest_lap", () => {
+    const result = validatePublishResults([
+      { ...base, driver_id: "d1", finishing_position: 1, fastest_lap: true },
+      { ...base, driver_id: "d2", finishing_position: 2, fastest_lap: true },
+    ]);
+    expect(result).toMatchObject({ ok: false, status: 422 });
+  });
+
+  it("allows a single fastest_lap driver", () => {
+    const result = validatePublishResults([
+      { ...base, driver_id: "d1", finishing_position: 1, fastest_lap: true },
+      { ...base, driver_id: "d2", finishing_position: 2, fastest_lap: false },
+    ]);
+    expect(result).toBeNull();
+  });
+});
+
+describe("RaceResultEntry — client-supplied points are rejected (test 11)", () => {
   it("RaceResultEntry type has no points_awarded field — server recalculates it", () => {
     const entry: RaceResultEntry = {
       driver_id: "d1",

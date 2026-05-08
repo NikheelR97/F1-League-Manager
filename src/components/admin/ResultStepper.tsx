@@ -62,6 +62,7 @@ interface RaceResultRow {
 }
 
 interface PenaltyRow {
+  id: string;
   appeal_notes: string;
   driver_id: string;
   penalty_points: number;
@@ -393,6 +394,7 @@ function PenaltiesStep({
     onChange([
       ...rows,
       {
+        id: crypto.randomUUID(),
         appeal_notes: "",
         driver_id: drivers[0]?.driver_id ?? "",
         penalty_points: 0,
@@ -423,7 +425,7 @@ function PenaltiesStep({
           {rows.map((row, i) => {
             const driver = drivers.find((d) => d.driver_id === row.driver_id);
             return (
-              <div className="border border-f1-border bg-f1-dark p-4 space-y-3" key={i}>
+              <div className="border border-f1-border bg-f1-dark p-4 space-y-3" key={row.id}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase text-f1-muted">Penalty {i + 1}</span>
                   <button
@@ -549,7 +551,12 @@ function ReviewStep({
   );
   const ordered = [...classified, ...nonClassified];
 
-  const penaltyMap = new Map(penalties.map((p) => [p.driver_id, p]));
+  const penaltyPtsByDriver = new Map<string, number>();
+  for (const p of penalties) {
+    if (p.status !== "rescinded") {
+      penaltyPtsByDriver.set(p.driver_id, (penaltyPtsByDriver.get(p.driver_id) ?? 0) + p.penalty_points);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -595,10 +602,9 @@ function ReviewStep({
                   session.pole_position_enabled,
                 );
                 const champTotal = racePts + row.manual_points_adjustment;
-                const formalPenalty = penaltyMap.get(row.driver_id);
                 const banAlert =
                   row.result_status === "ban" ||
-                  (formalPenalty && formalPenalty.status !== "rescinded" && formalPenalty.penalty_points > 0);
+                  (penaltyPtsByDriver.get(row.driver_id) ?? 0) > 0;
 
                 return (
                   <tr key={row.driver_id} className={banAlert ? "bg-destructive/10" : ""}>

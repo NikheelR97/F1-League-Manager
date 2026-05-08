@@ -55,6 +55,35 @@ export type PublishResult =
   | { ok: false; status: number; error: string };
 
 // ---------------------------------------------------------------------------
+// Cross-field validation (exported for unit tests)
+// ---------------------------------------------------------------------------
+
+export interface ResultsValidationError {
+  ok: false;
+  status: 422;
+  error: string;
+}
+
+export function validatePublishResults(
+  results: RaceResultEntry[],
+): ResultsValidationError | null {
+  const classified = results.filter(
+    (r) => r.result_status === "classified" && r.finishing_position !== null,
+  );
+  if (classified.length === 0) {
+    return { ok: false, status: 422, error: "At least one driver must be classified with a finishing position" };
+  }
+  const positions = classified.map((r) => r.finishing_position!);
+  if (new Set(positions).size !== positions.length) {
+    return { ok: false, status: 422, error: "Duplicate finishing positions detected" };
+  }
+  if (results.filter((r) => r.fastest_lap).length > 1) {
+    return { ok: false, status: 422, error: "Only one driver may have the fastest lap" };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Pure precondition check (exported for unit tests)
 // ---------------------------------------------------------------------------
 
@@ -121,6 +150,9 @@ export async function publishSession(
   // checkPublishPreconditions guarantees league and psRaw are non-null beyond this point
   const leagueData = league!;
   const ps = psRaw!;
+
+  const resultsCheck = validatePublishResults(results);
+  if (resultsCheck) return resultsCheck;
 
   // Build pole-position lookup from qualifying entries
   const poleDriverId = qualifying.find((q) => q.is_pole)?.driver_id ?? null;
@@ -197,7 +229,22 @@ export async function publishSession(
     }
   }
 
-  // 6. Mark session as completed
+  // 6. Recalculate standings (before marking completed so failure is safely retryable)
+  // Pass sessionId so this session's already-written results are included even though
+  // its status is not yet "completed".
+  const recalcResult = await recalculateStandings(
+    db,
+    leagueId,
+    session.season_id,
+    leagueData.constructor_championship_enabled,
+    leagueData.penalty_threshold,
+    sessionId,
+  );
+  if (!recalcResult.ok) {
+    return { ok: false, status: 500, error: recalcResult.error };
+  }
+
+  // 7. Mark session as completed (point of no return — standings are already correct)
   const { error: statusErr } = await db
     .from("race_sessions")
     .update({ status: "completed", published_at: new Date().toISOString() })
@@ -205,18 +252,6 @@ export async function publishSession(
 
   if (statusErr) {
     return { ok: false, status: 500, error: "Failed to mark session as completed" };
-  }
-
-  // 7. Recalculate standings
-  const recalcResult = await recalculateStandings(
-    db,
-    leagueId,
-    session.season_id,
-    leagueData.constructor_championship_enabled,
-    leagueData.penalty_threshold,
-  );
-  if (!recalcResult.ok) {
-    return { ok: false, status: 500, error: recalcResult.error };
   }
 
   // 8. Audit log
@@ -241,24 +276,30 @@ async function recalculateStandings(
   seasonId: string,
   constructorEnabled: boolean,
   penaltyThreshold: number,
+  additionalSessionId?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  // Fetch all completed race results for this league+season
+  // Fetch all completed race sessions, plus the current one being published
+  // (which is not yet marked "completed" when this runs).
+  const completedQuery = await db
+    .from("race_sessions")
+    .select("id")
+    .eq("league_id", leagueId)
+    .eq("season_id", seasonId)
+    .eq("status", "completed");
+
+  const sessionIds = [
+    ...(completedQuery.data?.map((s) => s.id) ?? []),
+    ...(additionalSessionId ? [additionalSessionId] : []),
+  ];
+  // Deduplicate (additionalSessionId may already be completed on a retry)
+  const uniqueSessionIds = [...new Set(sessionIds)];
+
   const { data: allResults } = await db
     .from("race_results")
     .select(
       "driver_id, team_id, finishing_position, result_status, points_awarded, manual_points_adjustment, fastest_lap",
     )
-    .in(
-      "race_session_id",
-      (
-        await db
-          .from("race_sessions")
-          .select("id")
-          .eq("league_id", leagueId)
-          .eq("season_id", seasonId)
-          .eq("status", "completed")
-      ).data?.map((s) => s.id) ?? [],
-    );
+    .in("race_session_id", uniqueSessionIds);
 
   const { data: adjustments } = await db
     .from("championship_adjustments")
@@ -348,12 +389,13 @@ async function recalculateStandings(
     }
   }
 
-  // Penalty totals
+  // Penalty totals — exclude rescinded decisions
   const { data: penaltyRows } = await db
     .from("penalties")
     .select("driver_id, penalty_points")
     .eq("league_id", leagueId)
-    .eq("season_id", seasonId);
+    .eq("season_id", seasonId)
+    .neq("status", "rescinded");
 
   const { data: entries } = await db
     .from("league_driver_entries")
