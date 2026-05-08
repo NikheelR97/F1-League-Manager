@@ -11,6 +11,8 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { MAX_DRIVERS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
+const MAX_SESSIONS_LIST = 20;
+
 export default async function LeagueDetailPage({
   params,
 }: {
@@ -24,6 +26,7 @@ export default async function LeagueDetailPage({
     { data: teams, error: teamsError },
     { data: entries, error: entriesError },
     { data: pointsSystems, error: pointsSystemsError },
+    { data: sessions },
   ] = await Promise.all([
     db
       .from("leagues")
@@ -48,6 +51,12 @@ export default async function LeagueDetailPage({
       .select("id, name, fastest_lap_points, pole_position_points, max_positions")
       .eq("league_id", leagueId)
       .order("name"),
+    db
+      .from("race_sessions")
+      .select("id, name, session_code, scheduled_at, status, circuits(name, country)")
+      .eq("league_id", leagueId)
+      .order("scheduled_at", { ascending: false })
+      .limit(MAX_SESSIONS_LIST),
   ]);
 
   if (leagueError && leagueError.code !== "PGRST116") {
@@ -144,6 +153,66 @@ export default async function LeagueDetailPage({
                 </div>
               </li>
             ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Sessions */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase text-f1-muted">
+            Race Sessions ({sessions?.length ?? 0})
+          </h2>
+          <Link
+            className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+            href={`/admin/leagues/${leagueId}/sessions/new`}
+          >
+            <Plus aria-hidden="true" size={12} />
+            Add Session
+          </Link>
+        </div>
+        {!sessions?.length ? (
+          <p className="text-sm text-f1-muted">No sessions yet. Add one to start entering results.</p>
+        ) : (
+          <ul className="space-y-2">
+            {sessions.map((session) => {
+              const circuit = session.circuits as unknown as { country: string; name: string } | null;
+              const isPublishable = session.status !== "completed";
+              return (
+                <li key={session.id}>
+                  <div className="flex items-center justify-between border border-f1-border bg-f1-dark p-4">
+                    <div>
+                      <p className="font-bold text-f1-white">{session.name}</p>
+                      <p className="font-mono text-xs text-f1-muted">
+                        {session.session_code}
+                        {circuit ? ` · ${circuit.name}, ${circuit.country}` : ""}
+                        {" · "}
+                        {new Date(session.scheduled_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`border px-2 py-0.5 text-xs font-bold uppercase ${
+                          session.status === "completed"
+                            ? "border-team-sauber text-team-sauber"
+                            : "border-f1-muted text-f1-muted"
+                        }`}
+                      >
+                        {session.status}
+                      </span>
+                      {isPublishable && (
+                        <Link
+                          className="border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                          href={`/admin/leagues/${leagueId}/sessions/${session.id}/publish`}
+                        >
+                          Enter Results
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

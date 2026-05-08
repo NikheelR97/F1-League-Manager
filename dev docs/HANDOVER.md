@@ -1,8 +1,85 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S0 implementation in progress after owner approval.
+**Status:** S4 public pages merged to `dev` in PR #8 on May 8, 2026.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
+
+---
+
+## Current Handover Notes
+
+Last updated: May 8, 2026.
+
+Current branch state:
+
+| Item | Current state |
+|------|---------------|
+| Active development branch | `dev` |
+| Latest merged PR | PR #8, `feat(s4): public standings, results, penalties, profiles, and stats` |
+| Merge commit | `2b1b8c1` |
+| Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
+| Latest migration applied locally | `20260508123000_s4_public_security_boundaries.sql` |
+
+S4 added public league pages for:
+
+1. League hub.
+2. Driver standings.
+3. Constructor standings.
+4. Results list.
+5. Race result detail.
+6. Penalties.
+7. Driver profiles.
+8. Team profiles.
+9. Statistics.
+
+Important S4 security note:
+
+```text
+Public pages may use server-side service-role reads, but the Supabase anon API must still enforce the public data boundary.
+```
+
+The S4 hardening migration:
+
+```text
+supabase/migrations/20260508123000_s4_public_security_boundaries.sql
+```
+
+does these things:
+
+1. Replaces broad public read policies with policies scoped to non-draft leagues.
+2. Keeps scheduled/completed public session data visible only for public leagues.
+3. Keeps qualifying/race result reads scoped to completed sessions in public leagues.
+4. Restricts public penalty table column grants so `steward_notes` and `appeal_notes` are not readable by `anon` or `authenticated`.
+
+Migration handling:
+
+1. For local validation, run `npx.cmd supabase migration up` from the repo root.
+2. The S4 migration has already been applied to the local Docker database on May 8, 2026.
+3. Any shared dev preview, staging, or production environment that receives `dev` or later branches must apply the same migration before public-page validation.
+4. Do not run migrations against non-production, staging, or production until the branch and Supabase target have been confirmed.
+
+S4 validation evidence:
+
+```bash
+npm.cmd run type-check
+npm.cmd run lint
+npm.cmd run test
+npm.cmd run test:coverage
+npm.cmd run build
+npm.cmd run test:e2e
+git diff --check
+```
+
+All passed before PR #8 was merged. Unit/component tests were at 105 passing after the S4 review fixes.
+
+Known deferred S4 items:
+
+| Item | Status | Next action |
+|------|--------|-------------|
+| Standalone qualifying results page | Deferred | Qualifying is shown on race detail; add standalone page in S5 or later if still needed. |
+| Race reports page | Deferred | Needs published result workflow/data to be meaningful. |
+| Season selector on public pages | Deferred | MVP assumes one active season per league; revisit with historical seasons. |
+| Cache/revalidation after publish | Deferred | Publish marks session completed; public pages use `force-dynamic`. Tag-based revalidation deferred to S6+. |
 
 ---
 

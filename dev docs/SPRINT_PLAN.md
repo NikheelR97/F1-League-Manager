@@ -619,13 +619,29 @@ Build the admin result publishing workflow and the calculation engine.
 12. Standings tie-breaks are correct.
 13. Result publish writes audit logs.
 
+### Sprint Evidence
+
+| Task | Status | Evidence |
+|------|--------|----------|
+| Points engine (`calculateRacePoints`) | Done | `src/lib/results/points.ts` — server-only, FL + pole bonus, non-classified → 0 |
+| Workbook gap parser (`parseWorkbookGap`) | Done | `src/lib/results/parse-gap.ts` — all HANDOVER §11 formats |
+| Standings builders | Done | `src/lib/results/standings.ts` — driver/team/penalty, tie-break order, carry-over |
+| Publish service (`publishSession`) | Done | `src/lib/results/publish-service.ts` — upsert results, mark completed, recalc standings, audit log |
+| Publish API route | Done | `POST /api/admin/sessions/[id]/publish` — Zod-validated, no client `points_awarded` |
+| Sessions API route | Done | `GET + POST /api/admin/leagues/[id]/sessions` — create with circuit + PS |
+| Session create UI | Done | `SessionForm.tsx` + `/admin/leagues/[id]/sessions/new` |
+| Result entry stepper | Done | `ResultStepper.tsx` — qualifying → results → penalties → review → publish |
+| League admin sessions section | Done | `/admin/leagues/[id]` — sessions list + "Enter Results" links |
+| Unit tests | Done | `s5-points.test.ts` — 49 tests covering all 13 HANDOVER scenarios + tie-breaks + parser |
+| `sprint-verify` gate | Done | type-check ✓ · lint ✓ · 154 tests ✓ · coverage ✓ · build ✓ · E2E ✓ |
+
 ### Done When
 
-1. Admin can publish a race result.
-2. Public driver standings update.
-3. Public constructor standings update.
-4. Penalty totals update.
-5. `npm run sprint-verify` passes.
+1. Admin can publish a race result. ✓
+2. Public driver standings update. ✓ (recalculateStandings rebuilds driver_standings)
+3. Public constructor standings update. ✓ (rebuilds team_standings when enabled)
+4. Penalty totals update. ✓ (upserts driver_penalty_totals)
+5. `npm run sprint-verify` passes. ✓
 
 ---
 
