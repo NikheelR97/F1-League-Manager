@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S4 public pages merged to `dev` in PR #8 on May 8, 2026.
+**Status:** S5 result publishing merged to `dev` in PR #9 on May 8, 2026.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -15,71 +15,79 @@ Current branch state:
 | Item | Current state |
 |------|---------------|
 | Active development branch | `dev` |
-| Latest merged PR | PR #8, `feat(s4): public standings, results, penalties, profiles, and stats` |
-| Merge commit | `2b1b8c1` |
+| Latest merged PR | PR #9, `feat(s5): result publishing — points engine, standings, and admin stepper` |
+| Merge commit | `e00a9c7` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
-| Latest migration applied locally | `20260508123000_s4_public_security_boundaries.sql` |
+| Latest migration applied locally | `20260508123000_s4_public_security_boundaries.sql` (no new S5 migrations) |
 
-S4 added public league pages for:
+S5 added the admin result publishing workflow:
 
-1. League hub.
-2. Driver standings.
-3. Constructor standings.
-4. Results list.
-5. Race result detail.
-6. Penalties.
-7. Driver profiles.
-8. Team profiles.
-9. Statistics.
+1. Session management API (`GET + POST /api/admin/leagues/[id]/sessions`).
+2. Session creation UI (`SessionForm.tsx` + `/admin/leagues/[id]/sessions/new`).
+3. Publish API (`POST /api/admin/sessions/[id]/publish`) — Zod-validated; `points_awarded` absent from schema, server-calculated only.
+4. Server-authoritative points engine (`src/lib/results/points.ts`) — FL bonus, pole bonus, non-classified → 0.
+5. Workbook gap parser (`src/lib/results/parse-gap.ts`) — all HANDOVER §11 formats.
+6. Standings builders (`src/lib/results/standings.ts`) — driver/team/penalty, tie-break order, carry-over.
+7. Publish service (`src/lib/results/publish-service.ts`) — full publish pipeline with standings rebuild.
+8. 4-step result entry stepper (`ResultStepper.tsx`) — qualifying → results → penalties → review → publish.
+9. 167 unit/component tests passing (167 from 5 prior — 5 new `validatePublishResults` tests added in post-review fix commit).
 
-Important S4 security note:
-
-```text
-Public pages may use server-side service-role reads, but the Supabase anon API must still enforce the public data boundary.
-```
-
-The S4 hardening migration:
+Important S5 publish pipeline rules:
 
 ```text
-supabase/migrations/20260508123000_s4_public_security_boundaries.sql
+- points_awarded is calculated server-side only. The API schema has no points_awarded field.
+- penalty_points (discipline) do NOT affect standings. manual_points_adjustment DOES.
+- Constructor standings use points_awarded only, not manual_points_adjustment.
+- Standings are recalculated by full delete + re-insert to avoid unique position constraint violations.
+- Standings recalculation runs BEFORE marking the session completed so a DB failure is safely retryable.
+- Rescinded penalties are excluded from ban-total calculations (.neq("status", "rescinded")).
+- Server validates cross-field rules: ≥1 classified finisher, no duplicate positions, ≤1 fastest-lap driver.
 ```
 
-does these things:
+Post-review fixes applied (in commit `4e67fbd`, merged in PR #9):
 
-1. Replaces broad public read policies with policies scoped to non-draft leagues.
-2. Keeps scheduled/completed public session data visible only for public leagues.
-3. Keeps qualifying/race result reads scoped to completed sessions in public leagues.
-4. Restricts public penalty table column grants so `steward_notes` and `appeal_notes` are not readable by `anon` or `authenticated`.
+| Bug | Fix |
+|-----|-----|
+| Session marked completed before standings recalc — failure left broken unretryable state | Moved standings recalc before `status = completed`; passes `additionalSessionId` so current session results are included |
+| Rescinded penalties counted toward `ban_threshold_reached` | Added `.neq("status", "rescinded")` to penalties query in `recalculateStandings` |
+| `penaltyMap` kept only last penalty per driver — multi-penalty ban alert wrong | Replaced with point aggregation loop across all non-rescinded penalties per driver |
+| No server-side cross-field validation — duplicate positions/multiple FL could reach DB | Added `validatePublishResults()` pure function called before any DB write; exported + 5 unit tests |
+| Index keys on removable penalty list items — stale React DOM on removal | Added stable `id: crypto.randomUUID()` to `PenaltyRow`; penalty items key on `row.id` |
 
-Migration handling:
+No new migrations in S5. The existing schema (including `race_results`, `qualifying_results`, `penalties`, `driver_standings`, `team_standings`, `driver_penalty_totals`) was defined in the S1 migration.
 
-1. For local validation, run `npx.cmd supabase migration up` from the repo root.
-2. The S4 migration has already been applied to the local Docker database on May 8, 2026.
-3. Any shared dev preview, staging, or production environment that receives `dev` or later branches must apply the same migration before public-page validation.
-4. Do not run migrations against non-production, staging, or production until the branch and Supabase target have been confirmed.
-
-S4 validation evidence:
+S5 validation evidence:
 
 ```bash
 npm.cmd run type-check
 npm.cmd run lint
-npm.cmd run test
-npm.cmd run test:coverage
+npm.cmd run test          # 167 tests
+npm.cmd run test:coverage # branches 82.9%, all thresholds met
 npm.cmd run build
 npm.cmd run test:e2e
-git diff --check
 ```
 
-All passed before PR #8 was merged. Unit/component tests were at 105 passing after the S4 review fixes.
+All passed before PR #9 was merged. CI green on both the initial S5 commit and the post-review fix commit.
 
-Known deferred S4 items:
+Known deferred S5 items:
 
 | Item | Status | Next action |
 |------|--------|-------------|
-| Standalone qualifying results page | Deferred | Qualifying is shown on race detail; add standalone page in S5 or later if still needed. |
-| Race reports page | Deferred | Needs published result workflow/data to be meaningful. |
+| Standalone qualifying results page | Deferred | Qualifying shown on race detail; standalone page deferred to S6+ if needed. |
+| Race reports page | Deferred | Needs published result data; deferred to S6+. |
 | Season selector on public pages | Deferred | MVP assumes one active season per league; revisit with historical seasons. |
-| Cache/revalidation after publish | Deferred | Publish marks session completed; public pages use `force-dynamic`. Tag-based revalidation deferred to S6+. |
+| Cache/revalidation after publish | Deferred | Public pages use `force-dynamic`; tag-based revalidation deferred to S6+. |
+| Standings atomicity (delete+insert gap) | Accepted risk | PostgREST has no transactions; gap is milliseconds during a rare admin action. Wrap in a DB function/RPC if standings become high-traffic. |
+
+---
+
+### S4 Notes (archived)
+
+S4 added public league pages: league hub, driver standings, constructor standings, results list, race result detail, penalties, driver profiles, team profiles, and statistics.
+
+The S4 hardening migration (`20260508123000_s4_public_security_boundaries.sql`) scopes public RLS policies to non-draft leagues, restricts result reads to completed sessions, and removes `steward_notes`/`appeal_notes` from the anon column grant on the penalties table.
+
+All S4 validation passed before PR #8 was merged. Unit/component tests were at 105 passing after S4 review fixes.
 
 ---
 
