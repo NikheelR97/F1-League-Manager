@@ -3,7 +3,7 @@ interface WheelSpinRecord {
   status: string;
 }
 
-export function selectWheelCircuit<T>(availableCircuits: T[]): T {
+export function selectWheelCircuit<T>(availableCircuits: T[] | null | undefined): T {
   if (!availableCircuits || availableCircuits.length === 0) {
     throw new Error("No circuits available in the pool.");
   }
