@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 import { Input } from "@/components/ui/input";
@@ -9,6 +11,18 @@ import { Label } from "@/components/ui/label";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 
 const SESSION_CODE_RE = /^[A-Z0-9]{6}$/;
+
+const formSchema = z.object({
+  circuit_id: z.string().min(1, "Please select a circuit"),
+  name: z.string().trim().min(1, "Name is required").max(120),
+  points_system_id: z.string().min(1, "Please select a points system"),
+  race_length_percent: z.union([z.literal(25), z.literal(50), z.literal(100)]),
+  race_number: z.union([z.literal(1), z.literal(2)]),
+  scheduled_at: z.string().min(1, "Please select a date"),
+  session_code: z.string().regex(SESSION_CODE_RE, "Must be exactly 6 uppercase letters or digits"),
+});
+
+type FormData = z.infer<typeof formSchema>;
 
 interface Circuit {
   country: string;
@@ -21,10 +35,24 @@ interface PointsSystem {
   name: string;
 }
 
+interface Session {
+  circuit_id: string;
+  id: string;
+  name: string;
+  points_system_id: string;
+  race_length_percent: 25 | 50 | 100;
+  race_number: 1 | 2;
+  scheduled_at: string;
+  session_code: string;
+}
+
 interface SessionFormProps {
   circuits: Circuit[];
+  initialCircuitId?: string;
   leagueId: string;
   pointsSystems: PointsSystem[];
+  session?: Session;
+  wheelSpinId?: string;
 }
 
 function generateCode(): string {
@@ -32,93 +60,90 @@ function generateCode(): string {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormProps) {
+export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystems, session, wheelSpinId }: SessionFormProps) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const [name, setName] = useState("");
-  const [sessionCode, setSessionCode] = useState(generateCode);
-  const [circuitId, setCircuitId] = useState("");
-  const [pointsSystemId, setPointsSystemId] = useState(pointsSystems[0]?.id ?? "");
-  const [raceNumber, setRaceNumber] = useState<1 | 2>(1);
-  const [raceLengthPercent, setRaceLengthPercent] = useState<25 | 50 | 100>(100);
-  const [scheduledAt, setScheduledAt] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [codeError, setCodeError] = useState<string | null>(null);
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      circuit_id: session?.circuit_id ?? initialCircuitId ?? "",
+      name: session?.name ?? "",
+      points_system_id: session?.points_system_id ?? pointsSystems[0]?.id ?? "",
+      race_length_percent: session?.race_length_percent ?? 100,
+      race_number: session?.race_number ?? 1,
+      scheduled_at: session?.scheduled_at 
+        ? new Date(session.scheduled_at).toISOString().slice(0, 16) 
+        : "",
+      session_code: session?.session_code ?? generateCode(),
+    },
+  });
 
-  function handleCodeChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.target.value.toUpperCase();
-    setSessionCode(val);
-    setCodeError(SESSION_CODE_RE.test(val) ? null : "Must be exactly 6 uppercase letters or digits");
-  }
+  const { register, handleSubmit, setValue, control, formState: { errors, isSubmitting } } = form;
+  const currentName = useWatch({ control, name: "name" });
 
   function handleCircuitChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    setCircuitId(e.target.value);
-    if (!name) {
-      const circuit = circuits.find((c) => c.id === e.target.value);
-      if (circuit) setName(`${circuit.name} Race`);
+    const newCircuitId = e.target.value;
+    setValue("circuit_id", newCircuitId, { shouldValidate: true });
+    
+    if (!currentName) {
+      const circuit = circuits.find((c) => c.id === newCircuitId);
+      if (circuit) setValue("name", `${circuit.name} Race`, { shouldValidate: true });
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    if (!SESSION_CODE_RE.test(sessionCode)) {
-      setCodeError("Must be exactly 6 uppercase letters or digits");
-      return;
-    }
+  async function onSubmit(data: FormData) {
+    setSubmitError(null);
 
     // Validate scheduled_at is a valid datetime
-    const parsed = z.string().datetime({ offset: true }).safeParse(new Date(scheduledAt).toISOString());
-    if (!parsed.success) {
-      setError("Invalid scheduled date");
+    const parsedDate = z.string().datetime({ offset: true }).safeParse(new Date(data.scheduled_at).toISOString());
+    if (!parsedDate.success) {
+      setSubmitError("Invalid scheduled date");
       return;
     }
 
-    setSubmitting(true);
     try {
-      const res = await fetch(`/api/admin/leagues/${leagueId}/sessions`, {
+      const url = session 
+        ? `/api/admin/sessions/${session.id}`
+        : `/api/admin/leagues/${leagueId}/sessions`;
+        
+      const res = await fetch(url, {
         body: JSON.stringify({
-          circuit_id: circuitId,
-          name,
-          points_system_id: pointsSystemId,
-          race_length_percent: raceLengthPercent,
-          race_number: raceNumber,
-          scheduled_at: new Date(scheduledAt).toISOString(),
-          session_code: sessionCode,
+          ...data,
+          scheduled_at: new Date(data.scheduled_at).toISOString(),
+          wheel_spin_id: wheelSpinId,
         }),
         headers: {
           "content-type": "application/json",
           "x-csrf-token": csrfToken,
         },
-        method: "POST",
+        method: session ? "PATCH" : "POST",
       });
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError((body as { error?: string }).error ?? "Failed to create session.");
+        setSubmitError((body as { error?: string }).error ?? `Failed to ${session ? "update" : "create"} session.`);
         return;
       }
 
       router.push(`/admin/leagues/${leagueId}`);
       router.refresh();
-    } finally {
-      setSubmitting(false);
+    } catch {
+      setSubmitError(`Failed to ${session ? "update" : "create"} session.`);
     }
   }
 
   return (
-    <form className="space-y-5" noValidate onSubmit={handleSubmit}>
+    <form className="space-y-5" noValidate onSubmit={handleSubmit(onSubmit)}>
       {/* Circuit */}
       <div className="space-y-1">
         <Label htmlFor="circuit">Circuit</Label>
         <select
-          className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+          className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none disabled:opacity-50"
+          aria-disabled={!!wheelSpinId}
           id="circuit"
-          required
-          value={circuitId}
+          {...register("circuit_id")}
           onChange={handleCircuitChange}
         >
           <option value="">Select a circuit…</option>
@@ -128,6 +153,7 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
             </option>
           ))}
         </select>
+        {errors.circuit_id && <p className="text-xs text-destructive">{errors.circuit_id.message}</p>}
       </div>
 
       {/* Name */}
@@ -137,10 +163,9 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
           className="bg-f1-dark text-f1-white placeholder:text-f1-muted"
           id="session-name"
           placeholder="Bahrain Race"
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          {...register("name")}
         />
+        {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
       </div>
 
       {/* Session code */}
@@ -152,18 +177,19 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
             id="session-code"
             maxLength={6}
             placeholder="ABC123"
-            value={sessionCode}
-            onChange={handleCodeChange}
+            {...register("session_code", {
+              onChange: (e) => setValue("session_code", e.target.value.toUpperCase()),
+            })}
           />
           <button
             className="border border-f1-border px-3 py-2 text-xs text-f1-muted hover:border-f1-white hover:text-f1-white"
             type="button"
-            onClick={() => { setSessionCode(generateCode()); setCodeError(null); }}
+            onClick={() => setValue("session_code", generateCode(), { shouldValidate: true })}
           >
             Regenerate
           </button>
         </div>
-        {codeError && <p className="text-xs text-destructive">{codeError}</p>}
+        {errors.session_code && <p className="text-xs text-destructive">{errors.session_code.message}</p>}
       </div>
 
       {/* Points system */}
@@ -172,8 +198,7 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
         <select
           className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none"
           id="points-system"
-          value={pointsSystemId}
-          onChange={(e) => setPointsSystemId(e.target.value)}
+          {...register("points_system_id")}
         >
           {pointsSystems.map((ps) => (
             <option key={ps.id} value={ps.id}>
@@ -181,6 +206,7 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
             </option>
           ))}
         </select>
+        {errors.points_system_id && <p className="text-xs text-destructive">{errors.points_system_id.message}</p>}
       </div>
 
       {/* Race number */}
@@ -190,17 +216,16 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
           {([1, 2] as const).map((n) => (
             <label className="flex items-center gap-2 text-sm text-f1-white" key={n}>
               <input
-                checked={raceNumber === n}
                 className="accent-f1-red"
-                name="race-number"
                 type="radio"
                 value={n}
-                onChange={() => setRaceNumber(n)}
+                {...register("race_number", { valueAsNumber: true })}
               />
               Race {n} {n === 2 ? "(Sprint)" : "(Feature)"}
             </label>
           ))}
         </div>
+        {errors.race_number && <p className="text-xs text-destructive">{errors.race_number.message}</p>}
       </div>
 
       {/* Race length */}
@@ -210,17 +235,16 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
           {([25, 50, 100] as const).map((pct) => (
             <label className="flex items-center gap-2 text-sm text-f1-white" key={pct}>
               <input
-                checked={raceLengthPercent === pct}
                 className="accent-f1-red"
-                name="race-length"
                 type="radio"
                 value={pct}
-                onChange={() => setRaceLengthPercent(pct)}
+                {...register("race_length_percent", { valueAsNumber: true })}
               />
               {pct}%
             </label>
           ))}
         </div>
+        {errors.race_length_percent && <p className="text-xs text-destructive">{errors.race_length_percent.message}</p>}
       </div>
 
       {/* Scheduled at */}
@@ -229,21 +253,20 @@ export function SessionForm({ circuits, leagueId, pointsSystems }: SessionFormPr
         <Input
           className="bg-f1-dark text-f1-white"
           id="scheduled-at"
-          required
           type="datetime-local"
-          value={scheduledAt}
-          onChange={(e) => setScheduledAt(e.target.value)}
+          {...register("scheduled_at")}
         />
+        {errors.scheduled_at && <p className="text-xs text-destructive">{errors.scheduled_at.message}</p>}
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {submitError && <p className="text-sm text-destructive">{submitError}</p>}
 
       <button
         className="w-full border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
-        disabled={submitting || !circuitId || !name || !pointsSystemId || !scheduledAt}
+        disabled={isSubmitting}
         type="submit"
       >
-        {submitting ? "Creating…" : "Create Session"}
+        {isSubmitting ? (session ? "Updating…" : "Creating…") : (session ? "Update Session" : "Create Session")}
       </button>
     </form>
   );
