@@ -1,6 +1,21 @@
+import { readFileSync } from "node:fs";
+
 import { z } from "zod";
 
 import { selectWheelCircuit, validateWheelConfirmation } from "@/lib/wheel/wheel-service";
+
+const createSessionRouteSource = readFileSync(
+  "src/app/api/admin/leagues/[id]/sessions/route.ts",
+  "utf8",
+);
+const wheelHistoryPageSource = readFileSync(
+  "src/app/leagues/[slug]/wheel/page.tsx",
+  "utf8",
+);
+const wheelConfirmationMigration = readFileSync(
+  "supabase/migrations/20260509101500_s6_confirm_wheel_spin_session.sql",
+  "utf8",
+);
 
 const SESSION_CODE_RE = /^[A-Z0-9]{6}$/;
 
@@ -99,6 +114,23 @@ describe("S6 Calendar and Wheel", () => {
     it("allows valid confirmation", () => {
       const res = validateWheelConfirmation(validSpin, "c1");
       expect(res).toBeNull();
+    });
+  });
+
+  describe("S6 review regressions", () => {
+    it("confirms wheel spins through the atomic database RPC", () => {
+      expect(wheelConfirmationMigration).toContain("create or replace function public.confirm_wheel_spin_session");
+      expect(wheelConfirmationMigration).toContain("target_league_id uuid");
+      expect(wheelConfirmationMigration).toContain("and wheel_spins.league_id = target_league_id");
+      expect(wheelConfirmationMigration).toContain("and wheel_spins.season_id = target_season_id");
+      expect(wheelConfirmationMigration).toContain("and league_circuit_pools.used_at is null");
+      expect(createSessionRouteSource).toContain('.rpc("confirm_wheel_spin_session"');
+    });
+
+    it("keeps public wheel history on the public league resolver boundary", () => {
+      expect(wheelHistoryPageSource).toContain("resolvePublicLeague(slug)");
+      expect(wheelHistoryPageSource).not.toContain("spun_by:profiles");
+      expect(wheelHistoryPageSource).not.toContain("confirmed_by:profiles");
     });
   });
 });

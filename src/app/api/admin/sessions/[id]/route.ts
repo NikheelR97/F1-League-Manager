@@ -49,6 +49,23 @@ export async function PATCH(
       return Response.json({ error: "Session not found" }, { status: 404 });
     }
 
+    if (body.points_system_id) {
+      const { data: pointsSystem, error: pointsSystemError } = await db
+        .from("points_systems")
+        .select("id")
+        .eq("id", body.points_system_id)
+        .eq("league_id", existing.league_id)
+        .maybeSingle();
+
+      if (pointsSystemError) {
+        return Response.json({ error: "Failed to validate points system" }, { status: 500 });
+      }
+
+      if (!pointsSystem) {
+        return Response.json({ error: "Points system not found for this league" }, { status: 422 });
+      }
+    }
+
     const { data, error } = await db
       .from("race_sessions")
       .update(body)

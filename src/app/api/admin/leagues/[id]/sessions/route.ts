@@ -69,6 +69,8 @@ export async function POST(
         .from("wheel_spins")
         .select("status, circuit_id")
         .eq("id", body.wheel_spin_id)
+        .eq("league_id", leagueId)
+        .eq("season_id", league.season_id)
         .single();
         
       if (spinError && spinError.code !== "PGRST116") {
@@ -79,6 +81,61 @@ export async function POST(
       if (validationError) {
         return Response.json({ error: validationError.error }, { status: validationError.status });
       }
+    }
+
+    const { data: pointsSystem } = await db
+      .from("points_systems")
+      .select("id")
+      .eq("id", body.points_system_id)
+      .eq("league_id", leagueId)
+      .maybeSingle();
+
+    if (!pointsSystem) {
+      return Response.json({ error: "Points system not found for this league" }, { status: 422 });
+    }
+
+    if (body.wheel_spin_id) {
+      const { data: confirmedRows, error: confirmError } = await db
+        .rpc("confirm_wheel_spin_session", {
+          actor_id: auth.user.id,
+          target_circuit_id: body.circuit_id,
+          target_league_id: leagueId,
+          target_name: body.name,
+          target_points_system_id: body.points_system_id,
+          target_race_length_percent: body.race_length_percent,
+          target_race_number: body.race_number,
+          target_scheduled_at: body.scheduled_at,
+          target_season_id: league.season_id,
+          target_session_code: body.session_code,
+          target_wheel_spin_id: body.wheel_spin_id,
+        });
+
+      const session = confirmedRows?.[0];
+
+      if (confirmError || !session) {
+        if (confirmError?.code === "23505") {
+          return Response.json({ error: "A session with that code already exists in this league" }, { status: 409 });
+        }
+        return Response.json({ error: "Failed to confirm wheel spin and create session" }, { status: 500 });
+      }
+
+      await writeAdminAuditLog({
+        action: "wheel.confirmed",
+        actorId: auth.user.id,
+        entityId: body.wheel_spin_id,
+        entityType: "wheel_spin",
+        metadata: { league_id: leagueId, race_session_id: session.id },
+      });
+
+      await writeAdminAuditLog({
+        action: "session.created",
+        actorId: auth.user.id,
+        entityId: session.id,
+        entityType: "race_session",
+        metadata: { league_id: leagueId, name: body.name, session_code: body.session_code },
+      });
+
+      return Response.json({ session }, { status: 201 });
     }
 
     const { data, error } = await db
@@ -102,28 +159,6 @@ export async function POST(
         return Response.json({ error: "A session with that code already exists in this league" }, { status: 409 });
       }
       return Response.json({ error: "Failed to create session" }, { status: 500 });
-    }
-
-    if (body.wheel_spin_id) {
-      await db.from("wheel_spins").update({
-        status: "confirmed",
-        confirmed_at: new Date().toISOString(),
-        confirmed_by: auth.user.id,
-        race_session_id: data.id,
-      }).eq("id", body.wheel_spin_id);
-
-      await db.from("league_circuit_pools").update({
-        is_available: false,
-        used_at: new Date().toISOString(),
-      }).eq("league_id", leagueId).eq("circuit_id", body.circuit_id);
-      
-      await writeAdminAuditLog({
-        action: "wheel.confirmed",
-        actorId: auth.user.id,
-        entityId: body.wheel_spin_id,
-        entityType: "wheel_spin",
-        metadata: { league_id: leagueId, race_session_id: data.id },
-      });
     }
 
     await writeAdminAuditLog({

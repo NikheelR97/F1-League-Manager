@@ -26,6 +26,7 @@ export default async function EditSessionPage({
       .from("race_sessions")
       .select("id, circuit_id, name, points_system_id, race_length_percent, race_number, scheduled_at, session_code")
       .eq("id", sessionId)
+      .eq("league_id", leagueId)
       .single(),
     db.from("circuits").select("id, name, country").order("name"),
     db

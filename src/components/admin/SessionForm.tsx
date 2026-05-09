@@ -141,7 +141,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
         <Label htmlFor="circuit">Circuit</Label>
         <select
           className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none disabled:opacity-50"
-          disabled={!!wheelSpinId}
+          aria-disabled={!!wheelSpinId}
           id="circuit"
           {...register("circuit_id")}
           onChange={handleCircuitChange}

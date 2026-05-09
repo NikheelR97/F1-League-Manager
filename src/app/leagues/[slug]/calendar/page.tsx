@@ -26,6 +26,7 @@ export default async function LeagueCalendarPage({
     .from("race_sessions")
     .select("id, name, session_code, race_number, scheduled_at, status, circuits(name, country)")
     .eq("league_id", league.id)
+    .in("status", ["scheduled", "completed"])
     .order("scheduled_at", { ascending: true });
 
   if (sessionsError) return <ErrorState message="Failed to load calendar" />;
