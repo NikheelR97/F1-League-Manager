@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Calendar, MapPin } from "lucide-react";
 
 import { ErrorState } from "@/components/ui/ErrorState";
+import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const revalidate = 60; // Revalidate every minute
@@ -15,16 +16,11 @@ export default async function LeagueCalendarPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const db = createSupabaseServiceRoleClient();
 
-  const { data: league, error: leagueError } = await db
-    .from("leagues")
-    .select("id, name, seasons(name)")
-    .eq("slug", slug)
-    .single();
-
-  if (leagueError) return <ErrorState message="League not found" />;
+  const league = await resolvePublicLeague(slug);
   if (!league) notFound();
+
+  const db = createSupabaseServiceRoleClient();
 
   const { data: sessions, error: sessionsError } = await db
     .from("race_sessions")
@@ -34,7 +30,7 @@ export default async function LeagueCalendarPage({
 
   if (sessionsError) return <ErrorState message="Failed to load calendar" />;
 
-  const seasonName = (league.seasons as unknown as { name: string } | null)?.name ?? "Current Season";
+  const seasonName = league.season.name;
 
   const upcoming = sessions?.filter((s) => s.status !== "completed") ?? [];
   const completed = sessions?.filter((s) => s.status === "completed") ?? [];

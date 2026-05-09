@@ -14,7 +14,7 @@ const updateSessionSchema = z.object({
   race_number: z.union([z.literal(1), z.literal(2)]).optional(),
   scheduled_at: z.string().datetime({ offset: true }).optional(),
   session_code: z.string().regex(SESSION_CODE_RE, "Must be 6 uppercase letters/digits").optional(),
-  status: z.enum(["scheduled", "in_progress", "completed", "cancelled"]).optional(),
+  // status intentionally excluded — transitions happen via /publish (completed) or DELETE (cancelled)
 });
 
 export async function PATCH(

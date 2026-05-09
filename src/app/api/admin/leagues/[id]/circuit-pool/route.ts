@@ -31,12 +31,23 @@ export async function PUT(
       return Response.json({ error: "Invalid request body" }, { status: 422 });
     }
 
-    // Upsert the selected circuits
-    const upserts = body.circuit_ids.map((circuitId) => ({
-      league_id: leagueId,
-      circuit_id: circuitId,
-      is_available: true,
-    }));
+    // Fetch already-used circuit IDs so we never restore their availability
+    const { data: usedRows } = await db
+      .from("league_circuit_pools")
+      .select("circuit_id")
+      .eq("league_id", leagueId)
+      .not("used_at", "is", null);
+
+    const usedIds = new Set((usedRows ?? []).map((r) => r.circuit_id));
+
+    // Upsert selected circuits, skipping any that have already been used
+    const upserts = body.circuit_ids
+      .filter((id) => !usedIds.has(id))
+      .map((circuitId) => ({
+        league_id: leagueId,
+        circuit_id: circuitId,
+        is_available: true,
+      }));
 
     if (upserts.length > 0) {
       const { error: upsertError } = await db
