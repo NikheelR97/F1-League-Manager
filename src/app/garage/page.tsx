@@ -7,11 +7,13 @@ import { redirect } from "next/navigation";
 import { SetupCard } from "@/components/garage/SetupCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { MAX_SETUPS_LIST } from "@/lib/constants";
+import { MAX_CIRCUITS_LIST, MAX_LEAGUES_LIST, MAX_SETUPS_LIST } from "@/lib/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface SearchParams {
   circuit_id?: string;
@@ -44,10 +46,10 @@ export default async function GaragePage({
 
   const driverIds = (drivers ?? []).map((d) => d.id);
 
-  // Fetch circuits and leagues for filter bar
+  // Fetch circuits and leagues for filter bar (bounded per §6)
   const [circuitsResult, leaguesResult] = await Promise.all([
-    db.from("circuits").select("id, name, country").order("country"),
-    db.from("leagues").select("id, name").neq("status", "draft").order("name"),
+    db.from("circuits").select("id, name, country").order("country").limit(MAX_CIRCUITS_LIST),
+    db.from("leagues").select("id, name").neq("status", "draft").order("name").limit(MAX_LEAGUES_LIST),
   ]);
 
   const circuits = circuitsResult.data ?? [];
@@ -71,10 +73,12 @@ export default async function GaragePage({
     .order("updated_at", { ascending: false })
     .limit(MAX_SETUPS_LIST);
 
-  if (filters.circuit_id) query = query.eq("circuit_id", filters.circuit_id);
+  // Only apply UUID filters if the param is a valid UUID (malformed values would
+  // cause a PostgREST 400 rather than returning empty results)
+  if (filters.circuit_id && UUID_RE.test(filters.circuit_id)) query = query.eq("circuit_id", filters.circuit_id);
   if (filters.game_version) query = query.eq("game_version", filters.game_version);
   if (filters.weather) query = query.eq("weather", filters.weather);
-  if (filters.league_id) query = query.eq("league_id", filters.league_id);
+  if (filters.league_id && UUID_RE.test(filters.league_id)) query = query.eq("league_id", filters.league_id);
 
   const { data: setups, error: setupError } = await query;
   if (setupError) return <ErrorState message="Failed to load setups" />;

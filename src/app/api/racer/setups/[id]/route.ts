@@ -14,7 +14,7 @@ async function resolveOwnedSetup(
     .from("vehicle_setups")
     .select("id, driver_id, name, drivers!inner(profile_id)")
     .eq("id", setupId)
-    .single();
+    .maybeSingle();
 
   if (error || !setup) return null;
 

@@ -56,6 +56,7 @@ export const MAX_NAV_LINKS = 8;
 export const MAX_HUB_STAT_ITEMS = 6;
 export const MAX_TEAM_BADGE_LABEL_LENGTH = 24;
 
+export const MAX_CIRCUITS_LIST = 50;
 export const MAX_SETUPS_LIST = 200;
 export const MAX_SETUP_NAME_LENGTH = 100;
 export const MAX_SETUP_META_LENGTH = 40;
