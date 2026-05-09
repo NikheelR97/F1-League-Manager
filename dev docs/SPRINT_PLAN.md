@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S4 public pages in progress on `feature/s4-public-pages`; S3 PRs (#5 and #6) merged to `dev`.
+**Status:** S7 racer garage in progress on `feature/s7-racer-garage`; PR not yet opened.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -691,7 +691,7 @@ Build calendar management and the server-confirmed digital wheel.
 
 | Task | Status | Evidence | Outstanding reason / next action |
 |------|--------|----------|----------------------------------|
-| Admin calendar CRUD | Done | `PATCH/DELETE` APIs + UI `SessionDeleteButton`, `npm run sprint-verify` | None |
+| Admin calendar CRUD | Done | `PATCH/DELETE` APIs + UI `SessionDeleteButton`; PR #10 validation passed | None |
 | Pre-populate races | Done | `SessionForm` supports creating and editing upcoming sessions | None |
 | Circuit picker | Done | `SessionForm` dropdown uses `circuits` table | None |
 | Public calendar page | Done | `src/app/leagues/[slug]/calendar/page.tsx` | None |
@@ -703,7 +703,19 @@ Build calendar management and the server-confirmed digital wheel.
 | Remove used circuit | Done | Session API updates pool `is_available = false` on confirmation | None |
 | Public wheel history | Done | `src/app/leagues/[slug]/wheel/page.tsx` | None |
 | Audit wheel spins | Done | `wheel.spun`, `wheel.confirmed`, `wheel.voided` audit logs implemented | None |
-| `npm run sprint-verify` | Done | Passed full suite (type-check, lint, test, coverage, build, e2e) | None |
+| Validation gate | Done | Local `type-check`, `lint`, `test` (181 tests), `build`, and `git diff --check` passed; PR #10 CI passed | Authenticated browser E2E can be expanded in a later sprint |
+
+### S6 Merge Note
+
+S6 was merged to `dev` via PR #10 on May 9, 2026.
+
+| Item | Evidence / note |
+|------|-----------------|
+| Merge commit | `654aa93 feat(s6): calendar and digital wheel` |
+| Review fixes | Public wheel history now uses `resolvePublicLeague`; wheel confirmation uses atomic RPC; points-system ownership is validated on session create/update. |
+| Local migration applied | `supabase/migrations/20260509101500_s6_confirm_wheel_spin_session.sql` was applied to local Supabase Docker with `npx.cmd supabase migration up`. |
+| Shared environment reminder | Apply the S6 migration to any shared dev preview, staging, or production target before validating S6 there. |
+| Validation | PR #10 CI passed; local `type-check`, `lint`, `test` (181 tests), `build`, and `git diff --check` passed before merge. |
 
 ---
 
@@ -738,6 +750,27 @@ Let racers manage private vehicle setups.
 6. Racer cannot edit another racer's setup.
 7. Setup payload size is capped.
 8. Setup list uses summary data, not full setup JSON.
+
+### Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason |
+|------|--------|----------|--------------------|
+| Racer dashboard / list page | Done | `/garage` server component, `force-dynamic` | — |
+| Setup create form | Done | `SetupForm.tsx`, `/garage/new` page | — |
+| Setup edit form | Done | `/garage/[id]/edit` page, PATCH route | — |
+| Setup delete flow | Done | DELETE route, SetupCard delete button | — |
+| Setup duplicate action | Done | POST `/api/racer/setups/[id]/duplicate` | — |
+| Owner-only access (server + RLS) | Done | `resolveOwnedSetup` helper, `owns_driver` RLS | — |
+| Private by default | Done | `is_public: false` default; duplicate forces private | — |
+| No setup_data in list view | Done | GET select excludes `setup_data`; test verifies | — |
+| Filters: circuit, weather, league | Done | URL search params, `?circuit_id` `?weather` `?league_id` | — |
+| S7 migration (`league_id` on vehicle_setups) | Done | `20260509120000_s7_vehicle_setups_league.sql` | — |
+| Racer guard (§7 security pipeline) | Done | `src/lib/racer/api-guard.ts` | — |
+| 46 new unit tests | Done | `npm run test` → 227 passing | — |
+| Sprint gate passes | Done | `npm run sprint-verify` all green | — |
+| Copy setup from another circuit (UI shortcut) | Deferred | — | Can be added later; duplicate + edit covers the workflow |
+| Game version autocomplete | Deferred | — | Free text sufficient for MVP |
+| Racer garage E2E tests | Deferred | — | Requires auth E2E helpers not yet built |
 
 ### Done When
 
