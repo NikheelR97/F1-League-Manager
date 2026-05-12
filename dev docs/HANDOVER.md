@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S7 racer garage in progress on `feature/s7-racer-garage`, awaiting PR.
+**Status:** S7 racer garage merged to `dev`; next sprint is S8 admin operations, seasons, carry-overs, and audit.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -8,23 +8,23 @@
 
 ## Current Handover Notes
 
-Last updated: May 9, 2026.
+Last updated: May 12, 2026.
 
 Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | `feature/s7-racer-garage` (PR pending → `dev`) |
-| Latest merged PR | PR #10, `feat(s6): calendar and digital wheel` on `dev` |
-| Merge commit | `654aa93` |
+| Active development branch | None. Start S8 from updated `dev` using a new `feature/s8-admin-operations` branch. |
+| Latest merged PR | PR #11, `feat(s7): racer garage - private setup CRUD, duplicate, filters` on `dev` |
+| Merge commit | `24a80b2` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
-| Latest migration applied locally | `20260509120000_s7_vehicle_setups_league.sql` |
+| Latest migrations | `20260509120000_s7_vehicle_setups_league.sql`; `20260509130000_fix_driver_standings_team_id.sql` |
 
-S7 adds the racer garage — private vehicle setup management for authenticated racers:
+S7 adds the racer garage - private vehicle setup management for authenticated racers:
 
 1. Racers can create, edit, delete, and duplicate vehicle setups per circuit.
 2. Setup list never exposes setup_data (compact DTOs only).
-3. All racer routes follow the HANDOVER §7 security pipeline: size → origin → session → CSRF.
+3. All racer routes follow the HANDOVER section 7 security pipeline: size -> origin -> session -> CSRF.
 4. Ownership is verified server-side (profile_id check via service role client); RLS enforces it at DB level too.
 5. Setups are private by default; duplicates always start private.
 6. Filters: circuit, weather, and league (league_id added to vehicle_setups via S7 migration).
@@ -32,20 +32,21 @@ S7 adds the racer garage — private vehicle setup management for authenticated 
 Important S7 racer garage rules:
 
 ```text
-- Never load setup_data in the list query — it can be large JSON; load it only on edit.
+- Never load setup_data in the list query - it can be large JSON; load it only on edit.
 - Verify driver ownership with a service role SELECT before any mutation (not just RLS).
-- Return 404 (not 403) when a setup is not found or not owned — avoids leaking existence.
+- Return 404 (not 403) when a setup is not found or not owned - avoids leaking existence.
 - Duplicate always sets is_public = false regardless of source setup visibility.
-- The racer guard checks session (any authenticated user) — no admin role required.
+- The racer guard checks session (any authenticated user) - no admin role required.
 ```
 
-S7 migration:
+S7 migrations:
 
 ```text
 supabase/migrations/20260509120000_s7_vehicle_setups_league.sql
+supabase/migrations/20260509130000_fix_driver_standings_team_id.sql
 ```
 
-This migration adds `league_id uuid` (nullable) to `vehicle_setups` for filtering setups by league, plus an index on `(driver_id, league_id)`.
+The first migration adds `league_id uuid` (nullable) to `vehicle_setups` for filtering setups by league, plus an index on `(driver_id, league_id)`. The second migration adds `team_id` to `driver_standings` so public standings can show current team context after seeded data or recalculation.
 
 S7 validation evidence:
 
@@ -55,7 +56,10 @@ npm.cmd run lint
 npm.cmd run test          # 227 tests
 npm.cmd run build
 npm.cmd run sprint-verify # all gates pass including E2E
+npm.cmd run deploy:check  # passed after Next 16.2.6 security patch
 ```
+
+PR #11 CI verification passed after the Next.js security update to `next@16.2.6` and `eslint-config-next@16.2.6`.
 
 Known deferred S7 items:
 

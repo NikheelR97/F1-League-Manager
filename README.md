@@ -4,24 +4,25 @@ Production-grade F1 esports league management app.
 
 ## Current Status
 
-Sprint 6, Calendar and Digital Wheel, is merged to `dev`.
+Sprint 7, Racer Garage, is merged to `dev`.
 
 Latest merged feature PR:
 
 ```text
-PR #10 - feat(s6): calendar and digital wheel
+PR #11 - feat(s7): racer garage - private setup CRUD, duplicate, filters
 ```
 
 Current next sprint:
 
 ```text
-S7 - Racer Garage
+S8 - Admin Operations, Seasons, Carry-Overs, And Audit
 ```
 
-Latest local migration required for S6:
+Latest local migrations required:
 
 ```text
-supabase/migrations/20260509101500_s6_confirm_wheel_spin_session.sql
+supabase/migrations/20260509120000_s7_vehicle_setups_league.sql
+supabase/migrations/20260509130000_fix_driver_standings_team_id.sql
 ```
 
 Default development database target:
