@@ -1063,8 +1063,8 @@ Performance and accessibility work:
 | Task | Status | Evidence | Outstanding reason / next action |
 |------|--------|----------|----------------------------------|
 | Fix DiffReport ✓/✗ aria-label | Done | `src/components/admin/DiffReport.tsx` — aria-label="match"/"mismatch" on span wrappers | None |
-| E2E seed script | Done | `scripts/seed-e2e.mjs`, `npm run seed:e2e` added to package.json | None |
-| Playwright auth storage state helpers | Done | `e2e/global-setup.ts`, `playwright.config.ts` — test-only `/api/e2e/session` endpoint with NODE_ENV + E2E_SECRET guard | None |
+| E2E seed script | Done | `scripts/seed-e2e.mjs`, `npm run seed:e2e` added to package.json. Fixed: local GoTrue ignores `user_id` in createUser — seed now uses dynamic UUIDs and upserts on `profile_id` / `(league_id, driver_id, season_id)`. | None |
+| Playwright auth storage state helpers | Done | `e2e/global-setup.ts`, `playwright.config.ts` — test-only `/api/e2e/session` endpoint with NODE_ENV + E2E_SECRET guard. Requires `E2E_SECRET` in `.env.local` (not committed). | None |
 | Admin browser E2E tests | Done | `e2e/admin-league-setup.spec.ts` — dashboard redirect, league create, team add, driver add | None |
 | Authenticated wheel E2E test | Done | `e2e/wheel-spin.spec.ts` — page navigation and unauthenticated redirect | None |
 | Racer garage E2E tests | Done | `e2e/racer-garage.spec.ts` — CRUD and cross-racer isolation (admin gets 404 on racer's setup) | None |
@@ -1076,7 +1076,7 @@ Performance and accessibility work:
 | Lighthouse performance scores | Outstanding | Requires live staging with real data | Deferred to S12 pre-deploy |
 | WCAG AA contrast full audit | Outstanding | Tailwind color tokens visually reviewed; no automated audit tool run | Deferred to S12 pre-deploy |
 | Mobile screenshot capture | Outstanding | Requires running dev server | Deferred to S12 pre-deploy |
-| `npm run sprint-verify` gate | Outstanding | type-check ✓, lint ✓, 337 unit tests ✓; E2E requires running server + seeded Supabase | Run locally before PR merge |
+| `npm run sprint-verify` gate | Outstanding | type-check ✓, lint ✓, 337 unit tests ✓, `npm run seed:e2e` ✓; `npm run test:e2e` not yet confirmed (requires dev server + Supabase simultaneously — memory-intensive) | Run `npm run seed:e2e` then `npm run dev` in one terminal, `npm run test:e2e` in another, before merging PR #17 |
 
 ---
 

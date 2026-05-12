@@ -108,7 +108,7 @@ Known cross-sprint deferred items (carried into S12):
 S11 delivers all deferred features from S3–S9 plus performance, accessibility, and UX polish:
 
 1. Playwright auth storage state helpers for admin and racer E2E tests via a test-only `/api/e2e/session` endpoint (NODE_ENV + `E2E_SECRET` guard; returns 404 in production).
-2. E2E seed script (`npm run seed:e2e`) using fixed UUIDs for idempotent local test data.
+2. E2E seed script (`npm run seed:e2e`) — idempotent, uses email as the stable lookup key. Local GoTrue ignores the `user_id` parameter in `createUser`, so the seed uses dynamic UUIDs assigned by Supabase and upserts on unique columns (`profile_id` for drivers, `(league_id, driver_id, season_id)` for league driver entries).
 3. Admin browser E2E tests: dashboard redirect, league create, team add, driver add, seed data navigation.
 4. Authenticated wheel E2E tests: page navigation, unauthenticated redirect.
 5. Racer garage E2E tests: setup CRUD, cross-racer isolation (admin gets 404 on racer's setup).
@@ -129,6 +129,8 @@ S11 important rules:
 - unstable_cache tags must match what revalidateTag fires — use cacheTag.* factory for both.
 - steward_notes and appeal_notes must never appear in public penalty queries (report page included).
 - Playwright auth files (e2e/.auth/*.json) are gitignored — regenerate with npm run seed:e2e then npm run test:e2e.
+- E2E_SECRET must be set in .env.local before running tests (it is NOT in .env.example with a real value — add it manually). Example: E2E_SECRET=dev-e2e-secret-for-local-testing-only
+- Do not use fixed auth user UUIDs anywhere — local GoTrue silently ignores user_id in createUser. Always look up users by email after creation.
 ```
 
 S11 validation evidence:
@@ -137,6 +139,8 @@ S11 validation evidence:
 npm run type-check  # 0 errors
 npm run lint        # 0 warnings
 npm run test        # 337 tests, 19 files, all passed
+npm run seed:e2e    # seed confirmed working after fixing dynamic UUID approach
+# npm run test:e2e  # NOT yet run — requires dev server + seeded Supabase (see outstanding items)
 ```
 
 Known S11 accepted limitations:
@@ -146,6 +150,7 @@ Known S11 accepted limitations:
 | Lighthouse scores not captured | Requires live staging environment with real data. Deferred to S12 pre-deploy. |
 | `/login` page E2E auth | Login page not yet built. Authenticated E2E uses `/api/e2e/session` test-only endpoint instead. |
 | Wheel E2E spin flow | Full spin+confirm E2E deferred — requires seeded circuit pool on local Supabase; covered by unit tests in `wheel-service.test.ts`. |
+| `npm run test:e2e` not confirmed | Requires running dev server + Supabase simultaneously, which is memory-intensive. Run manually before merging PR #17. Steps: (1) `npm run seed:e2e`, (2) `npm run dev` in a separate terminal, (3) `npm run test:e2e`. |
 
 ---
 
