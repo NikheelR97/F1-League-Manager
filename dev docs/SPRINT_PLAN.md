@@ -918,6 +918,7 @@ c:\Users\rajma\OneDrive\F1 2025\4QM8 F1 2025 Season 2.xlsx
 | Import nav link in `AdminShell` | Done | `FileUp` icon, visible to all admins | None |
 | `src/__tests__/unit/s9-import.test.ts` | Done | 43 tests across 7 describe blocks: file validation, security pipeline, parser, import service, diff, lock, migration | None |
 | `npm run sprint-verify` gate | Done | type-check ✓ · lint ✓ · 313 tests ✓ · coverage ✓ · build ✓ · E2E ✓ | None |
+| Post-review fixes (commit `99c9098`) | Done | Penalty insert error check; `allResults` bounded; dead-code `void ps` and `void teamForEntry` removed | None |
 
 ### Done When
 

@@ -60,12 +60,23 @@ npm run build
 npm run sprint-verify # all gates pass including E2E
 ```
 
+Post-review fixes applied (commit `99c9098`, PR #15):
+
+| Bug | Fix |
+|-----|-----|
+| `penalties.insert()` error silently discarded — import returned `ok: true` with broken penalty data | Added error check; now returns `{ ok: false, error: ... }` on failure |
+| `allResults` query in `recalculate()` had no limit — violated HANDOVER §6 "Bound every list" | Added `.limit(MAX_WORKBOOK_RACES * MAX_WORKBOOK_DRIVERS)` |
+| `void ps` dead code — `ps` parameter unused in `recalculate()` | Removed parameter from `recalculate()` signature and call site |
+| `void teamForEntry` dead code — reserve stint creation was never implemented | Removed unused variable and stale comment |
+
 Known deferred S9 items:
 
 | Item | Reason |
 |------|--------|
 | `driver_penalty_totals` not rebuilt on import | Import flow has no threshold configuration data. Carry-over penalties from the League Management sheet populate `carry_over_penalty_points` on `league_driver_entries` but do not populate `driver_penalty_totals`. Run carry-over via the S8 carry-over API after import. |
 | Real workbook end-to-end smoke | Requires local Supabase with a seeded league + season; the import logic is unit-tested structurally. |
+| `xlsx@0.18.5` security audit | Last public npm version before SheetJS went proprietary; has known prototype-pollution paths. Flag for `npm audit --audit-level=moderate` in S10 security audit. |
+| `DiffReport` tick/cross accessibility | `✓`/`✗` symbols in `<span>` lack `aria-label`. Flag for S11 accessibility pass. |
 
 ---
 
