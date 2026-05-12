@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S9 spreadsheet import complete on `feature/s9-spreadsheet-import`; next sprint is S10 regression and security audit.
+**Status:** S10 regression and security audit in progress on `feature/s10-regression-security`; next sprint is S11 performance and accessibility.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -968,6 +968,20 @@ Freeze features, run the full test suite, and attempt common attacks before poli
 9. Invalid import files are rejected before parsing.
 10. Admin mutation without audit log fails test.
 
+### Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| Branch created | Done | `feature/s10-regression-security` from `dev` | None |
+| Baseline tests — zero regressions | Done | `npm run test` → 313/313 passing before any S10 changes | None |
+| Admin route audit (auth, role, CSRF, Zod, audit log, sanitized errors) | Done | All 25 admin routes use `withAdminGuard`; `publishSession` writes audit log internally; health route uses `requireAdminContext` directly (read-only, pre-guard) | None |
+| Racer route audit (owner checks) | Done | All 3 racer routes use `withRacerGuard` + `resolveOwnedSetup` | None |
+| RLS verification — all 24 tables enabled | Done | `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'` → 24/24 `true` | None |
+| Secret scan — source and build output | Done | No `NEXT_PUBLIC_SERVICE_ROLE_KEY`; service-role module has `server-only`; `.next/static` contains no service role key | None |
+| Dependency audit (`--audit-level=high`) | Done | `npm audit --audit-level=high` → 0 high/critical; 2 moderate `postcss` via Next.js (no safe fix without breaking downgrade — accepted) | None |
+| S10 security tests (24 tests across 10 describe blocks) | Done | `src/__tests__/unit/s10-security.test.ts` — 337 total tests passing | None |
+| `npm run sprint-verify` gate | Done | type-check ✓ · lint ✓ · 337 tests ✓ · coverage ✓ · build ✓ · E2E ✓ | None |
+
 ### Done When
 
 1. There are zero regressions.
@@ -985,40 +999,64 @@ Make the app fast, accessible, and comfortable to use on race night.
 
 ### Build Steps
 
-1. Run Lighthouse on public pages.
-2. Run Lighthouse on login and racer garage pages.
-3. Optimize images and brand assets.
-4. Fix LCP, CLS, and INP issues.
-5. Review public page bundle sizes.
-6. Remove unnecessary client components.
-7. Add keyboard navigation tests.
-8. Add screen reader labels for tables and forms.
-9. Check WCAG AA color contrast.
-10. Capture mobile screenshots at 375px, 768px, 1024px, and desktop.
-11. Fix text overlap and horizontal scroll.
-12. Polish empty, loading, and error states.
-13. Test admin result publish while public standings page is open.
-14. Pause polling when browser tab is hidden.
+Deferred items carried into S11 (from S3, S4, S6, S7, S9):
+
+1. Build Playwright auth storage state helpers for admin and racer roles. (Prerequisite for all authenticated E2E below — deferred from S3, S6, S7.)
+2. Add admin browser E2E tests: league create, team add, driver add, result publish. (Deferred from S3.)
+3. Add authenticated wheel E2E test: spin and confirm flow. (Deferred from S6.)
+4. Add racer garage E2E tests: create, edit, delete setup; confirm another racer cannot read it. (Deferred from S7.)
+5. Add standalone qualifying results page at `/leagues/[slug]/results/[sessionId]/qualifying`. (Deferred from S4.)
+6. Add public race reports page at `/leagues/[slug]/results/[sessionId]/report`. (Deferred from S4.)
+7. Add season selector to public standings and results pages. (Deferred from S4/S5.)
+8. Add tag-based cache revalidation after publish, transfer, penalty, wheel, and asset changes. (Deferred from S4/S5.)
+9. Fix `DiffReport` ✓/✗ symbols — add `aria-label` to `<span>` wrappers. (Deferred from S9.)
+10. Polish digital wheel animation. (Deferred from S6.)
+
+Performance and accessibility work:
+
+11. Run Lighthouse on public pages.
+12. Run Lighthouse on admin and racer garage pages.
+13. Optimize images and brand assets.
+14. Fix LCP, CLS, and INP issues.
+15. Review public page bundle sizes.
+16. Remove unnecessary client components.
+17. Add keyboard navigation tests.
+18. Add screen reader labels for tables and forms.
+19. Check WCAG AA color contrast.
+20. Capture mobile screenshots at 375px, 768px, 1024px, and desktop.
+21. Fix text overlap and horizontal scroll.
+22. Polish empty, loading, and error states.
+23. Test admin result publish while public standings page is open.
+24. Pause polling when browser tab is hidden.
 
 ### Tests To Add
 
-1. Public pages meet Lighthouse Performance minimum 85.
-2. Public pages target Lighthouse Performance 90 where feasible.
-3. Pages meet Lighthouse Accessibility 90 or higher.
-4. LCP is under 2.5s on tested public pages.
-5. CLS is under 0.1 on tested public pages.
-6. INP is under 200ms on tested public pages.
-7. Keyboard navigation works for admin forms.
-8. Mobile screenshots show no horizontal scroll.
-9. Public standings remain responsive during admin publish.
-10. Hidden tab polling pauses.
+1. Admin browser E2E: league creation, team, driver, result publish, standings update.
+2. Racer garage E2E: create setup, verify another racer cannot read it.
+3. Wheel E2E: spin and confirm flow updates public wheel history.
+4. Qualifying results page renders correct data.
+5. Race reports page renders qualifying, grid, race, fastest lap, and penalties.
+6. Season selector isolates data to the selected season.
+7. Cache revalidation: public standings update after admin publish without full page reload.
+8. Public pages meet Lighthouse Performance minimum 85.
+9. Public pages target Lighthouse Performance 90 where feasible.
+10. Pages meet Lighthouse Accessibility 90 or higher.
+11. LCP is under 2.5s on tested public pages.
+12. CLS is under 0.1 on tested public pages.
+13. INP is under 200ms on tested public pages.
+14. Keyboard navigation works for admin forms.
+15. Mobile screenshots show no horizontal scroll.
+16. Public standings remain responsive during admin publish.
+17. Hidden tab polling pauses.
 
 ### Done When
 
-1. The app feels fast on normal laptops and phones.
-2. Public pages are accessible.
-3. Admin workflows feel responsive.
-4. `npm run sprint-verify` passes.
+1. Authenticated E2E tests exist for admin, racer, and wheel flows.
+2. All S4/S5/S6/S7/S9 deferred features are built and tested.
+3. The app feels fast on normal laptops and phones.
+4. Public pages are accessible.
+5. Admin workflows feel responsive.
+6. `npm run sprint-verify` passes.
 
 ---
 
@@ -1030,26 +1068,34 @@ Deploy the app and prove the production release works.
 
 ### Build Steps
 
-1. Run `npm run deploy:check` locally.
-2. Open release PR from `dev` to `staging`.
-3. Confirm staging deploy points to `f1-league-manager-nonprod`.
-4. Apply migrations to staging first.
-5. Run Playwright smoke tests against staging.
-6. Get release PR reviewed and merged to `staging`.
-7. Open production promotion PR from `staging` to `prod`.
-8. Confirm production branch is `prod`.
-9. Confirm production deploy points to `f1-league-manager-prod`.
-10. Confirm production PR has senior review.
-11. Apply production migrations.
-12. Create production storage buckets.
-13. Seed official team templates.
-14. Seed circuit library.
-15. Create first super admin account.
-16. Add Vercel production environment variables.
-17. Merge production PR and promote to production.
-18. Run production smoke tests.
-19. Record release notes.
-20. Record rollback plan.
+Pre-deploy deferred items (must be done before release):
+
+1. Build `/login` page (magic link or email/password). Required for authenticated smoke tests on staging and production. (Missing since S1 — all sprints redirected to `/login` but the page was never built.)
+2. Run real workbook end-to-end smoke: import the Season 2 `.xlsx` against staging Supabase, confirm diff is clean, confirm lock. (Deferred from S9 — requires seeded league + season on staging.)
+3. Verify `driver_penalty_totals` after import: run the carry-over API (`POST /api/admin/leagues/[id]/carry-over`) after confirming the workbook migration to populate penalty totals for the new season. (Deferred from S9.)
+
+Deployment steps:
+
+4. Run `npm run deploy:check` locally.
+5. Open release PR from `dev` to `staging`.
+6. Confirm staging deploy points to `f1-league-manager-nonprod`.
+7. Apply all migrations to staging first.
+8. Run Playwright smoke tests against staging.
+9. Get release PR reviewed and merged to `staging`.
+10. Open production promotion PR from `staging` to `prod`.
+11. Confirm production branch is `prod`.
+12. Confirm production deploy points to `f1-league-manager-prod`.
+13. Confirm production PR has senior review.
+14. Apply production migrations.
+15. Create production storage buckets.
+16. Seed official team templates.
+17. Seed circuit library.
+18. Create first super admin account.
+19. Add Vercel production environment variables.
+20. Merge production PR and promote to production.
+21. Run production smoke tests.
+22. Record release notes.
+23. Record rollback plan.
 
 ### Production Smoke Tests
 
@@ -1060,14 +1106,18 @@ Deploy the app and prove the production release works.
 5. Penalties page loads.
 6. Calendar page loads.
 7. Wheel history page loads.
-8. `/admin` redirects when logged out.
-9. Admin can log in.
-10. Admin can publish a test result.
-11. Public standings update.
-12. Racer can log in.
-13. Racer can create private setup.
-14. Another racer cannot view that setup.
-15. Browser network responses contain no service role key or webhook URL.
+8. Qualifying results page loads.
+9. Race reports page loads.
+10. `/admin` redirects when logged out.
+11. `/login` page loads and magic link sends.
+12. Admin can log in.
+13. Admin can publish a test result.
+14. Public standings update after publish.
+15. Admin can upload and confirm workbook import on staging.
+16. Racer can log in.
+17. Racer can create private setup.
+18. Another racer cannot view that setup.
+19. Browser network responses contain no service role key or webhook URL.
 
 ### Done When
 
