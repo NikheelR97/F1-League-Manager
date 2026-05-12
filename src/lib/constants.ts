@@ -69,3 +69,7 @@ export const WHEEL_DECEL_DURATION_MS = 2000;
 
 export const MAX_AUDIT_LOGS_LIST = 100;
 export const MAX_ADMIN_USERS_LIST = 100;
+
+export const MAX_WORKBOOK_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_WORKBOOK_DRIVERS = 60;
+export const MAX_WORKBOOK_RACES = 30;
