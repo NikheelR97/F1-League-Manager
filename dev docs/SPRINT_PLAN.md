@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S7 racer garage in progress on `feature/s7-racer-garage`; PR not yet opened.
+**Status:** S7 racer garage merged to `dev` via PR #11; next sprint is S8 admin operations, seasons, carry-overs, and audit.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -755,22 +755,22 @@ Let racers manage private vehicle setups.
 
 | Task | Status | Evidence | Outstanding reason |
 |------|--------|----------|--------------------|
-| Racer dashboard / list page | Done | `/garage` server component, `force-dynamic` | — |
-| Setup create form | Done | `SetupForm.tsx`, `/garage/new` page | — |
-| Setup edit form | Done | `/garage/[id]/edit` page, PATCH route | — |
-| Setup delete flow | Done | DELETE route, SetupCard delete button | — |
-| Setup duplicate action | Done | POST `/api/racer/setups/[id]/duplicate` | — |
-| Owner-only access (server + RLS) | Done | `resolveOwnedSetup` helper, `owns_driver` RLS | — |
-| Private by default | Done | `is_public: false` default; duplicate forces private | — |
-| No setup_data in list view | Done | GET select excludes `setup_data`; test verifies | — |
-| Filters: circuit, weather, league | Done | URL search params, `?circuit_id` `?weather` `?league_id` | — |
-| S7 migration (`league_id` on vehicle_setups) | Done | `20260509120000_s7_vehicle_setups_league.sql` | — |
-| Racer guard (§7 security pipeline) | Done | `src/lib/racer/api-guard.ts` | — |
-| 46 new unit tests | Done | `npm run test` → 227 passing | — |
-| Sprint gate passes | Done | `npm run sprint-verify` all green | — |
-| Copy setup from another circuit (UI shortcut) | Deferred | — | Can be added later; duplicate + edit covers the workflow |
-| Game version autocomplete | Deferred | — | Free text sufficient for MVP |
-| Racer garage E2E tests | Deferred | — | Requires auth E2E helpers not yet built |
+| Racer dashboard / list page | Done | `/garage` server component, `force-dynamic` | - |
+| Setup create form | Done | `SetupForm.tsx`, `/garage/new` page | - |
+| Setup edit form | Done | `/garage/[id]/edit` page, PATCH route | - |
+| Setup delete flow | Done | DELETE route, SetupCard delete button | - |
+| Setup duplicate action | Done | POST `/api/racer/setups/[id]/duplicate` | - |
+| Owner-only access (server + RLS) | Done | `resolveOwnedSetup` helper, `owns_driver` RLS | - |
+| Private by default | Done | `is_public: false` default; duplicate forces private | - |
+| No setup_data in list view | Done | GET select excludes `setup_data`; test verifies | - |
+| Filters: circuit, weather, league | Done | URL search params, `?circuit_id` `?weather` `?league_id` | - |
+| S7 migration (`league_id` on vehicle_setups) | Done | `20260509120000_s7_vehicle_setups_league.sql` | - |
+| Racer guard (section 7 security pipeline) | Done | `src/lib/racer/api-guard.ts` | - |
+| 46 new unit tests | Done | `npm run test` -> 227 passing | - |
+| Sprint gate passes | Done | `npm run deploy:check` passed locally; PR #11 CI `verify` passed after Next 16.2.6 security patch | - |
+| Copy setup from another circuit (UI shortcut) | Deferred | - | Can be added later; duplicate + edit covers the workflow |
+| Game version autocomplete | Deferred | - | Free text sufficient for MVP |
+| Racer garage E2E tests | Deferred | - | Requires auth E2E helpers not yet built |
 
 ### Done When
 
