@@ -28,6 +28,7 @@ S8 adds admin operations — seasons management, carry-over of penalties and ban
 4. Super-admin user management: super_admins can promote or demote other users' roles. Normal admins cannot access this page or API. A super_admin cannot change their own role.
 5. Audit log viewer: server-rendered table at `/admin/audit` with filters for actor, action, entity type, entity ID (pass a league or season UUID to scope by league/season), and date range. Append-only — no update or delete policies exist on `audit_logs`. All search params are validated with Zod before reaching the DB.
 6. Admin nav gains "Audit Log" for all admins and "User Roles" for super_admins only.
+7. Season selector on the league admin detail page (`/admin/leagues/[id]`): a `?season_id=` URL param (Zod-validated UUID) switches the season context; `race_sessions` and `league_driver_entries` are filtered by the chosen season. Defaults to the current season, then the league's own initial season. The selector is hidden when only one season exists.
 
 Important S8 rules:
 
@@ -102,9 +103,7 @@ PR #11 CI verification passed after the Next.js security update to `next@16.2.6`
 
 Known deferred S8 items:
 
-| Item | Status | Note |
-|------|--------|------|
-| Season selectors on admin pages | Deferred | Requires refactoring the league admin detail page to accept a season query param and re-scoping sessions/teams/drivers. Deferred to S9 — more useful once historical spreadsheet data exists. |
+None — all build steps completed.
 
 ---
 

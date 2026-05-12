@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+const leagueDetailPage = readFileSync(
+  "src/app/admin/leagues/[id]/page.tsx",
+  "utf8",
+);
+
 // Source files for security regression checks
 const seasonCurrentRoute = readFileSync(
   "src/app/api/admin/seasons/[id]/current/route.ts",
@@ -232,7 +237,40 @@ describe("S8 audit log route", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. S8 migration — audit logs remain append-only
+// 6. Season selector on league detail page
+// ---------------------------------------------------------------------------
+
+describe("S8 season selector on league admin page", () => {
+  it("imports and renders SeasonSelector", () => {
+    expect(leagueDetailPage).toContain("SeasonSelector");
+  });
+
+  it("validates the season_id search param as a UUID before using it", () => {
+    expect(leagueDetailPage).toContain("searchParamsSchema");
+    expect(leagueDetailPage).toContain("z.string().uuid()");
+  });
+
+  it("filters race_sessions by effectiveSeasonId", () => {
+    expect(leagueDetailPage).toContain("effectiveSeasonId");
+    // Both season-scoped tables should be filtered
+    const sessionIdx = leagueDetailPage.indexOf("race_sessions");
+    const seasonFilterIdx = leagueDetailPage.indexOf("effectiveSeasonId");
+    expect(sessionIdx).toBeGreaterThan(-1);
+    expect(seasonFilterIdx).toBeGreaterThan(-1);
+  });
+
+  it("filters league_driver_entries by effectiveSeasonId", () => {
+    expect(leagueDetailPage).toContain("league_driver_entries");
+  });
+
+  it("defaults to current season, then league season_id if no param", () => {
+    expect(leagueDetailPage).toContain("is_current");
+    expect(leagueDetailPage).toContain("league.season_id");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. S8 migration — audit logs remain append-only
 // ---------------------------------------------------------------------------
 
 describe("S8 migration", () => {

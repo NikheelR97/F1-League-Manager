@@ -823,7 +823,7 @@ Build the operational tools needed to run multiple seasons safely.
 | Season archive/unarchive API | Done | `PATCH /api/admin/seasons/[id]/archive`; blocks current season, audit log | None |
 | Season detail page | Done | `/admin/seasons/[id]` — status display, SeasonActions, CarryOverForm per league | None |
 | Seasons list links to detail page | Done | `/admin/seasons` each row links to `/admin/seasons/[id]` | None |
-| Season selectors on admin pages | Outstanding | None | Requires refactoring league admin page to accept a season query param and re-fetching sessions, teams, and drivers per season. Deferred to S9 — the spreadsheet import workflow establishes multi-season data and the selector is more useful once historical data exists. |
+| Season selectors on admin pages | Done | `SeasonSelector` component on `/admin/leagues/[id]`; Zod-validated `?season_id=` param; filters `race_sessions` and `league_driver_entries` by season; defaults to current season then league's own season | None |
 | Carry-over API | Done | `POST /api/admin/leagues/[id]/carry-over`; upserts `league_driver_entries` with `carry_over_penalty_points` + `carry_over_ban_count`; audit log | None |
 | CarryOverForm component | Done | `src/components/admin/CarryOverForm.tsx`; shown per league on season detail page | None |
 | Super-admin users list API | Done | `GET /api/admin/users`; super_admin only; returns admin + super_admin profiles | None |
