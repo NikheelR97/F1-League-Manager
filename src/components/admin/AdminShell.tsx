@@ -1,4 +1,4 @@
-import { ClipboardList, Flag, LayoutDashboard, ShieldCheck, Trophy, Users } from "lucide-react";
+import { ClipboardList, FileUp, Flag, LayoutDashboard, ShieldCheck, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 
 import type { ProfileRole } from "@/lib/auth/roles";
@@ -14,6 +14,7 @@ const baseNavItems = [
   { href: "/admin/drivers", icon: Users, label: "Drivers" },
   { href: "/admin/reserves", icon: Flag, label: "Reserves" },
   { href: "/admin/audit", icon: ClipboardList, label: "Audit Log" },
+  { href: "/admin/import", icon: FileUp, label: "Import" },
 ] as const;
 
 const superAdminNavItems = [

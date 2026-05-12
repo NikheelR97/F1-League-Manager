@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S8 admin operations merged to `dev` via PR #13; next sprint is S9 spreadsheet import.
+**Status:** S9 spreadsheet import complete on `feature/s9-spreadsheet-import`; next sprint is S10 regression and security audit.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -14,11 +14,73 @@ Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | None. Start S9 from updated `dev` using a new `feature/s9-spreadsheet-import` branch. |
+| Active development branch | `feature/s9-spreadsheet-import` — S9 complete, pending PR to `dev`. |
 | Latest merged PR | PR #13, `feat(s8): admin operations — seasons, carry-overs, user roles, audit log` on `dev` |
 | Merge commit | `cad0341` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
-| Latest migration applied locally | `20260512000000_s8_admin_operations.sql` |
+| Latest migration applied locally | `20260512000000_s8_admin_operations.sql` (S9 migration `20260513000000_s9_workbook_import.sql` must be applied before testing import) |
+
+S9 adds workbook import — a two-phase import pipeline for the Season 2 `.xlsx` workbook:
+
+1. Admin uploads a workbook at `/admin/import`. The upload route parses the file, imports all data, calculates standings server-side, and returns a diff comparing app standings to workbook-stated standings. Raw workbook rows are never sent to the browser.
+2. Admin reviews the diff report. Confirmation is blocked unless `diff.clean === true`.
+3. On confirmation, the migration record is locked (`status = 'confirmed'`). Re-upload for the same season is rejected with 409.
+4. Sessions are upserted by a deterministic `session_code` (`IMP001`–`IMP024`) — safe to re-upload before confirmation.
+5. Transfer-aware team resolution: each race result resolves the correct team using `transferAfterRace` from the League Management sheet.
+6. All routes use `withAdminGuard`; the upload route passes `maxBodyBytes: MAX_WORKBOOK_BYTES` to allow 10 MB workbooks through the guard's default 50 KB body limit.
+
+Important S9 rules:
+
+```text
+- Only .xlsx files are accepted; extension is checked on the server.
+- MAX_WORKBOOK_BYTES = 10 MB; MAX_WORKBOOK_DRIVERS = 60; MAX_WORKBOOK_RACES = 30.
+- XLSX is read with type:"buffer" to read cached cell values, not formulas.
+- Points are calculated server-side (calculateRacePoints); workbook formula results are ignored for standings.
+- One confirmed migration per (league_id, season_id) — upload returns 409 if a confirmed migration exists.
+- Confirm route validates migration_id as UUID and rejects already-confirmed migrations with 409.
+- Both routes write audit logs: import.uploaded and import.confirmed.
+- workbook_migrations stores only metadata + diff; raw parsed rows are discarded after import.
+```
+
+S9 migration:
+
+```text
+supabase/migrations/20260513000000_s9_workbook_import.sql
+```
+
+This migration adds a unique constraint on `race_sessions(league_id, season_id, session_code)` for idempotent upserts, and an index on `workbook_migrations(league_id, season_id, status)` for fast lock checks.
+
+S9 validation evidence:
+
+```powershell
+npm run type-check
+npm run lint
+npm run test          # 313 tests (18 test files)
+npm run build
+npm run sprint-verify # all gates pass including E2E
+```
+
+Post-review fixes applied (commit `99c9098`, PR #15):
+
+| Bug | Fix |
+|-----|-----|
+| `penalties.insert()` error silently discarded — import returned `ok: true` with broken penalty data | Added error check; now returns `{ ok: false, error: ... }` on failure |
+| `allResults` query in `recalculate()` had no limit — violated HANDOVER §6 "Bound every list" | Added `.limit(MAX_WORKBOOK_RACES * MAX_WORKBOOK_DRIVERS)` |
+| `void ps` dead code — `ps` parameter unused in `recalculate()` | Removed parameter from `recalculate()` signature and call site |
+| `void teamForEntry` dead code — reserve stint creation was never implemented | Removed unused variable and stale comment |
+
+Known deferred S9 items:
+
+| Item | Reason |
+|------|--------|
+| `driver_penalty_totals` not rebuilt on import | Import flow has no threshold configuration data. Carry-over penalties from the League Management sheet populate `carry_over_penalty_points` on `league_driver_entries` but do not populate `driver_penalty_totals`. Run carry-over via the S8 carry-over API after import. |
+| Real workbook end-to-end smoke | Requires local Supabase with a seeded league + season; the import logic is unit-tested structurally. |
+| `xlsx@0.18.5` security audit | Last public npm version before SheetJS went proprietary; has known prototype-pollution paths. Flag for `npm audit --audit-level=moderate` in S10 security audit. |
+| `DiffReport` tick/cross accessibility | `✓`/`✗` symbols in `<span>` lack `aria-label`. Flag for S11 accessibility pass. |
+
+---
+
+### S8 Notes (archived)
 
 S8 adds admin operations — seasons management, carry-over of penalties and bans, super-admin user role management, and the audit log viewer:
 
@@ -42,27 +104,7 @@ Important S8 rules:
 - The Discord webhook env var (DISCORD_WEBHOOK_URL) is present in env.ts and .env.example but no webhook sending is implemented yet.
 ```
 
-S8 migration:
-
-```text
-supabase/migrations/20260512000000_s8_admin_operations.sql
-```
-
-This migration adds `is_archived boolean not null default false` to `seasons` and adds `audit_logs` filtering indexes (`actor_id`, `action`, `entity_type`).
-
-S8 validation evidence:
-
-```powershell
-npm.cmd run type-check
-npm.cmd run lint
-npm.cmd run test          # 270 tests
-npm.cmd run build
-npm.cmd run sprint-verify # all gates pass including E2E
-```
-
-Known deferred S8 items:
-
-None — all build steps completed.
+S8 migration: `supabase/migrations/20260512000000_s8_admin_operations.sql`
 
 Known S8 accepted risks:
 

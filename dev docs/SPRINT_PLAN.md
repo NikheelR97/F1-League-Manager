@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S8 admin operations merged to `dev` via PR #13; next sprint is S9 spreadsheet import.
+**Status:** S9 spreadsheet import complete on `feature/s9-spreadsheet-import`; next sprint is S10 regression and security audit.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -898,12 +898,36 @@ c:\Users\rajma\OneDrive\F1 2025\4QM8 F1 2025 Season 2.xlsx
 13. Parser errors are sanitized.
 14. Raw workbook rows are not sent to the browser.
 
+### Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| Branch created | Done | `feature/s9-spreadsheet-import` from `dev` | None |
+| `MAX_WORKBOOK_BYTES`, `MAX_WORKBOOK_DRIVERS`, `MAX_WORKBOOK_RACES` constants | Done | `src/lib/constants.ts` | None |
+| `maxBodyBytes` option on `withAdminGuard` | Done | `src/lib/admin/api-guard.ts` — allows 10 MB workbook uploads past the 50 KB default | None |
+| S9 migration (unique constraint + status index) | Done | `supabase/migrations/20260513000000_s9_workbook_import.sql` | None |
+| `src/lib/import/types.ts` | Done | Internal parsed workbook types; never sent to browser | None |
+| `src/lib/import/workbook-parser.ts` | Done | Parses League Management, Final Classifications, Championships sheets; validates bounds and circuit slugs | None |
+| `src/lib/import/import-service.ts` | Done | `runImport`, `resolveTeamId`, `fetchComputedStandings`; server-authoritative points via `calculateRacePoints` | None |
+| `src/lib/import/diff.ts` | Done | `buildDiff` pure function; `TEAM_DISPLAY_ALIASES` for workbook short names | None |
+| `POST /api/admin/import` upload route | Done | Validates .xlsx, size, UUID params; lock check; audit log `import.uploaded`; returns `{ migration_id, diff, clean }` only | None |
+| `POST /api/admin/import/confirm` confirm route | Done | UUID validation; 409 on already-confirmed; sets `confirmed_by`; audit log `import.confirmed` | None |
+| `/admin/import` page | Done | Server component; loads leagues + seasons in parallel | None |
+| `ImportForm` client component | Done | State machine: idle → uploading → done → confirming → confirmed; confirm blocked when `!diff.clean` | None |
+| `DiffReport` client component | Done | Driver and constructor tables; mismatch rows highlighted; clean/mismatch badge | None |
+| Import nav link in `AdminShell` | Done | `FileUp` icon, visible to all admins | None |
+| `src/__tests__/unit/s9-import.test.ts` | Done | 43 tests across 7 describe blocks: file validation, security pipeline, parser, import service, diff, lock, migration | None |
+| `npm run sprint-verify` gate | Done | type-check ✓ · lint ✓ · 313 tests ✓ · coverage ✓ · build ✓ · E2E ✓ | None |
+| Post-review fixes (commit `99c9098`) | Done | Penalty insert error check; `allResults` bounded; dead-code `void ps` and `void teamForEntry` removed | None |
+
 ### Done When
 
 1. The real workbook imports.
 2. Diff report is clean.
 3. Season migration is locked after confirmation.
 4. `npm run sprint-verify` passes.
+
+All four criteria met. Gate evidence: `npm run sprint-verify` — 313 tests, build clean, E2E 2/2.
 
 ---
 

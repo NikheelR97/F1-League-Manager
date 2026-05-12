@@ -27,13 +27,14 @@ const ALLOWED_MUTATION_CONTENT_TYPES = [
 export async function withAdminGuard(
   req: NextRequest,
   handler: GuardedHandler,
-  options: { skipCsrf?: boolean } = {},
+  options: { skipCsrf?: boolean; maxBodyBytes?: number } = {},
 ): Promise<Response> {
   try {
     // 1. Content-type + size check for mutating methods
     if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
+      const sizeLimit = options.maxBodyBytes ?? MAX_REQUEST_BODY_BYTES;
       const contentLength = Number(req.headers.get("content-length") ?? 0);
-      if (contentLength > MAX_REQUEST_BODY_BYTES) {
+      if (contentLength > sizeLimit) {
         return Response.json({ error: "Payload too large" }, { status: 413 });
       }
 
