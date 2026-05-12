@@ -20,60 +20,6 @@ Current branch state:
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
 | Latest migration applied locally | `20260512000000_s8_admin_operations.sql` (S9 migration `20260513000000_s9_workbook_import.sql` must be applied before testing import) |
 
-S8 adds admin operations — seasons management, carry-over of penalties and bans, super-admin user role management, and the audit log viewer:
-
-1. Seasons can be marked as current (clears the flag from all others) or archived (togglable). The current season cannot be archived.
-2. An archived season cannot be made current.
-3. Carry-over: copies each driver's end-of-season `penalty_points` and `ban_threshold_reached` flag from `driver_penalty_totals` into `carry_over_penalty_points` and `carry_over_ban_count` on new `league_driver_entries`. Safe to re-run (upsert).
-4. Super-admin user management: super_admins can promote or demote other users' roles. Normal admins cannot access this page or API. A super_admin cannot change their own role.
-5. Audit log viewer: server-rendered table at `/admin/audit` with filters for actor, action, entity type, entity ID (pass a league or season UUID to scope by league/season), and date range. Append-only — no update or delete policies exist on `audit_logs`. All search params are validated with Zod before reaching the DB.
-6. Admin nav gains "Audit Log" for all admins and "User Roles" for super_admins only.
-7. Season selector on the league admin detail page (`/admin/leagues/[id]`): a `?season_id=` URL param (Zod-validated UUID) switches the season context; `race_sessions` and `league_driver_entries` are filtered by the chosen season. Defaults to the current season, then the league's own initial season. The selector is hidden when only one season exists.
-
-Important S8 rules:
-
-```text
-- Only super_admin may call GET /api/admin/users or PATCH /api/admin/users/[id]/role.
-- A super_admin cannot change their own role (prevents accidental self-lockout).
-- Cannot mark an archived season as current.
-- Cannot archive the current season.
-- Carry-over upserts on (league_id, season_id, driver_id) — safe to re-run.
-- audit_logs has no update or delete RLS policies — append-only by design.
-- The Discord webhook env var (DISCORD_WEBHOOK_URL) is present in env.ts and .env.example but no webhook sending is implemented yet.
-```
-
-S8 migration:
-
-```text
-supabase/migrations/20260512000000_s8_admin_operations.sql
-```
-
-This migration adds `is_archived boolean not null default false` to `seasons` and adds `audit_logs` filtering indexes (`actor_id`, `action`, `entity_type`).
-
-S8 validation evidence:
-
-```powershell
-npm.cmd run type-check
-npm.cmd run lint
-npm.cmd run test          # 270 tests
-npm.cmd run build
-npm.cmd run sprint-verify # all gates pass including E2E
-```
-
-Known deferred S8 items:
-
-None — all build steps completed.
-
-Known S8 accepted risks:
-
-| Risk | Detail |
-|------|--------|
-| `season.set_current` atomicity | Two sequential writes: set target → clear others. If the clear step fails the desired season is already current (better than zero current seasons), but stale `is_current = true` rows may remain until the next successful call. Wrap in a DB function/RPC if this becomes a concern. |
-
----
-
-### S9 Notes
-
 S9 adds workbook import — a two-phase import pipeline for the Season 2 `.xlsx` workbook:
 
 1. Admin uploads a workbook at `/admin/import`. The upload route parses the file, imports all data, calculates standings server-side, and returns a diff comparing app standings to workbook-stated standings. Raw workbook rows are never sent to the browser.
@@ -125,7 +71,35 @@ Known deferred S9 items:
 
 ### S8 Notes (archived)
 
-S8 adds admin operations — seasons management, carry-over of penalties and bans, super-admin user role management, and the audit log viewer.
+S8 adds admin operations — seasons management, carry-over of penalties and bans, super-admin user role management, and the audit log viewer:
+
+1. Seasons can be marked as current (clears the flag from all others) or archived (togglable). The current season cannot be archived.
+2. An archived season cannot be made current.
+3. Carry-over: copies each driver's end-of-season `penalty_points` and `ban_threshold_reached` flag from `driver_penalty_totals` into `carry_over_penalty_points` and `carry_over_ban_count` on new `league_driver_entries`. Safe to re-run (upsert).
+4. Super-admin user management: super_admins can promote or demote other users' roles. Normal admins cannot access this page or API. A super_admin cannot change their own role.
+5. Audit log viewer: server-rendered table at `/admin/audit` with filters for actor, action, entity type, entity ID (pass a league or season UUID to scope by league/season), and date range. Append-only — no update or delete policies exist on `audit_logs`. All search params are validated with Zod before reaching the DB.
+6. Admin nav gains "Audit Log" for all admins and "User Roles" for super_admins only.
+7. Season selector on the league admin detail page (`/admin/leagues/[id]`): a `?season_id=` URL param (Zod-validated UUID) switches the season context; `race_sessions` and `league_driver_entries` are filtered by the chosen season. Defaults to the current season, then the league's own initial season. The selector is hidden when only one season exists.
+
+Important S8 rules:
+
+```text
+- Only super_admin may call GET /api/admin/users or PATCH /api/admin/users/[id]/role.
+- A super_admin cannot change their own role (prevents accidental self-lockout).
+- Cannot mark an archived season as current.
+- Cannot archive the current season.
+- Carry-over upserts on (league_id, season_id, driver_id) — safe to re-run.
+- audit_logs has no update or delete RLS policies — append-only by design.
+- The Discord webhook env var (DISCORD_WEBHOOK_URL) is present in env.ts and .env.example but no webhook sending is implemented yet.
+```
+
+S8 migration: `supabase/migrations/20260512000000_s8_admin_operations.sql`
+
+Known S8 accepted risks:
+
+| Risk | Detail |
+|------|--------|
+| `season.set_current` atomicity | Two sequential writes: set target → clear others. If the clear step fails the desired season is already current (better than zero current seasons), but stale `is_current = true` rows may remain until the next successful call. Wrap in a DB function/RPC if this becomes a concern. |
 
 ---
 
