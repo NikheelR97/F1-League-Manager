@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S8 admin operations in progress on `feature/s8-admin-operations`; PR pending → `dev`.
+**Status:** S8 admin operations merged to `dev` via PR #13; next sprint is S9 spreadsheet import.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 

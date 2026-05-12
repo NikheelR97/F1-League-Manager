@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S8 admin operations on `feature/s8-admin-operations`; PR #13 open → `dev`, post-review fixes applied.
+**Status:** S8 admin operations merged to `dev` via PR #13; next sprint is S9 spreadsheet import.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -14,9 +14,9 @@ Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | `feature/s8-admin-operations` (PR #13 open → `dev`) |
-| Latest merged PR | PR #11, `feat(s7): racer garage - private setup CRUD, duplicate, filters` on `dev` |
-| Merge commit | `24a80b2` |
+| Active development branch | None. Start S9 from updated `dev` using a new `feature/s9-spreadsheet-import` branch. |
+| Latest merged PR | PR #13, `feat(s8): admin operations — seasons, carry-overs, user roles, audit log` on `dev` |
+| Merge commit | `cad0341` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
 | Latest migration applied locally | `20260512000000_s8_admin_operations.sql` |
 
@@ -59,6 +59,20 @@ npm.cmd run test          # 270 tests
 npm.cmd run build
 npm.cmd run sprint-verify # all gates pass including E2E
 ```
+
+Known deferred S8 items:
+
+None — all build steps completed.
+
+Known S8 accepted risks:
+
+| Risk | Detail |
+|------|--------|
+| `season.set_current` atomicity | Two sequential writes: set target → clear others. If the clear step fails the desired season is already current (better than zero current seasons), but stale `is_current = true` rows may remain until the next successful call. Wrap in a DB function/RPC if this becomes a concern. |
+
+---
+
+### S7 Notes (archived)
 
 S7 adds the racer garage - private vehicle setup management for authenticated racers:
 
