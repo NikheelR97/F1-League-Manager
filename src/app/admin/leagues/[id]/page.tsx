@@ -3,37 +3,53 @@ import "server-only";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
+import { z } from "zod";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { LeagueAssetUpload } from "@/components/admin/LeagueAssetUpload";
 import { LeagueStatusButton } from "@/components/admin/LeagueStatusButton";
+import { SeasonSelector } from "@/components/admin/SeasonSelector";
 import { SessionDeleteButton } from "@/components/admin/SessionDeleteButton";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { MAX_DRIVERS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
+import { MAX_DRIVERS_LIST, MAX_SEASONS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 const MAX_SESSIONS_LIST = 20;
 
+const searchParamsSchema = z.object({
+  season_id: z.string().uuid().optional(),
+});
+
 export default async function LeagueDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id: leagueId } = await params;
+  const rawSearch = await searchParams;
+  const parsedSearch = searchParamsSchema.safeParse(rawSearch);
+  const seasonIdParam = parsedSearch.success ? parsedSearch.data.season_id : undefined;
+
   const db = createSupabaseServiceRoleClient();
 
   const [
     { data: league, error: leagueError },
+    { data: allSeasons, error: seasonsError },
     { data: teams, error: teamsError },
-    { data: entries, error: entriesError },
     { data: pointsSystems, error: pointsSystemsError },
-    { data: sessions },
   ] = await Promise.all([
     db
       .from("leagues")
-      .select("id, name, slug, format, status, fastest_lap_enabled, pole_position_enabled, constructor_championship_enabled, penalty_threshold, seasons(name)")
+      .select("id, name, slug, format, status, fastest_lap_enabled, pole_position_enabled, constructor_championship_enabled, penalty_threshold, season_id, seasons(name)")
       .eq("id", leagueId)
       .single(),
+    db
+      .from("seasons")
+      .select("id, name, is_current, is_archived, starts_on")
+      .order("starts_on", { ascending: false })
+      .limit(MAX_SEASONS_LIST),
     db
       .from("teams")
       .select("id, name, slug, kind, color_hex")
@@ -41,42 +57,66 @@ export default async function LeagueDetailPage({
       .order("name")
       .limit(MAX_TEAMS_PER_LEAGUE),
     db
-      .from("league_driver_entries")
-      .select("id, is_reserve, drivers(display_name, racing_number), driver_team_stints(team_id, ends_on, teams(name, color_hex))")
-      .eq("league_id", leagueId)
-      .is("left_on", null)
-      .order("joined_on")
-      .limit(MAX_DRIVERS_LIST),
-    db
       .from("points_systems")
       .select("id, name, fastest_lap_points, pole_position_points, max_positions")
       .eq("league_id", leagueId)
       .order("name"),
-    db
-      .from("race_sessions")
-      .select("id, name, session_code, scheduled_at, status, circuits(name, country)")
-      .eq("league_id", leagueId)
-      .order("scheduled_at", { ascending: false })
-      .limit(MAX_SESSIONS_LIST),
   ]);
 
   if (leagueError && leagueError.code !== "PGRST116") {
     return <ErrorState message="Failed to load league." />;
   }
+  if (seasonsError || teamsError || pointsSystemsError) {
+    return <ErrorState message="Failed to load league management data." />;
+  }
+  if (!league) notFound();
 
-  if (teamsError || entriesError || pointsSystemsError) {
+  // Resolve which season to display. Priority:
+  // 1. Valid season_id from URL param
+  // 2. The current season (is_current = true)
+  // 3. The league's own initial season_id
+  const seasons = allSeasons ?? [];
+  const currentSeason = seasons.find((s) => s.is_current);
+  const effectiveSeasonId =
+    (seasonIdParam && seasons.some((s) => s.id === seasonIdParam)
+      ? seasonIdParam
+      : null) ??
+    currentSeason?.id ??
+    league.season_id;
+
+  const [{ data: entries, error: entriesError }, { data: sessions }] =
+    await Promise.all([
+      db
+        .from("league_driver_entries")
+        .select("id, is_reserve, drivers(display_name, racing_number), driver_team_stints(team_id, ends_on, teams(name, color_hex))")
+        .eq("league_id", leagueId)
+        .eq("season_id", effectiveSeasonId)
+        .is("left_on", null)
+        .order("joined_on")
+        .limit(MAX_DRIVERS_LIST),
+      db
+        .from("race_sessions")
+        .select("id, name, session_code, scheduled_at, status, circuits(name, country)")
+        .eq("league_id", leagueId)
+        .eq("season_id", effectiveSeasonId)
+        .order("scheduled_at", { ascending: false })
+        .limit(MAX_SESSIONS_LIST),
+    ]);
+
+  if (entriesError) {
     return <ErrorState message="Failed to load league management data." />;
   }
 
-  if (!league) notFound();
-
-  const seasonName = (league.seasons as unknown as { name: string } | null)?.name ?? "—";
+  const effectiveSeasonName =
+    seasons.find((s) => s.id === effectiveSeasonId)?.name ??
+    (league.seasons as unknown as { name: string } | null)?.name ??
+    "—";
 
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <AdminPageHeader
-          description={`${league.format} · ${seasonName}`}
+          description={`${league.format} · ${effectiveSeasonName}`}
           title={league.name}
         />
         <div className="flex flex-col items-end gap-2 pt-1 shrink-0">
@@ -89,6 +129,7 @@ export default async function LeagueDetailPage({
           >
             {league.status}
           </span>
+          <SeasonSelector seasons={seasons} selectedSeasonId={effectiveSeasonId} />
           <LeagueStatusButton currentStatus={league.status} leagueId={leagueId} />
         </div>
       </div>

@@ -1,5 +1,6 @@
 import "server-only";
 
+import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
@@ -12,7 +13,7 @@ export default async function SeasonsPage() {
   const db = createSupabaseServiceRoleClient();
   const { data: seasons, error: seasonsError } = await db
     .from("seasons")
-    .select("id, name, starts_on, ends_on, is_current")
+    .select("id, name, starts_on, ends_on, is_current, is_archived")
     .order("starts_on", { ascending: false })
     .limit(MAX_SEASONS_LIST);
 
@@ -40,18 +41,28 @@ export default async function SeasonsPage() {
                   className="flex items-center justify-between border border-f1-border bg-f1-dark p-4"
                   key={s.id}
                 >
-                  <div>
+                  <Link
+                    className="flex-1 hover:underline"
+                    href={`/admin/seasons/${s.id}`}
+                  >
                     <p className="font-bold text-f1-white">{s.name}</p>
                     <p className="font-mono text-xs text-f1-muted">
                       {s.starts_on}
                       {s.ends_on ? ` → ${s.ends_on}` : " → ongoing"}
                     </p>
+                  </Link>
+                  <div className="flex gap-2">
+                    {s.is_current && (
+                      <span className="border border-f1-red px-2 py-0.5 text-xs font-bold uppercase text-f1-red">
+                        Current
+                      </span>
+                    )}
+                    {s.is_archived && (
+                      <span className="border border-f1-border px-2 py-0.5 text-xs font-bold uppercase text-f1-muted">
+                        Archived
+                      </span>
+                    )}
                   </div>
-                  {s.is_current && (
-                    <span className="border border-f1-red px-2 py-0.5 text-xs font-bold uppercase text-f1-red">
-                      Current
-                    </span>
-                  )}
                 </li>
               ))}
             </ul>

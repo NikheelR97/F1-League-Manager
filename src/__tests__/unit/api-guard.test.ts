@@ -33,6 +33,7 @@ function makeReq(
   method: string,
   opts: {
     contentLength?: number;
+    contentType?: string;
     origin?: string;
     csrfToken?: string;
   } = {},
@@ -40,6 +41,9 @@ function makeReq(
   const headers: Record<string, string> = {};
   if (opts.contentLength !== undefined) {
     headers["content-length"] = String(opts.contentLength);
+  }
+  if (opts.contentType !== undefined) {
+    headers["content-type"] = opts.contentType;
   }
   if (opts.origin !== undefined) {
     headers["origin"] = opts.origin;
@@ -98,6 +102,17 @@ describe("withAdminGuard security pipeline", () => {
     expect(neverCalled).not.toHaveBeenCalled();
   });
 
+  it("rejects unsupported content types on mutating requests with bodies", async () => {
+    const req = makeReq("POST", {
+      contentLength: 100,
+      contentType: "text/plain",
+      origin: "http://localhost:3000",
+    });
+    const res = await withAdminGuard(req, neverCalled);
+    expect(res.status).toBe(415);
+    expect(neverCalled).not.toHaveBeenCalled();
+  });
+
   it("passes GET requests through origin and content-length checks", async () => {
     vi.mocked(requireAdminContext).mockResolvedValueOnce(mockAuthOk);
     // GET with no CSRF token should still pass CSRF (non-mutating method)
@@ -112,6 +127,7 @@ describe("withAdminGuard security pipeline", () => {
     const req = makeReq("POST", {
       origin: "http://localhost:3000",
       contentLength: 100,
+      contentType: "application/json",
       // no csrfToken
     });
     const res = await withAdminGuard(req, neverCalled);
@@ -124,6 +140,7 @@ describe("withAdminGuard security pipeline", () => {
     const req = makeReq("POST", {
       origin: "http://localhost:3000",
       contentLength: 100,
+      contentType: "application/json",
       csrfToken: "12345678.deadbeefdeadbeef",
     });
     const res = await withAdminGuard(req, neverCalled);
@@ -137,6 +154,7 @@ describe("withAdminGuard security pipeline", () => {
     const req = makeReq("POST", {
       origin: "http://localhost:3000",
       contentLength: 100,
+      contentType: "application/json",
       csrfToken: token,
     });
     const handler = vi.fn(async () => Response.json({ ok: true }));
@@ -154,6 +172,7 @@ describe("withAdminGuard security pipeline", () => {
     const token = generateCsrfToken(CSRF_SECRET);
     const req = makeReq("POST", {
       contentLength: 100,
+      contentType: "application/json",
       csrfToken: token,
       origin: "http://localhost:3000",
     });
@@ -168,6 +187,7 @@ describe("withAdminGuard security pipeline", () => {
     const token = generateCsrfToken(CSRF_SECRET);
     const req = makeReq("POST", {
       contentLength: 100,
+      contentType: "application/json",
       csrfToken: token,
       origin: "http://localhost:3000",
     });
@@ -192,6 +212,7 @@ describe("withAdminGuard security pipeline", () => {
     const req = makeReq("POST", {
       origin: "http://localhost:3000",
       contentLength: 100,
+      contentType: "application/json",
       csrfToken: token,
     });
     const res = await withAdminGuard(req, neverCalled);
@@ -209,6 +230,7 @@ describe("withAdminGuard security pipeline", () => {
     const req = makeReq("POST", {
       origin: "http://localhost:3000",
       contentLength: 100,
+      contentType: "application/json",
       csrfToken: token,
     });
     const res = await withAdminGuard(req, neverCalled);
