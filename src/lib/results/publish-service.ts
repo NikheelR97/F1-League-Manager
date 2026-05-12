@@ -318,6 +318,12 @@ async function recalculateStandings(
     (prevDriverStandings ?? []).map((s) => [s.driver_id, s.position]),
   );
 
+  // Track each driver's most recent team across all result rows
+  const latestTeamByDriver = new Map<string, string>();
+  for (const r of allResults ?? []) {
+    if (r.team_id) latestTeamByDriver.set(r.driver_id, r.team_id);
+  }
+
   const newDriverStandings = buildDriverStandings(
     allResults ?? [],
     adjustments ?? [],
@@ -337,6 +343,7 @@ async function recalculateStandings(
         league_id: leagueId,
         season_id: seasonId,
         driver_id: s.driver_id,
+        team_id: latestTeamByDriver.get(s.driver_id) ?? null,
         position: s.position,
         previous_position: s.previous_position,
         total_points: s.total_points,

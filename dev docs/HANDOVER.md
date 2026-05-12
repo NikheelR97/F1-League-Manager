@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S5 result publishing merged to `dev` in PR #9 on May 8, 2026.
+**Status:** S7 racer garage in progress on `feature/s7-racer-garage`, awaiting PR.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -8,17 +8,122 @@
 
 ## Current Handover Notes
 
-Last updated: May 8, 2026.
+Last updated: May 9, 2026.
 
 Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | `dev` |
-| Latest merged PR | PR #9, `feat(s5): result publishing — points engine, standings, and admin stepper` |
-| Merge commit | `e00a9c7` |
+| Active development branch | `feature/s7-racer-garage` (PR pending → `dev`) |
+| Latest merged PR | PR #10, `feat(s6): calendar and digital wheel` on `dev` |
+| Merge commit | `654aa93` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
-| Latest migration applied locally | `20260508123000_s4_public_security_boundaries.sql` (no new S5 migrations) |
+| Latest migration applied locally | `20260509120000_s7_vehicle_setups_league.sql` |
+
+S7 adds the racer garage — private vehicle setup management for authenticated racers:
+
+1. Racers can create, edit, delete, and duplicate vehicle setups per circuit.
+2. Setup list never exposes setup_data (compact DTOs only).
+3. All racer routes follow the HANDOVER §7 security pipeline: size → origin → session → CSRF.
+4. Ownership is verified server-side (profile_id check via service role client); RLS enforces it at DB level too.
+5. Setups are private by default; duplicates always start private.
+6. Filters: circuit, weather, and league (league_id added to vehicle_setups via S7 migration).
+
+Important S7 racer garage rules:
+
+```text
+- Never load setup_data in the list query — it can be large JSON; load it only on edit.
+- Verify driver ownership with a service role SELECT before any mutation (not just RLS).
+- Return 404 (not 403) when a setup is not found or not owned — avoids leaking existence.
+- Duplicate always sets is_public = false regardless of source setup visibility.
+- The racer guard checks session (any authenticated user) — no admin role required.
+```
+
+S7 migration:
+
+```text
+supabase/migrations/20260509120000_s7_vehicle_setups_league.sql
+```
+
+This migration adds `league_id uuid` (nullable) to `vehicle_setups` for filtering setups by league, plus an index on `(driver_id, league_id)`.
+
+S7 validation evidence:
+
+```powershell
+npm.cmd run type-check
+npm.cmd run lint
+npm.cmd run test          # 227 tests
+npm.cmd run build
+npm.cmd run sprint-verify # all gates pass including E2E
+```
+
+Known deferred S7 items:
+
+| Item | Status | Note |
+|------|--------|------|
+| "Copy from circuit" create-form shortcut | Deferred | Racers can duplicate manually; a dedicated copy-from selector can be added later. |
+| Game version autocomplete | Deferred | Free text input works; autocomplete from existing values can be added later. |
+| Public setup discovery | Deferred | `is_public` flag exists; a public setup gallery page is not yet built. |
+| Racer E2E auth tests | Deferred | Browser E2E for authenticated racer flow deferred with other auth E2E expansion. |
+
+---
+
+### S6 Notes (archived)
+
+S6 added the calendar and digital wheel workflow:
+
+1. Admins can create, edit, and manage race sessions on the calendar.
+2. Public users can view scheduled and completed sessions through league-safe public routes.
+3. Admins can spin a digital circuit wheel for scheduled sessions.
+4. Wheel confirmation is server-side and atomic, so the selected circuit is persisted consistently.
+5. Public wheel history avoids leaking admin profile details.
+
+Important S6 calendar and wheel rules:
+
+```text
+- The wheel animation is visual only; the server-confirmed result is the source of truth.
+- Wheel confirmation must use public.confirm_wheel_spin_session(...) rather than client-only updates.
+- Public calendar reads should stay limited to scheduled/completed sessions.
+- Session create/update must validate the selected points system belongs to the same league.
+- The S6 migration must be applied to whichever database target is used for validation.
+```
+
+S6 migration:
+
+```text
+supabase/migrations/20260509101500_s6_confirm_wheel_spin_session.sql
+```
+
+This migration creates the `public.confirm_wheel_spin_session(...)` RPC used to atomically confirm wheel selections.
+
+S6 validation evidence:
+
+```powershell
+npm.cmd run type-check
+npm.cmd run lint
+npm.cmd run test          # 181 tests
+npm.cmd run build
+git diff --check
+```
+
+All passed before PR #10 was merged. PR #10 CI verification also passed.
+
+Shared environment reminder:
+
+Apply the S6 migration to any shared dev preview, staging, or production database before validating calendar and wheel behavior there. It has already been applied to the local Supabase Docker target.
+
+Known deferred S6 items:
+
+| Item | Status | Note |
+|------|--------|------|
+| Rich wheel animation polish | Deferred | Current wheel flow is functional; deeper animation polish can happen later. |
+| Public race reports page | Deferred | Still depends on a dedicated reports experience. |
+| Historical season selector | Deferred | MVP still assumes the active league season for primary public flows. |
+| Full browser E2E for authenticated wheel flow | Deferred | Unit/integration coverage exists; browser coverage can be added when auth E2E helpers are expanded. |
+
+---
+
+### S5 Notes (archived)
 
 S5 added the admin result publishing workflow:
 
@@ -73,10 +178,10 @@ Known deferred S5 items:
 
 | Item | Status | Next action |
 |------|--------|-------------|
-| Standalone qualifying results page | Deferred | Qualifying shown on race detail; standalone page deferred to S6+ if needed. |
-| Race reports page | Deferred | Needs published result data; deferred to S6+. |
+| Standalone qualifying results page | Deferred | Qualifying shown on race detail; standalone page still deferred after S6. |
+| Race reports page | Deferred | Needs a dedicated public reports experience; still deferred after S6. |
 | Season selector on public pages | Deferred | MVP assumes one active season per league; revisit with historical seasons. |
-| Cache/revalidation after publish | Deferred | Public pages use `force-dynamic`; tag-based revalidation deferred to S6+. |
+| Cache/revalidation after publish | Deferred | Public pages use `force-dynamic`; tag-based revalidation still deferred after S6. |
 | Standings atomicity (delete+insert gap) | Accepted risk | PostgREST has no transactions; gap is milliseconds during a rare admin action. Wrap in a DB function/RPC if standings become high-traffic. |
 
 ---

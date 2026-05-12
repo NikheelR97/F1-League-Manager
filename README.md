@@ -4,7 +4,25 @@ Production-grade F1 esports league management app.
 
 ## Current Status
 
-Sprint 0 foundation is in progress on `feature/s0-project-setup`, targeting `dev`.
+Sprint 6, Calendar and Digital Wheel, is merged to `dev`.
+
+Latest merged feature PR:
+
+```text
+PR #10 - feat(s6): calendar and digital wheel
+```
+
+Current next sprint:
+
+```text
+S7 - Racer Garage
+```
+
+Latest local migration required for S6:
+
+```text
+supabase/migrations/20260509101500_s6_confirm_wheel_spin_session.sql
+```
 
 Default development database target:
 
