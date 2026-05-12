@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
+import { MAX_WORKBOOK_DRIVERS, MAX_WORKBOOK_RACES } from "@/lib/constants";
 import { calculateRacePoints } from "@/lib/results/points";
 import type { PointsSystem } from "@/lib/results/points";
 import { buildDriverStandings, buildTeamStandings } from "@/lib/results/standings";
@@ -210,7 +211,6 @@ export async function runImport(
     for (const res of rd.results) {
       const driverId = driverByName.get(res.driverName)!;
       if (entryByDriver.has(driverId)) continue;
-      const teamForEntry = res.reserveTeam ? canonicalTeamName(res.reserveTeam) : null;
       const { data: entry, error: entryErr } = await db
         .from("league_driver_entries")
         .upsert(
@@ -229,7 +229,6 @@ export async function runImport(
         .single();
       if (entryErr || !entry) return { ok: false, error: `Failed to upsert reserve entry for "${res.driverName}"` };
       entryByDriver.set(driverId, entry.id);
-      void teamForEntry; // used later for stints if needed
     }
   }
 
@@ -505,12 +504,13 @@ export async function runImport(
     }
 
     if (penaltyRows.length > 0) {
-      await db.from("penalties").insert(penaltyRows);
+      const { error: penErr } = await db.from("penalties").insert(penaltyRows);
+      if (penErr) return { ok: false, error: `Failed to write penalties for "${rd.race.name}": ${penErr.message}` };
     }
   }
 
   // 9. Recalculate standings
-  const recalcResult = await recalculate(db, leagueId, seasonId, league, ps);
+  const recalcResult = await recalculate(db, leagueId, seasonId, league);
   if (!recalcResult.ok) return recalcResult;
 
   return { ok: true, sessionCount: sessionIds.length, driverCount: workbook.drivers.length };
@@ -568,9 +568,7 @@ async function recalculate(
     constructor_championship_enabled: boolean;
     penalty_threshold: number;
   },
-  ps: PointsSystem,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  void ps; // points already baked into race_results.points_awarded
 
   const { data: completedSessions } = await db
     .from("race_sessions")
@@ -586,7 +584,8 @@ async function recalculate(
     db
       .from("race_results")
       .select("driver_id, team_id, finishing_position, result_status, points_awarded, manual_points_adjustment, fastest_lap")
-      .in("race_session_id", sessionIds),
+      .in("race_session_id", sessionIds)
+      .limit(MAX_WORKBOOK_RACES * MAX_WORKBOOK_DRIVERS),
     db
       .from("championship_adjustments")
       .select("driver_id, team_id, points_delta")
