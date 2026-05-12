@@ -4,50 +4,66 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { SeasonSelector } from "@/components/league/SeasonSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
+import { resolveLeagueSeasons } from "@/lib/public/resolve-league-seasons";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function ConstructorStandingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
+  const sp = await searchParams;
   const league = await resolvePublicLeague(slug);
   if (!league) notFound();
 
   if (!league.constructor_championship_enabled) notFound();
 
+  const rawSeason = typeof sp.season === "string" ? sp.season : null;
+  const seasonId =
+    rawSeason && UUID_RE.test(rawSeason) ? rawSeason : league.season.id;
+
   const db = createSupabaseServiceRoleClient();
 
-  const [{ data: rows }, { data: lastSession }] = await Promise.all([
+  const [{ data: rows }, { data: lastSession }, seasons] = await Promise.all([
     db
       .from("team_standings")
       .select(
         "position, previous_position, total_points, wins, podiums, updated_at, teams(id, name, color_hex)",
       )
       .eq("league_id", league.id)
-      .eq("season_id", league.season.id)
+      .eq("season_id", seasonId)
       .order("position")
       .limit(15),
     db
       .from("race_sessions")
       .select("name, published_at")
       .eq("league_id", league.id)
-      .eq("season_id", league.season.id)
+      .eq("season_id", seasonId)
       .eq("status", "completed")
       .order("published_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    resolveLeagueSeasons(league.id),
   ]);
 
   const standings = rows ?? [];
   const leaderPoints = standings[0]?.total_points ?? 0;
   const updatedAt = standings[0]?.updated_at ?? null;
+
+  const displaySeason =
+    seasons.find((s) => s.id === seasonId)?.name ?? league.season.name;
 
   type TeamRow = { id: string; name: string; color_hex: string };
 
@@ -57,9 +73,15 @@ export default async function ConstructorStandingsPage({
         format={league.format}
         lastRound={lastSession?.name ?? null}
         leagueName={league.name}
-        seasonName={league.season.name}
+        seasonName={displaySeason}
         title="Constructor Standings"
         updatedAt={updatedAt}
+      />
+
+      <SeasonSelector
+        currentSeasonId={seasonId}
+        pathname={`/leagues/${slug}/standings/constructors`}
+        seasons={seasons}
       />
 
       {standings.length === 0 ? (

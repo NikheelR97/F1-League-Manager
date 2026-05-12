@@ -1,5 +1,7 @@
+import { revalidateTag } from "next/cache";
 import { type NextRequest } from "next/server";
 
+import { cacheTag } from "@/lib/cache/tags";
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import { selectWheelCircuit } from "@/lib/wheel/wheel-service";
@@ -72,6 +74,8 @@ export async function POST(
       entityType: "wheel_spin",
       metadata: { league_id: leagueId, circuit_id: chosen.circuit_id },
     });
+
+    revalidateTag(cacheTag.wheel(leagueId), "default");
 
     return Response.json({ spin: { ...spin, circuit: chosen.circuits } });
   });

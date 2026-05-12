@@ -1,6 +1,8 @@
+import { revalidateTag } from "next/cache";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { cacheTag } from "@/lib/cache/tags";
 import { withAdminGuard } from "@/lib/admin/api-guard";
 import { publishSession } from "@/lib/results/publish-service";
 
@@ -69,6 +71,11 @@ export async function POST(
     if (!result.ok) {
       return Response.json({ error: result.error }, { status: result.status });
     }
+
+    revalidateTag(cacheTag.standings(body.league_id), "default");
+    revalidateTag(cacheTag.results(body.league_id), "default");
+    revalidateTag(cacheTag.session(sessionId), "default");
+    revalidateTag(cacheTag.penalties(body.league_id), "default");
 
     return Response.json({ sessionId: result.sessionId }, { status: 200 });
   });

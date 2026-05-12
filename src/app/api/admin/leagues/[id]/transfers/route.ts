@@ -1,6 +1,8 @@
+import { revalidateTag } from "next/cache";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { cacheTag } from "@/lib/cache/tags";
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { MAX_PRIMARY_DRIVERS_PER_TEAM } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -188,6 +190,9 @@ export async function POST(
         to_team_id: new_team_id,
       },
     });
+
+    revalidateTag(cacheTag.standings(leagueId), "default");
+    revalidateTag(cacheTag.league(leagueId), "default");
 
     return Response.json({ ok: true }, { status: 200 });
   });

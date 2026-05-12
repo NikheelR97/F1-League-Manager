@@ -1,5 +1,7 @@
+import { revalidateTag } from "next/cache";
 import { type NextRequest } from "next/server";
 
+import { cacheTag } from "@/lib/cache/tags";
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { MAX_ASSET_UPLOAD_BYTES, TEAM_ASSETS_BUCKET } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -102,6 +104,8 @@ export async function POST(
       entityType: "team",
       metadata: { kind, league_id: leagueId, path: storagePath },
     });
+
+    revalidateTag(cacheTag.league(leagueId), "default");
 
     return Response.json({ path: storagePath }, { status: 200 });
   });

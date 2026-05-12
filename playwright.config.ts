@@ -1,7 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
+export const ADMIN_STORAGE_STATE = "e2e/.auth/admin.json";
+export const RACER_STORAGE_STATE = "e2e/.auth/racer.json";
+
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.ts",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,

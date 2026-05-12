@@ -5,33 +5,52 @@ import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { SeasonSelector } from "@/components/league/SeasonSelector";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
+import { resolveLeagueSeasons } from "@/lib/public/resolve-league-seasons";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function ResultsIndexPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
+  const sp = await searchParams;
   const league = await resolvePublicLeague(slug);
   if (!league) notFound();
 
+  const rawSeason = typeof sp.season === "string" ? sp.season : null;
+  const seasonId =
+    rawSeason && UUID_RE.test(rawSeason) ? rawSeason : league.season.id;
+
   const db = createSupabaseServiceRoleClient();
 
-  const { data: sessions } = await db
-    .from("race_sessions")
-    .select("id, name, race_number, race_length_percent, scheduled_at, published_at, circuits(name, country, grand_prix_name)")
-    .eq("league_id", league.id)
-    .eq("season_id", league.season.id)
-    .eq("status", "completed")
-    .order("published_at", { ascending: false })
-    .limit(50);
+  const [{ data: sessions }, seasons] = await Promise.all([
+    db
+      .from("race_sessions")
+      .select(
+        "id, name, race_number, race_length_percent, scheduled_at, published_at, circuits(name, country, grand_prix_name)",
+      )
+      .eq("league_id", league.id)
+      .eq("season_id", seasonId)
+      .eq("status", "completed")
+      .order("published_at", { ascending: false })
+      .limit(50),
+    resolveLeagueSeasons(league.id),
+  ]);
 
   const results = sessions ?? [];
   const lastSession = results[0];
+  const displaySeason =
+    seasons.find((s) => s.id === seasonId)?.name ?? league.season.name;
 
   type Circuit = { name: string; country: string; grand_prix_name: string };
 
@@ -41,9 +60,15 @@ export default async function ResultsIndexPage({
         format={league.format}
         lastRound={lastSession?.name ?? null}
         leagueName={league.name}
-        seasonName={league.season.name}
+        seasonName={displaySeason}
         title="Race Results"
         updatedAt={lastSession?.published_at ?? null}
+      />
+
+      <SeasonSelector
+        currentSeasonId={seasonId}
+        pathname={`/leagues/${slug}/results`}
+        seasons={seasons}
       />
 
       {results.length === 0 ? (

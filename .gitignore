@@ -20,6 +20,7 @@ test-results/
 blob-report/
 .nyc_output/
 junit.xml
+e2e/.auth/
 
 # Logs
 logs/
