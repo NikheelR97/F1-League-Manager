@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S9 spreadsheet import complete on `feature/s9-spreadsheet-import`; next sprint is S10 regression and security audit.
+**Status:** S10 regression and security audit complete on `feature/s10-regression-security`; next sprint is S11 performance and accessibility.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -14,11 +14,35 @@ Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | `feature/s9-spreadsheet-import` — S9 complete, pending PR to `dev`. |
-| Latest merged PR | PR #13, `feat(s8): admin operations — seasons, carry-overs, user roles, audit log` on `dev` |
-| Merge commit | `cad0341` |
+| Active development branch | `feature/s10-regression-security` — S10 in progress. |
+| Latest merged PR | PR #15, `feat(s9): spreadsheet import — xlsx upload, diff, confirmation lock` on `dev` |
+| Merge commit | `e2e7788` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
-| Latest migration applied locally | `20260512000000_s8_admin_operations.sql` (S9 migration `20260513000000_s9_workbook_import.sql` must be applied before testing import) |
+| Latest migration applied locally | `20260513000000_s9_workbook_import.sql` |
+
+S10 is the regression and security audit sprint. Key findings and audit results:
+
+```text
+- All 24 public tables have RLS enabled (verified via pg_tables query).
+- All admin routes use withAdminGuard; racer routes use withRacerGuard + resolveOwnedSetup.
+- No NEXT_PUBLIC_ prefix on server-only secrets.
+- Service role key absent from .next/static client chunks.
+- Dependency audit: zero high/critical findings. Two moderate postcss findings via Next.js — no safe fix without a breaking downgrade; accepted.
+- 24 new S10 security tests in src/__tests__/unit/s10-security.test.ts covering all 10 SPRINT_PLAN requirements.
+```
+
+S10 security rules to maintain:
+
+```text
+- withAdminGuard covers the full §7 pipeline: size → content-type → origin → session → role-from-DB → rate-limit → CSRF → Zod → service → audit log → sanitized response.
+- withRacerGuard covers: size → origin → session → CSRF. Owner check is in resolveOwnedSetup (returns 404, not 403).
+- points_awarded must never appear in any API request schema — server-calculates only.
+- Wheel circuit must be validated against DB-stored spin via validateWheelConfirmation + confirm_wheel_spin_session RPC.
+- Every state-changing admin route must call writeAdminAuditLog (or delegate to a service that does).
+- RLS enabled: audit_logs append-only (no update/delete policy), vehicle_setups owner-scoped.
+```
+
+---
 
 S9 adds workbook import — a two-phase import pipeline for the Season 2 `.xlsx` workbook:
 
@@ -68,6 +92,24 @@ Post-review fixes applied (commit `99c9098`, PR #15):
 | `allResults` query in `recalculate()` had no limit — violated HANDOVER §6 "Bound every list" | Added `.limit(MAX_WORKBOOK_RACES * MAX_WORKBOOK_DRIVERS)` |
 | `void ps` dead code — `ps` parameter unused in `recalculate()` | Removed parameter from `recalculate()` signature and call site |
 | `void teamForEntry` dead code — reserve stint creation was never implemented | Removed unused variable and stale comment |
+
+Known cross-sprint deferred items (carried into S11/S12):
+
+| Item | Originally deferred in | Now planned for |
+|------|------------------------|-----------------|
+| `/login` page (magic link or email/password) | Never built — all sprints redirect to `/login` | S12 pre-deploy (hard blocker for smoke tests) |
+| Playwright auth storage state helpers | S3, S6, S7 | S11 |
+| Admin browser E2E (league, result publish) | S3 | S11 |
+| Authenticated wheel E2E | S6 | S11 |
+| Racer garage E2E | S7 | S11 |
+| Standalone qualifying results page | S4 | S11 |
+| Public race reports page | S4, S5, S6 | S11 |
+| Season selector on public standings pages | S4 | S11 |
+| Cache/revalidation after publish | S4/S5 | S11 |
+| DiffReport ✓/✗ `aria-label` | S9 | S11 |
+| Rich wheel animation polish | S6 | S11 |
+| Real workbook end-to-end smoke | S9 | S12 pre-deploy |
+| `driver_penalty_totals` rebuild after import | S9 | S12 pre-deploy (manual: run carry-over API after import confirmation) |
 
 Known deferred S9 items:
 
