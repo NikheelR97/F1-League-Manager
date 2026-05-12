@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import Link from "next/link";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
@@ -92,9 +94,9 @@ export function LeagueForm({ seasons }: LeagueFormProps) {
       {seasons.length === 0 && (
         <p className="border border-f1-red bg-f1-dark p-3 text-sm text-f1-silver">
           No seasons exist yet.{" "}
-          <a className="text-f1-red underline" href="/admin/seasons">
+          <Link className="text-f1-red underline" href="/admin/seasons">
             Create a season first.
-          </a>
+          </Link>
         </p>
       )}
 

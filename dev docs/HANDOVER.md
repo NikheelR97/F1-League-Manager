@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S7 racer garage merged to `dev`; next sprint is S8 admin operations, seasons, carry-overs, and audit.
+**Status:** S8 admin operations in progress on `feature/s8-admin-operations`, awaiting PR.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -14,11 +14,50 @@ Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | None. Start S8 from updated `dev` using a new `feature/s8-admin-operations` branch. |
+| Active development branch | `feature/s8-admin-operations` (PR pending → `dev`) |
 | Latest merged PR | PR #11, `feat(s7): racer garage - private setup CRUD, duplicate, filters` on `dev` |
 | Merge commit | `24a80b2` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
-| Latest migrations | `20260509120000_s7_vehicle_setups_league.sql`; `20260509130000_fix_driver_standings_team_id.sql` |
+| Latest migration applied locally | `20260512000000_s8_admin_operations.sql` |
+
+S8 adds admin operations — seasons management, carry-over of penalties and bans, super-admin user role management, and the audit log viewer:
+
+1. Seasons can be marked as current (clears the flag from all others) or archived (togglable). The current season cannot be archived.
+2. An archived season cannot be made current.
+3. Carry-over: copies each driver's end-of-season `penalty_points` and `ban_threshold_reached` flag from `driver_penalty_totals` into `carry_over_penalty_points` and `carry_over_ban_count` on new `league_driver_entries`. Safe to re-run (upsert).
+4. Super-admin user management: super_admins can promote or demote other users' roles. Normal admins cannot access this page or API. A super_admin cannot change their own role.
+5. Audit log viewer: server-rendered table at `/admin/audit` with filters for actor, action, entity type, entity ID (pass a league or season UUID to scope by league/season), and date range. Append-only — no update or delete policies exist on `audit_logs`. All search params are validated with Zod before reaching the DB.
+6. Admin nav gains "Audit Log" for all admins and "User Roles" for super_admins only.
+
+Important S8 rules:
+
+```text
+- Only super_admin may call GET /api/admin/users or PATCH /api/admin/users/[id]/role.
+- A super_admin cannot change their own role (prevents accidental self-lockout).
+- Cannot mark an archived season as current.
+- Cannot archive the current season.
+- Carry-over upserts on (league_id, season_id, driver_id) — safe to re-run.
+- audit_logs has no update or delete RLS policies — append-only by design.
+- The Discord webhook env var (DISCORD_WEBHOOK_URL) is present in env.ts and .env.example but no webhook sending is implemented yet.
+```
+
+S8 migration:
+
+```text
+supabase/migrations/20260512000000_s8_admin_operations.sql
+```
+
+This migration adds `is_archived boolean not null default false` to `seasons` and adds `audit_logs` filtering indexes (`actor_id`, `action`, `entity_type`).
+
+S8 validation evidence:
+
+```powershell
+npm.cmd run type-check
+npm.cmd run lint
+npm.cmd run test          # 259 tests
+npm.cmd run build
+npm.cmd run sprint-verify # all gates pass including E2E
+```
 
 S7 adds the racer garage - private vehicle setup management for authenticated racers:
 
@@ -60,6 +99,16 @@ npm.cmd run deploy:check  # passed after Next 16.2.6 security patch
 ```
 
 PR #11 CI verification passed after the Next.js security update to `next@16.2.6` and `eslint-config-next@16.2.6`.
+
+Known deferred S8 items:
+
+| Item | Status | Note |
+|------|--------|------|
+| Season selectors on admin pages | Deferred | Requires refactoring the league admin detail page to accept a season query param and re-scoping sessions/teams/drivers. Deferred to S9 — more useful once historical spreadsheet data exists. |
+
+---
+
+### S7 Notes (archived)
 
 Known deferred S7 items:
 

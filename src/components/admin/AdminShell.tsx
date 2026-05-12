@@ -1,4 +1,4 @@
-import { Flag, LayoutDashboard, Trophy, Users } from "lucide-react";
+import { ClipboardList, Flag, LayoutDashboard, ShieldCheck, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 
 import type { ProfileRole } from "@/lib/auth/roles";
@@ -8,11 +8,16 @@ interface AdminShellProps {
   role: ProfileRole;
 }
 
-const navItems = [
+const baseNavItems = [
   { href: "/admin/leagues", icon: Trophy, label: "Leagues" },
   { href: "/admin/seasons", icon: LayoutDashboard, label: "Seasons" },
   { href: "/admin/drivers", icon: Users, label: "Drivers" },
   { href: "/admin/reserves", icon: Flag, label: "Reserves" },
+  { href: "/admin/audit", icon: ClipboardList, label: "Audit Log" },
+] as const;
+
+const superAdminNavItems = [
+  { href: "/admin/users", icon: ShieldCheck, label: "User Roles" },
 ] as const;
 
 export function AdminShell({ children, role }: AdminShellProps) {
@@ -26,7 +31,7 @@ export function AdminShell({ children, role }: AdminShellProps) {
           </span>
         </div>
         <nav aria-label="Admin navigation" className="flex flex-col gap-1 p-2">
-          {navItems.map(({ href, icon: Icon, label }) => (
+          {baseNavItems.map(({ href, icon: Icon, label }) => (
             <Link
               className="flex items-center gap-3 rounded-none border border-transparent px-3 py-2 text-sm font-bold uppercase text-f1-silver transition-colors hover:border-f1-border hover:bg-f1-dark hover:text-f1-white"
               href={href}
@@ -36,6 +41,17 @@ export function AdminShell({ children, role }: AdminShellProps) {
               {label}
             </Link>
           ))}
+          {role === "super_admin" &&
+            superAdminNavItems.map(({ href, icon: Icon, label }) => (
+              <Link
+                className="flex items-center gap-3 rounded-none border border-transparent px-3 py-2 text-sm font-bold uppercase text-f1-silver transition-colors hover:border-f1-border hover:bg-f1-dark hover:text-f1-white"
+                href={href}
+                key={href}
+              >
+                <Icon aria-hidden="true" size={16} />
+                {label}
+              </Link>
+            ))}
         </nav>
         <div className="mt-auto border-t border-f1-border p-4">
           <p className="text-xs font-bold uppercase text-f1-muted">{role}</p>

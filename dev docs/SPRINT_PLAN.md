@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S7 racer garage merged to `dev` via PR #11; next sprint is S8 admin operations, seasons, carry-overs, and audit.
+**Status:** S8 admin operations in progress on `feature/s8-admin-operations`; PR pending → `dev`.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -813,12 +813,35 @@ Build the operational tools needed to run multiple seasons safely.
 7. Audit logs cannot be edited or deleted from the app.
 8. Audit metadata does not store secrets.
 
+### Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| Branch created | Done | `feature/s8-admin-operations` from `dev` | None |
+| S8 migration (`is_archived` on seasons + audit_logs indexes) | Done | `supabase/migrations/20260512000000_s8_admin_operations.sql`; applied locally | None |
+| Season mark-as-current API | Done | `PATCH /api/admin/seasons/[id]/current`; clears others, blocks archived, audit log | None |
+| Season archive/unarchive API | Done | `PATCH /api/admin/seasons/[id]/archive`; blocks current season, audit log | None |
+| Season detail page | Done | `/admin/seasons/[id]` — status display, SeasonActions, CarryOverForm per league | None |
+| Seasons list links to detail page | Done | `/admin/seasons` each row links to `/admin/seasons/[id]` | None |
+| Season selectors on admin pages | Outstanding | None | Requires refactoring league admin page to accept a season query param and re-fetching sessions, teams, and drivers per season. Deferred to S9 — the spreadsheet import workflow establishes multi-season data and the selector is more useful once historical data exists. |
+| Carry-over API | Done | `POST /api/admin/leagues/[id]/carry-over`; upserts `league_driver_entries` with `carry_over_penalty_points` + `carry_over_ban_count`; audit log | None |
+| CarryOverForm component | Done | `src/components/admin/CarryOverForm.tsx`; shown per league on season detail page | None |
+| Super-admin users list API | Done | `GET /api/admin/users`; super_admin only; returns admin + super_admin profiles | None |
+| Super-admin role change API | Done | `PATCH /api/admin/users/[id]/role`; super_admin only; blocks self-change; audit log | None |
+| User roles page | Done | `/admin/users`; super_admin redirect guard server-side; UserRoleForm per user | None |
+| Audit log API | Done | `GET /api/admin/audit`; filters by actor, action, entity_type, date_from, date_to; bounded by `MAX_AUDIT_LOGS_LIST` | None |
+| Audit log viewer page | Done | `/admin/audit`; server-rendered AuditLogTable with pagination | None |
+| Admin nav updated | Done | `AdminShell.tsx` — Audit Log for all admins; User Roles for super_admin only | None |
+| Discord webhook stub | Done | `DISCORD_WEBHOOK_URL` already in `env.ts` + `.env.example`; no webhook sending — disabled foundation only | None |
+| 32 new S8 unit tests | Done | `npm run test` → 259 passing | None |
+| `npm run sprint-verify` gate | Done | type-check ✓ · lint ✓ · 259 tests ✓ · coverage ✓ · build ✓ · E2E ✓ | None |
+
 ### Done When
 
-1. The app supports historical seasons.
-2. Admin role management is safe.
-3. Audit history is searchable and append-only.
-4. `npm run sprint-verify` passes.
+1. The app supports historical seasons. ✓
+2. Admin role management is safe. ✓
+3. Audit history is searchable and append-only. ✓
+4. `npm run sprint-verify` passes. ✓
 
 ---
 

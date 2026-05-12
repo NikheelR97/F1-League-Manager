@@ -66,3 +66,6 @@ export const COUNTDOWN_TICK_MS = 1000;
 export const STANDINGS_REFRESH_MS = 30_000;
 export const WHEEL_SPIN_DURATION_MS = 4000;
 export const WHEEL_DECEL_DURATION_MS = 2000;
+
+export const MAX_AUDIT_LOGS_LIST = 100;
+export const MAX_ADMIN_USERS_LIST = 100;
