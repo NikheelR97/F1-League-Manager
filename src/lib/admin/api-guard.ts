@@ -19,6 +19,11 @@ export type GuardedHandler = (
   auth: Extract<AdminAuthResult, { ok: true }>,
 ) => Promise<Response>;
 
+const ALLOWED_MUTATION_CONTENT_TYPES = [
+  "application/json",
+  "multipart/form-data",
+];
+
 export async function withAdminGuard(
   req: NextRequest,
   handler: GuardedHandler,
@@ -30,6 +35,21 @@ export async function withAdminGuard(
       const contentLength = Number(req.headers.get("content-length") ?? 0);
       if (contentLength > MAX_REQUEST_BODY_BYTES) {
         return Response.json({ error: "Payload too large" }, { status: 413 });
+      }
+
+      const hasBody =
+        contentLength > 0 || req.headers.has("transfer-encoding");
+      const contentType = req.headers.get("content-type")?.toLowerCase() ?? "";
+      if (
+        hasBody &&
+        !ALLOWED_MUTATION_CONTENT_TYPES.some((allowed) =>
+          contentType.startsWith(allowed),
+        )
+      ) {
+        return Response.json(
+          { error: "Unsupported content type" },
+          { status: 415 },
+        );
       }
     }
 

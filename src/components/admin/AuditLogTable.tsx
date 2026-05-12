@@ -78,9 +78,12 @@ export function AuditLogTable({ limit, logs, offset }: Props) {
                     </span>
                   )}
                 </td>
-                <td className="py-2 font-mono text-xs text-f1-muted">
+                <td className="py-2 font-mono text-xs text-f1-muted" title={JSON.stringify(log.metadata)}>
                   {Object.keys(log.metadata).length > 0
-                    ? JSON.stringify(log.metadata)
+                    ? (() => {
+                        const s = JSON.stringify(log.metadata);
+                        return s.length > 120 ? `${s.slice(0, 120)}…` : s;
+                      })()
                     : "—"}
                 </td>
               </tr>

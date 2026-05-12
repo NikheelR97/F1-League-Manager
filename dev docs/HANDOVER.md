@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S8 admin operations in progress on `feature/s8-admin-operations`, awaiting PR.
+**Status:** S8 admin operations on `feature/s8-admin-operations`; PR #13 open → `dev`, post-review fixes applied.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -14,7 +14,7 @@ Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | `feature/s8-admin-operations` (PR pending → `dev`) |
+| Active development branch | `feature/s8-admin-operations` (PR #13 open → `dev`) |
 | Latest merged PR | PR #11, `feat(s7): racer garage - private setup CRUD, duplicate, filters` on `dev` |
 | Merge commit | `24a80b2` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
@@ -55,7 +55,7 @@ S8 validation evidence:
 ```powershell
 npm.cmd run type-check
 npm.cmd run lint
-npm.cmd run test          # 259 tests
+npm.cmd run test          # 270 tests
 npm.cmd run build
 npm.cmd run sprint-verify # all gates pass including E2E
 ```
@@ -104,6 +104,12 @@ PR #11 CI verification passed after the Next.js security update to `next@16.2.6`
 Known deferred S8 items:
 
 None — all build steps completed.
+
+Known S8 accepted risks:
+
+| Risk | Detail |
+|------|--------|
+| `season.set_current` atomicity | Two sequential writes: set target → clear others. If the clear step fails the desired season is already current (better than zero current seasons), but stale `is_current = true` rows may remain on other seasons until the next successful call. Wrap in a DB function/RPC if this becomes a concern. |
 
 ---
 

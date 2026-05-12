@@ -7,7 +7,7 @@ import { CarryOverForm } from "@/components/admin/CarryOverForm";
 import { SeasonActions } from "@/components/admin/SeasonActions";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
-import { MAX_SEASONS_LIST } from "@/lib/constants";
+import { MAX_LEAGUES_LIST, MAX_SEASONS_LIST } from "@/lib/constants";
 
 export default async function SeasonDetailPage({
   params,
@@ -17,30 +17,33 @@ export default async function SeasonDetailPage({
   const { id } = await params;
   const db = createSupabaseServiceRoleClient();
 
-  const [{ data: season, error: seasonError }, { data: allSeasons, error: seasonsError }] =
-    await Promise.all([
-      db
-        .from("seasons")
-        .select("id, name, starts_on, ends_on, is_current, is_archived")
-        .eq("id", id)
-        .single(),
-      db
-        .from("seasons")
-        .select("id, name")
-        .order("starts_on", { ascending: false })
-        .limit(MAX_SEASONS_LIST),
-    ]);
+  const [
+    { data: season, error: seasonError },
+    { data: allSeasons, error: seasonsError },
+    { data: leaguesData, error: leaguesError },
+  ] = await Promise.all([
+    db
+      .from("seasons")
+      .select("id, name, starts_on, ends_on, is_current, is_archived")
+      .eq("id", id)
+      .single(),
+    db
+      .from("seasons")
+      .select("id, name")
+      .order("starts_on", { ascending: false })
+      .limit(MAX_SEASONS_LIST),
+    db
+      .from("leagues")
+      .select("id, name")
+      .order("name", { ascending: true })
+      .limit(MAX_LEAGUES_LIST),
+  ]);
 
   if (seasonError && seasonError.code !== "PGRST116") {
     return <ErrorState message="Failed to load season." />;
   }
   if (!season) notFound();
-  if (seasonsError) return <ErrorState message="Failed to load seasons list." />;
-
-  const leagues = await db
-    .from("leagues")
-    .select("id, name")
-    .order("name", { ascending: true });
+  if (seasonsError || leaguesError) return <ErrorState message="Failed to load seasons list." />;
 
   return (
     <div className="space-y-8">
@@ -76,7 +79,7 @@ export default async function SeasonDetailPage({
           />
         </section>
 
-        {leagues.data && leagues.data.length > 0 && (
+        {leaguesData && leaguesData.length > 0 && (
           <section className="space-y-4">
             <h2 className="text-sm font-bold uppercase text-f1-muted">
               Carry-Over Penalties &amp; Bans
@@ -85,7 +88,7 @@ export default async function SeasonDetailPage({
               Select a league and source season to carry over penalty points and
               unserved bans for all drivers into this season.
             </p>
-            {leagues.data.map((league) => (
+            {leaguesData.map((league) => (
               <div
                 className="border border-f1-border bg-f1-black p-4 space-y-3"
                 key={league.id}

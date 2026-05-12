@@ -4,6 +4,10 @@ import { z } from "zod";
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
+const paramsSchema = z.object({
+  id: z.string().uuid(),
+});
+
 const bodySchema = z.object({
   role: z.enum(["racer", "admin", "super_admin"]),
 });
@@ -17,7 +21,12 @@ export async function PATCH(
       return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { id: targetId } = await params;
+    const rawParams = await params;
+    const parsedParams = paramsSchema.safeParse(rawParams);
+    if (!parsedParams.success) {
+      return Response.json({ error: "Invalid user id" }, { status: 422 });
+    }
+    const { id: targetId } = parsedParams.data;
 
     // Prevent super_admin from demoting themselves.
     if (targetId === auth.user.id) {

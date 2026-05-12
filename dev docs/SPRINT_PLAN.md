@@ -833,8 +833,8 @@ Build the operational tools needed to run multiple seasons safely.
 | Audit log viewer page | Done | `/admin/audit`; server-rendered AuditLogTable with pagination | None |
 | Admin nav updated | Done | `AdminShell.tsx` — Audit Log for all admins; User Roles for super_admin only | None |
 | Discord webhook stub | Done | `DISCORD_WEBHOOK_URL` already in `env.ts` + `.env.example`; no webhook sending — disabled foundation only | None |
-| 32 new S8 unit tests | Done | `npm run test` → 259 passing | None |
-| `npm run sprint-verify` gate | Done | type-check ✓ · lint ✓ · 259 tests ✓ · coverage ✓ · build ✓ · E2E ✓ | None |
+| 42 new S8 unit tests | Done | `npm run test` → 270 passing | None |
+| `npm run sprint-verify` gate | Done | type-check ✓ · lint ✓ · 270 tests ✓ · coverage ✓ · build ✓ · E2E ✓ | None |
 
 ### Done When
 

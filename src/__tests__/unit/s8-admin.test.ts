@@ -58,6 +58,12 @@ describe("S8 season.set_current route", () => {
     expect(seasonCurrentRoute).toContain("withAdminGuard");
   });
 
+  it("validates the season id before querying", () => {
+    expect(seasonCurrentRoute).toContain("paramsSchema");
+    expect(seasonCurrentRoute).toContain("z.string().uuid()");
+    expect(seasonCurrentRoute).toContain("Invalid season id");
+  });
+
   it("refuses to mark an archived season as current", () => {
     // Route checks is_archived before updating — verify guard logic is present.
     expect(seasonCurrentRoute).toContain("is_archived");
@@ -82,6 +88,12 @@ describe("S8 season.set_current route", () => {
 describe("S8 season.archive route", () => {
   it("uses withAdminGuard", () => {
     expect(seasonArchiveRoute).toContain("withAdminGuard");
+  });
+
+  it("validates the season id before querying", () => {
+    expect(seasonArchiveRoute).toContain("paramsSchema");
+    expect(seasonArchiveRoute).toContain("z.string().uuid()");
+    expect(seasonArchiveRoute).toContain("Invalid season id");
   });
 
   it("refuses to archive the current season", () => {
@@ -131,6 +143,12 @@ describe("S8 carry-over route", () => {
     expect(carryOverRoute).toContain("withAdminGuard");
   });
 
+  it("validates the league id before querying", () => {
+    expect(carryOverRoute).toContain("paramsSchema");
+    expect(carryOverRoute).toContain("z.string().uuid()");
+    expect(carryOverRoute).toContain("Invalid league id");
+  });
+
   it("rejects when source and target seasons are the same", () => {
     expect(carryOverRoute).toContain("Source and target seasons must differ");
   });
@@ -148,6 +166,11 @@ describe("S8 carry-over route", () => {
   it("uses upsert to allow safe re-runs", () => {
     expect(carryOverRoute).toContain("upsert");
     expect(carryOverRoute).toContain("onConflict");
+  });
+
+  it("bounds carry-over source and penalty total queries", () => {
+    expect(carryOverRoute).toContain("MAX_DRIVERS_LIST");
+    expect(carryOverRoute).toContain("Too many source drivers");
   });
 
   it("writes audit log with driver count", () => {
@@ -188,6 +211,12 @@ describe("S8 users list route", () => {
 describe("S8 user role change route", () => {
   it("uses withAdminGuard", () => {
     expect(userRoleRoute).toContain("withAdminGuard");
+  });
+
+  it("validates the user id before querying", () => {
+    expect(userRoleRoute).toContain("paramsSchema");
+    expect(userRoleRoute).toContain("z.string().uuid()");
+    expect(userRoleRoute).toContain("Invalid user id");
   });
 
   it("requires super_admin role", () => {

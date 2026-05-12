@@ -2,7 +2,12 @@ import { type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
+import { MAX_DRIVERS_LIST } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
+
+const paramsSchema = z.object({
+  id: z.string().uuid(),
+});
 
 const bodySchema = z.object({
   source_season_id: z.string().uuid(),
@@ -14,7 +19,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   return withAdminGuard(req, async (_req, auth) => {
-    const { id: leagueId } = await params;
+    const rawParams = await params;
+    const parsedParams = paramsSchema.safeParse(rawParams);
+    if (!parsedParams.success) {
+      return Response.json({ error: "Invalid league id" }, { status: 422 });
+    }
+    const { id: leagueId } = parsedParams.data;
 
     let body: z.infer<typeof bodySchema>;
     try {
@@ -32,12 +42,14 @@ export async function POST(
 
     const db = createSupabaseServiceRoleClient();
 
-    // Verify league exists.
-    const { data: league, error: leagueErr } = await db
-      .from("leagues")
-      .select("id")
-      .eq("id", leagueId)
-      .single();
+    // Verify league and target season exist in parallel.
+    const [
+      { data: league, error: leagueErr },
+      { data: targetSeason, error: targetErr },
+    ] = await Promise.all([
+      db.from("leagues").select("id").eq("id", leagueId).single(),
+      db.from("seasons").select("id").eq("id", body.target_season_id).single(),
+    ]);
 
     if (leagueErr && leagueErr.code !== "PGRST116") {
       return Response.json({ error: "Failed to load league" }, { status: 500 });
@@ -45,13 +57,6 @@ export async function POST(
     if (!league) {
       return Response.json({ error: "League not found" }, { status: 404 });
     }
-
-    // Verify target season exists.
-    const { data: targetSeason, error: targetErr } = await db
-      .from("seasons")
-      .select("id")
-      .eq("id", body.target_season_id)
-      .single();
 
     if (targetErr && targetErr.code !== "PGRST116") {
       return Response.json({ error: "Failed to load target season" }, { status: 500 });
@@ -65,10 +70,17 @@ export async function POST(
       .from("league_driver_entries")
       .select("driver_id")
       .eq("league_id", leagueId)
-      .eq("season_id", body.source_season_id);
+      .eq("season_id", body.source_season_id)
+      .limit(MAX_DRIVERS_LIST + 1);
 
     if (entriesErr) {
       return Response.json({ error: "Failed to load source entries" }, { status: 500 });
+    }
+    if ((sourceEntries?.length ?? 0) > MAX_DRIVERS_LIST) {
+      return Response.json(
+        { error: "Too many source drivers to carry over at once" },
+        { status: 422 },
+      );
     }
     if (!sourceEntries?.length) {
       return Response.json(
@@ -85,7 +97,8 @@ export async function POST(
       .select("driver_id, penalty_points, ban_threshold_reached")
       .eq("league_id", leagueId)
       .eq("season_id", body.source_season_id)
-      .in("driver_id", driverIds);
+      .in("driver_id", driverIds)
+      .limit(MAX_DRIVERS_LIST);
 
     if (penaltyErr) {
       return Response.json({ error: "Failed to load penalty totals" }, { status: 500 });

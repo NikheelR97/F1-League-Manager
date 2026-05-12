@@ -1,14 +1,24 @@
 import { type NextRequest } from "next/server";
+import { z } from "zod";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
+
+const paramsSchema = z.object({
+  id: z.string().uuid(),
+});
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   return withAdminGuard(req, async (_req, auth) => {
-    const { id: seasonId } = await params;
+    const rawParams = await params;
+    const parsedParams = paramsSchema.safeParse(rawParams);
+    if (!parsedParams.success) {
+      return Response.json({ error: "Invalid season id" }, { status: 422 });
+    }
+    const { id: seasonId } = parsedParams.data;
     const db = createSupabaseServiceRoleClient();
 
     const { data: season, error: fetchError } = await db
@@ -30,16 +40,8 @@ export async function PATCH(
       );
     }
 
-    // Clear current flag on all seasons, then set this one.
-    const { error: clearError } = await db
-      .from("seasons")
-      .update({ is_current: false })
-      .neq("id", seasonId);
-
-    if (clearError) {
-      return Response.json({ error: "Failed to update seasons" }, { status: 500 });
-    }
-
+    // Set this season as current first so a partial failure still leaves a
+    // current season (better than zero current seasons if the clear step fails).
     const { error: setError } = await db
       .from("seasons")
       .update({ is_current: true })
@@ -47,6 +49,16 @@ export async function PATCH(
 
     if (setError) {
       return Response.json({ error: "Failed to set current season" }, { status: 500 });
+    }
+
+    // Clear current flag from all other seasons.
+    const { error: clearError } = await db
+      .from("seasons")
+      .update({ is_current: false })
+      .neq("id", seasonId);
+
+    if (clearError) {
+      return Response.json({ error: "Failed to update seasons" }, { status: 500 });
     }
 
     await writeAdminAuditLog({
