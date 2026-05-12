@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S10 regression and security audit in progress on `feature/s10-regression-security`; next sprint is S11 performance and accessibility.
+**Status:** S10 regression and security audit complete on `feature/s10-regression-security`; next sprint is S11 performance and accessibility.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 

@@ -14,14 +14,26 @@ const requireAdminSrc = readFileSync("src/lib/auth/admin.ts", "utf8");
 const envSrc = readFileSync("src/lib/env.ts", "utf8");
 const racerSetupRoute = readFileSync("src/app/api/racer/setups/[id]/route.ts", "utf8");
 
-const ADMIN_ROUTE_FILES = [
+// All mutating admin routes — used for both withAdminGuard and audit log checks.
+// Read-only routes (health, audit GET, users GET) are excluded; they need no audit log.
+const ADMIN_MUTATION_ROUTES = [
   "src/app/api/admin/leagues/route.ts",
   "src/app/api/admin/drivers/route.ts",
   "src/app/api/admin/seasons/route.ts",
   "src/app/api/admin/leagues/[id]/teams/route.ts",
   "src/app/api/admin/leagues/[id]/drivers/route.ts",
+  "src/app/api/admin/leagues/[id]/points-systems/route.ts",
   "src/app/api/admin/leagues/[id]/transfers/route.ts",
   "src/app/api/admin/leagues/[id]/carry-over/route.ts",
+  "src/app/api/admin/leagues/[id]/status/route.ts",
+  "src/app/api/admin/leagues/[id]/assets/route.ts",
+  "src/app/api/admin/leagues/[id]/teams/[teamId]/assets/route.ts",
+  "src/app/api/admin/leagues/[id]/sessions/route.ts",
+  "src/app/api/admin/leagues/[id]/circuit-pool/route.ts",
+  "src/app/api/admin/leagues/[id]/wheel/spin/route.ts",
+  "src/app/api/admin/sessions/[id]/route.ts",
+  "src/app/api/admin/sessions/[id]/publish/route.ts",
+  "src/app/api/admin/wheel-spins/[id]/void/route.ts",
   "src/app/api/admin/seasons/[id]/archive/route.ts",
   "src/app/api/admin/seasons/[id]/current/route.ts",
   "src/app/api/admin/users/[id]/role/route.ts",
@@ -29,13 +41,19 @@ const ADMIN_ROUTE_FILES = [
   "src/app/api/admin/import/confirm/route.ts",
 ];
 
+// Routes that write audit logs directly. Publish delegates to publishSession which
+// writes the log internally, so it is excluded here and checked separately.
+const ROUTES_WITH_DIRECT_AUDIT_LOG = ADMIN_MUTATION_ROUTES.filter(
+  (f) => f !== "src/app/api/admin/sessions/[id]/publish/route.ts",
+);
+
 // ---------------------------------------------------------------------------
 // 1. Unauthenticated admin mutation returns 401
 // ---------------------------------------------------------------------------
 
 describe("S10 unauthenticated admin mutation blocked", () => {
   it("every mutating admin route uses withAdminGuard (which returns 401 for missing session)", () => {
-    for (const file of ADMIN_ROUTE_FILES) {
+    for (const file of ADMIN_MUTATION_ROUTES) {
       const src = readFileSync(file, "utf8");
       expect(src, `${file} must use withAdminGuard`).toContain("withAdminGuard");
     }
@@ -91,11 +109,8 @@ describe("S10 client-supplied points blocked", () => {
     expect(publishRoute).not.toContain("points_awarded");
   });
 
-  it("publish route calls calculateRacePoints via publishSession (server-authoritative)", () => {
+  it("publish route delegates to publishSession (server-authoritative points calculation)", () => {
     expect(publishRoute).toContain("publishSession");
-    // points_awarded must not appear in the incoming Zod schema
-    const schemaBlock = publishRoute.match(/const raceResultSchema[\s\S]+?z\.object\(\{[\s\S]+?\}\)/)?.[0] ?? "";
-    expect(schemaBlock).not.toContain("points_awarded");
   });
 
   it("publish route schema intentionally omits points_awarded (comment confirms)", () => {
@@ -183,7 +198,11 @@ describe("S10 service role key absent from client bundle", () => {
 
   it("service role key is absent from .next/static client chunks", () => {
     const staticDir = path.join(".next", "static");
-    if (!existsSync(staticDir)) return; // skip if no build output
+    if (!existsSync(staticDir)) {
+      // Build output not present — run `npm run build` before this test is meaningful
+      console.warn("Skipping bundle scan: .next/static not found. Run npm run build first.");
+      return;
+    }
 
     let found = false;
     function scanDir(dir: string) {
@@ -239,32 +258,14 @@ describe("S10 invalid import files rejected before parsing", () => {
 // ---------------------------------------------------------------------------
 
 describe("S10 admin mutations write audit logs", () => {
-  const MUTATION_ROUTES_REQUIRING_AUDIT = [
-    "src/app/api/admin/leagues/route.ts",
-    "src/app/api/admin/leagues/[id]/teams/route.ts",
-    "src/app/api/admin/leagues/[id]/drivers/route.ts",
-    "src/app/api/admin/leagues/[id]/transfers/route.ts",
-    "src/app/api/admin/leagues/[id]/carry-over/route.ts",
-    "src/app/api/admin/leagues/[id]/status/route.ts",
-    "src/app/api/admin/seasons/[id]/archive/route.ts",
-    "src/app/api/admin/seasons/[id]/current/route.ts",
-    "src/app/api/admin/users/[id]/role/route.ts",
-    "src/app/api/admin/import/route.ts",
-    "src/app/api/admin/import/confirm/route.ts",
-    "src/app/api/admin/leagues/[id]/wheel/spin/route.ts",
-    "src/app/api/admin/wheel-spins/[id]/void/route.ts",
-  ];
-
   it("every state-changing admin route writes an audit log (directly or via service)", () => {
     const publishServiceSrc = readFileSync("src/lib/results/publish-service.ts", "utf8");
-    // Publish delegates to publishSession which writes the log
+    // Publish delegates to publishSession which writes the log internally
     expect(publishServiceSrc).toContain("writeAdminAuditLog");
 
-    for (const file of MUTATION_ROUTES_REQUIRING_AUDIT) {
+    for (const file of ROUTES_WITH_DIRECT_AUDIT_LOG) {
       const src = readFileSync(file, "utf8");
-      const hasDirectLog = src.includes("writeAdminAuditLog");
-      // All routes in this list must write audit logs directly
-      expect(hasDirectLog, `${file} must call writeAdminAuditLog`).toBe(true);
+      expect(src, `${file} must call writeAdminAuditLog`).toContain("writeAdminAuditLog");
     }
   });
 });

@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S10 regression and security audit in progress on `feature/s10-regression-security`; next sprint is S11 performance and accessibility.
+**Status:** S10 regression and security audit complete on `feature/s10-regression-security`; next sprint is S11 performance and accessibility.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
