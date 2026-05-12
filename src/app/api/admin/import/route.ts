@@ -58,7 +58,8 @@ export async function POST(req: NextRequest): Promise<Response> {
         return Response.json({ error: "Workbook exceeds maximum size" }, { status: 413 });
       }
 
-      const buffer = Buffer.from(await file.arrayBuffer());
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
       const fileHash = crypto.createHash("sha256").update(buffer).digest("hex");
 
       const db = createSupabaseServiceRoleClient();
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       }
 
       // 5. Parse workbook (never trust workbook formula cells — values only)
-      const parseResult = parseWorkbook(buffer);
+      const parseResult = await parseWorkbook(arrayBuffer);
       if (!parseResult.ok) {
         return Response.json({ error: parseResult.error }, { status: 422 });
       }

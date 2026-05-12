@@ -192,8 +192,9 @@ describe("S9 workbook parser", () => {
   });
 
   it("reads cell VALUES only (no formula evaluation)", () => {
-    // XLSX read uses type:'buffer' which reads cached values, not formulas
-    expect(workbookParser).toContain("type: \"buffer\"");
+    // ExcelJS: formula cells expose cached result via CellFormulaValue.result
+    expect(workbookParser).toContain("CellFormulaValue");
+    expect(workbookParser).toContain(".result");
   });
 });
 

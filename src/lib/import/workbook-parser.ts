@@ -1,6 +1,6 @@
 import "server-only";
 
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 import { MAX_WORKBOOK_DRIVERS, MAX_WORKBOOK_RACES } from "@/lib/constants";
 
@@ -86,20 +86,32 @@ const CH_DRIVER_PTS_COL = 11;
 const CH_DRIVER_TEAM_COL = 15;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers — all coordinates are 0-indexed; ExcelJS getCell is 1-indexed
 // ---------------------------------------------------------------------------
 
-function cell(ws: XLSX.WorkSheet, r: number, c: number): unknown {
-  return ws[XLSX.utils.encode_cell({ r, c })]?.v ?? null;
+type ScalarValue = string | number | boolean | null;
+
+function cellVal(ws: ExcelJS.Worksheet, r: number, c: number): ScalarValue {
+  const v = ws.getCell(r + 1, c + 1).value;
+  if (v === null || v === undefined) return null;
+  // Formula cell: read the cached result, not the formula string
+  if (typeof v === "object" && "result" in v) {
+    const result = (v as ExcelJS.CellFormulaValue).result;
+    if (result === null || result === undefined) return null;
+    if (typeof result === "object") return null; // error result
+    return result as ScalarValue;
+  }
+  if (typeof v === "object") return null; // date, rich-text, hyperlink — not expected
+  return v;
 }
 
-function str(ws: XLSX.WorkSheet, r: number, c: number): string {
-  const v = cell(ws, r, c);
+function str(ws: ExcelJS.Worksheet, r: number, c: number): string {
+  const v = cellVal(ws, r, c);
   return v !== null && v !== undefined ? String(v).trim() : "";
 }
 
-function num(ws: XLSX.WorkSheet, r: number, c: number): number {
-  const v = cell(ws, r, c);
+function num(ws: ExcelJS.Worksheet, r: number, c: number): number {
+  const v = cellVal(ws, r, c);
   if (v === null || v === undefined || v === "") return 0;
   const n = Number(v);
   return isNaN(n) ? 0 : n;
@@ -134,32 +146,35 @@ export type WorkbookParseResult =
   | { ok: true; data: ParsedWorkbook }
   | WorkbookParseError;
 
-export function parseWorkbook(buffer: Buffer): WorkbookParseResult {
-  let wb: XLSX.WorkBook;
+export async function parseWorkbook(data: ArrayBuffer): Promise<WorkbookParseResult> {
+  const wb = new ExcelJS.Workbook();
   try {
-    wb = XLSX.read(buffer, { type: "buffer" });
+    await wb.xlsx.load(data as unknown as Parameters<typeof wb.xlsx.load>[0]);
   } catch {
     return { ok: false, error: "File could not be parsed as a spreadsheet" };
   }
 
+  const sheetNames = wb.worksheets.map((ws) => ws.name);
   const REQUIRED_SHEETS = ["League Management", "Final Classifications", "Championships"];
   for (const name of REQUIRED_SHEETS) {
-    if (!wb.SheetNames.includes(name)) {
+    if (!sheetNames.includes(name)) {
       return { ok: false, error: `Required sheet "${name}" is missing` };
     }
   }
 
-  const lm = wb.Sheets["League Management"];
-  const fc = wb.Sheets["Final Classifications"];
-  const ch = wb.Sheets["Championships"];
+  const lm = wb.getWorksheet("League Management")!;
+  const fc = wb.getWorksheet("Final Classifications")!;
+  const ch = wb.getWorksheet("Championships")!;
 
-  const fcRange = XLSX.utils.decode_range(fc["!ref"] ?? "A1:A1");
+  // rowCount / columnCount are 1-indexed counts; subtract 1 to get 0-indexed max
+  const fcMaxCol = fc.columnCount - 1;
+  const fcMaxRow = fc.rowCount - 1;
 
   // Guard against pathologically large sheets
-  if (fcRange.e.c > MAX_WORKBOOK_RACES * FC_BLOCK_SIZE + 20) {
+  if (fcMaxCol > MAX_WORKBOOK_RACES * FC_BLOCK_SIZE + 20) {
     return { ok: false, error: "Too many columns in Final Classifications sheet" };
   }
-  if (fcRange.e.r > FC_DRIVER_ROW_START + MAX_WORKBOOK_DRIVERS + 10) {
+  if (fcMaxRow > FC_DRIVER_ROW_START + MAX_WORKBOOK_DRIVERS + 10) {
     return { ok: false, error: "Too many rows in Final Classifications sheet" };
   }
 
@@ -226,17 +241,15 @@ export function parseWorkbook(buffer: Buffer): WorkbookParseResult {
 
   for (let raceIdx = 0; raceIdx < races.length; raceIdx++) {
     const race = races[raceIdx];
-    // Verify the race name in row FC_RACE_NAME_ROW matches
     const blockStartCol = 1 + raceIdx * FC_BLOCK_SIZE;
     const sheetRaceName = str(fc, FC_RACE_NAME_ROW, blockStartCol);
     if (!sheetRaceName || sheetRaceName.toLowerCase().includes("inactive")) {
-      // Race slot not activated — skip
       continue;
     }
 
     const results: ParsedRaceResult[] = [];
 
-    for (let row = FC_DRIVER_ROW_START; row <= fcRange.e.r; row++) {
+    for (let row = FC_DRIVER_ROW_START; row <= fcMaxRow; row++) {
       const driverName = str(fc, row, blockStartCol + OFF_DRIVER);
       if (!driverName || driverName === "-") break;
 
@@ -244,7 +257,7 @@ export function parseWorkbook(buffer: Buffer): WorkbookParseResult {
       const qualyException = qualyExceptionRaw && qualyExceptionRaw !== "-" ? qualyExceptionRaw.toUpperCase() : null;
       const gridRaw = str(fc, row, blockStartCol + OFF_GRID_START);
       const gridPosition = gridRaw && !isNaN(Number(gridRaw)) ? Math.floor(Number(gridRaw)) : null;
-      const fastestLapRaw = cell(fc, row, blockStartCol + OFF_FASTEST_LAP);
+      const fastestLapRaw = cellVal(fc, row, blockStartCol + OFF_FASTEST_LAP);
       const fastestLap = fastestLapRaw !== null && fastestLapRaw !== "" && fastestLapRaw !== 0 && fastestLapRaw !== false;
       const reserveTeam = str(fc, row, blockStartCol + OFF_RESERVE_TEAM) || null;
       const resultRaw = str(fc, row, blockStartCol + OFF_RESULT);
@@ -252,7 +265,6 @@ export function parseWorkbook(buffer: Buffer): WorkbookParseResult {
       const bans = Math.max(0, Math.floor(num(fc, row, blockStartCol + OFF_BANS)));
       const manualChampPoints = Math.floor(num(fc, row, blockStartCol + OFF_MANUAL_CHAMP_PTS));
 
-      // Skip completely absent drivers (no result and no grid — never entered)
       if (!resultRaw && gridPosition === null) continue;
 
       const { finishingPosition, resultStatus } = parseResultStatus(resultRaw || "DNP");
@@ -284,10 +296,9 @@ export function parseWorkbook(buffer: Buffer): WorkbookParseResult {
   // -------------------------------------------------------------------------
   const workbookConstructorStandings: ParsedWorkbookConstructorStanding[] = [];
   const workbookDriverStandings: ParsedWorkbookDriverStanding[] = [];
-  const chRange = XLSX.utils.decode_range(ch["!ref"] ?? "A1:A1");
+  const chMaxRow = ch.rowCount - 1;
 
-  for (let r = CH_DATA_ROW_START; r <= chRange.e.r; r++) {
-    // Constructor standings (appear every ~2 rows on the left half)
+  for (let r = CH_DATA_ROW_START; r <= chMaxRow; r++) {
     const consPosRaw = str(ch, r, CH_CONSTRUCTOR_POS_COL);
     const consTeam = str(ch, r, CH_CONSTRUCTOR_TEAM_COL);
     if (consPosRaw && consTeam && consTeam !== "---" && !isNaN(Number(consPosRaw))) {
@@ -298,7 +309,6 @@ export function parseWorkbook(buffer: Buffer): WorkbookParseResult {
       });
     }
 
-    // Driver standings (appear on every row on the right half)
     const drvPosRaw = str(ch, r, CH_DRIVER_POS_COL);
     const drvName = str(ch, r, CH_DRIVER_NAME_COL);
     if (drvPosRaw && drvName && drvName !== "-" && !isNaN(Number(drvPosRaw))) {
