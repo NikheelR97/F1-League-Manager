@@ -14,6 +14,16 @@ import * as path from "node:path";
 
 import { chromium, type BrowserContext } from "@playwright/test";
 
+// Load .env.local so E2E_SECRET is available when Playwright runs the setup
+// (Next.js loads .env.local automatically, but Playwright's test runner does not)
+const envLocalPath = path.resolve(".env.local");
+if (fs.existsSync(envLocalPath)) {
+  for (const line of fs.readFileSync(envLocalPath, "utf8").split("\n")) {
+    const match = line.match(/^([^#=]+)=(.*)$/);
+    if (match) process.env[match[1].trim()] ??= match[2].trim().replace(/^["']|["']$/g, "");
+  }
+}
+
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:3000";
 const E2E_SECRET = process.env.E2E_SECRET;
 const ADMIN_EMAIL = "e2e-admin@test.local";
