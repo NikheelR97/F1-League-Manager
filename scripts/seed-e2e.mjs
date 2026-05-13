@@ -53,7 +53,10 @@ async function upsertAuthUser(email, displayName) {
 
   const existing = list?.users?.find((u) => u.email === email);
   if (existing) {
-    console.log(`  [skip] auth user ${email} already exists (id=${existing.id})`);
+    // Always reset the password so credentials are guaranteed correct on re-runs
+    const { error: pwErr } = await db.auth.admin.updateUserById(existing.id, { password: TEST_PASSWORD });
+    if (pwErr) throw new Error(`resetPassword(${email}): ${pwErr.message}`);
+    console.log(`  [skip] auth user ${email} already exists — password reset (id=${existing.id})`);
     return existing;
   }
 
