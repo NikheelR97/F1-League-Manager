@@ -10,6 +10,8 @@ export function getSafeNextPath(value: string | null | undefined): string | null
     const parsed = new URL(trimmed, "http://local.test");
     if (parsed.origin !== "http://local.test") return null;
 
+    if (!isAllowedProtectedPath(parsed.pathname)) return null;
+
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
     return null;
@@ -28,4 +30,13 @@ function getDefaultPathForProfileRole(role: ProfileRole): string {
   if (role === "racer") return "/garage";
 
   return "/";
+}
+
+function isAllowedProtectedPath(pathname: string): boolean {
+  return (
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/garage" ||
+    pathname.startsWith("/garage/")
+  );
 }
