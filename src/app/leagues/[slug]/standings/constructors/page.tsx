@@ -55,7 +55,7 @@ export default async function ConstructorStandingsPage({
       .order("published_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    resolveLeagueSeasons(league.id),
+    resolveLeagueSeasons(league.id, { fallbackSeason: league.season }),
   ]);
 
   const standings = rows ?? [];

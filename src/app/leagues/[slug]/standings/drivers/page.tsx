@@ -66,7 +66,7 @@ export default async function DriverStandingsPage({
 
   const [{ rows, lastSession }, seasons] = await Promise.all([
     fetchStandingsData(league.id, seasonId),
-    resolveLeagueSeasons(league.id),
+    resolveLeagueSeasons(league.id, { fallbackSeason: league.season }),
   ]);
 
   const standings = rows ?? [];

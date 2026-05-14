@@ -44,7 +44,7 @@ export default async function ResultsIndexPage({
       .eq("status", "completed")
       .order("published_at", { ascending: false })
       .limit(50),
-    resolveLeagueSeasons(league.id),
+    resolveLeagueSeasons(league.id, { fallbackSeason: league.season }),
   ]);
 
   const results = sessions ?? [];
