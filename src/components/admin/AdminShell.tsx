@@ -1,6 +1,7 @@
 import { ClipboardList, FileUp, Flag, LayoutDashboard, ShieldCheck, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import type { ProfileRole } from "@/lib/auth/roles";
 
 interface AdminShellProps {
@@ -56,12 +57,16 @@ export function AdminShell({ children, role }: AdminShellProps) {
         </nav>
         <div className="mt-auto border-t border-f1-border p-4">
           <p className="text-xs font-bold uppercase text-f1-muted">{role}</p>
+          <SignOutButton />
         </div>
       </aside>
       <div className="flex flex-1 flex-col">
         <header className="flex min-h-16 items-center border-b border-f1-border bg-f1-black px-6 md:hidden">
           <Trophy aria-hidden="true" className="text-f1-red" size={20} />
           <span className="ml-2 text-sm font-black uppercase">Race Control</span>
+          <div className="ml-auto w-32">
+            <SignOutButton className="mt-0" />
+          </div>
         </header>
         <main className="flex-1 p-6">{children}</main>
       </div>
