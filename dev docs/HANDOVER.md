@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S11 performance and accessibility is merged to `dev`; S12 production release prep is next on `feature/s12-production-release`.
+**Status:** S12 production release prep is in progress on `feature/s12-docs-deploy-gate`; `/login` auth is merged to `dev`.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -14,9 +14,9 @@ Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | `feature/s12-production-release` — S12 housekeeping and production release prep. |
-| Latest merged PR | PR #17, `feat(s11): performance, accessibility, and UX polish` on `dev` |
-| Merge commit | `a6b36b8` |
+| Active development branch | `feature/s12-docs-deploy-gate` — S12 docs refresh and deploy gate evidence. |
+| Latest merged PR | PR #18, `feat(s12): add login and sign-out flow` on `dev` |
+| Merge commit | `77dfaf5` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
 | Latest migration applied locally | `20260513000000_s9_workbook_import.sql` (no new migration in S10 or S11) |
 
@@ -97,9 +97,27 @@ Known cross-sprint deferred items (carried into S12):
 
 | Item | Originally deferred in | Now planned for |
 |------|------------------------|-----------------|
-| `/login` page (magic link or email/password) | Never built — all sprints redirect to `/login` | S12 pre-deploy (hard blocker for smoke tests) |
+| `/login` page (email/password) | Never built — all sprints redirected to `/login` | Done in PR #18 |
 | Real workbook end-to-end smoke | S9 | S12 pre-deploy |
 | `driver_penalty_totals` rebuild after import | S9 | S12 pre-deploy (manual: run carry-over API after import confirmation) |
+
+S12 login/auth status:
+
+```text
+- /login now supports Supabase email/password auth.
+- Protected /admin and /garage routes preserve safe next redirects limited to those path families.
+- Admin and racer shells include sign-out controls.
+- Browser CSP allows only the configured Supabase origin for auth requests.
+- PR #18 CI passed before merge; local sprint gate passed with 346 tests and 19 Playwright tests.
+- S12 docs/deploy-gate pass: npm run deploy:check passed locally with 347 tests, coverage, build, 19 Playwright tests, high audit, and secret scan.
+```
+
+Known S12 deploy-gate warning:
+
+```text
+Next.js reports that the middleware file convention is deprecated and should move to proxy.
+This is a warning only; deploy:check passes. Track before staging release if the warning becomes a release concern.
+```
 
 ---
 
@@ -149,7 +167,6 @@ Known S11 accepted limitations:
 | Item | Reason |
 |------|--------|
 | Lighthouse scores not captured | Requires live staging environment with real data. Deferred to S12 pre-deploy. |
-| `/login` page E2E auth | Login page not yet built. Authenticated E2E uses `/api/e2e/session` test-only endpoint instead. |
 | Wheel E2E spin flow | Full spin+confirm E2E deferred — requires seeded circuit pool on local Supabase; covered by unit tests in `wheel-service.test.ts`. |
 
 ---

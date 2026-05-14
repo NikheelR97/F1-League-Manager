@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S11 performance and accessibility is merged to `dev`; S12 production release prep is next on `feature/s12-production-release`.
+**Status:** S12 production release prep is in progress on `feature/s12-docs-deploy-gate`; `/login` auth is merged to `dev`.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -1090,7 +1090,7 @@ Deploy the app and prove the production release works.
 
 Pre-deploy deferred items (must be done before release):
 
-1. Build `/login` page (magic link or email/password). Required for authenticated smoke tests on staging and production. (Missing since S1 — all sprints redirected to `/login` but the page was never built.)
+1. Build `/login` page (email/password). Required for authenticated smoke tests on staging and production. Done in PR #18.
 2. Run real workbook end-to-end smoke: import the Season 2 `.xlsx` against staging Supabase, confirm diff is clean, confirm lock. (Deferred from S9 — requires seeded league + season on staging.)
 3. Verify `driver_penalty_totals` after import: run the carry-over API (`POST /api/admin/leagues/[id]/carry-over`) after confirming the workbook migration to populate penalty totals for the new season. (Deferred from S9.)
 
@@ -1117,6 +1117,19 @@ Deployment steps:
 22. Record release notes.
 23. Record rollback plan.
 
+### Sprint Tracker
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| `/login` email/password auth | Done | PR #18, merge commit `77dfaf5`; GitHub CI `verify` passed; local `npm run sprint-verify` passed with 346 tests and 19 Playwright tests | None |
+| Protected-route `next` redirects and sign-out controls | Done | PR #18; `/admin` and `/garage` login E2E coverage; safe next paths limited to admin/garage path families | None |
+| S12 docs refresh | Done | Stale-text scan found no old login-missing wording, old S12 branch, or PR #17 latest-merge references | None |
+| Local deploy gate | Done | `npm run deploy:check` passed locally: 347 tests, coverage thresholds, build, 19 Playwright tests, high audit, and secret scan | None |
+| Real workbook smoke on staging | Outstanding | None yet | Requires staging/non-prod Supabase release target and workbook import run |
+| `driver_penalty_totals` verification after import | Outstanding | None yet | Run carry-over API after import confirmation and verify totals |
+| Lighthouse/accessibility/mobile screenshots | Outstanding | None yet | Requires live staging deployment with representative data |
+| Next middleware deprecation warning | Outstanding | `npm run deploy:check` passes, but Next warns that the middleware file convention is deprecated in favor of proxy | Track before staging release if warning becomes a release concern |
+
 ### Production Smoke Tests
 
 1. Home page loads.
@@ -1129,7 +1142,7 @@ Deployment steps:
 8. Qualifying results page loads.
 9. Race reports page loads.
 10. `/admin` redirects when logged out.
-11. `/login` page loads and magic link sends.
+11. `/login` page loads and email/password login works.
 12. Admin can log in.
 13. Admin can publish a test result.
 14. Public standings update after publish.
