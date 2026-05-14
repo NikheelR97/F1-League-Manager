@@ -16,7 +16,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: "npm run dev",
+    command: "npm run start:e2e",
     reuseExistingServer: !process.env.CI,
     url: "http://127.0.0.1:3000",
   },

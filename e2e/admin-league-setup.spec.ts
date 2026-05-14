@@ -12,7 +12,13 @@ import { ADMIN_STORAGE_STATE } from "../playwright.config";
 
 test.use({ storageState: ADMIN_STORAGE_STATE });
 
-test.describe("Admin league setup flow", () => {
+const runId = Date.now();
+const leagueName = `E2E Test League ${runId}`;
+const leagueSlug = `e2e-test-league-${runId}`;
+const teamName = `E2E Team Alpha ${runId}`;
+let createdLeagueUrl = "";
+
+test.describe.serial("Admin league setup flow", () => {
   test("admin dashboard redirects to leagues list", async ({ page }) => {
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/admin\/leagues/);
@@ -27,46 +33,44 @@ test.describe("Admin league setup flow", () => {
     ).toBeVisible();
 
     // Fill in the form
-    await page.getByLabel("Name").fill("E2E Test League");
-    await page.getByLabel("Slug").fill("e2e-test-league");
+    await page.getByLabel("Season").selectOption({ label: "2025 Season" });
+    await page.getByLabel("Name").fill(leagueName);
+    await page.getByLabel("Slug").fill(leagueSlug);
 
     // Submit
     await page.getByRole("button", { name: "Create League" }).click();
 
     // Should redirect to the new league detail page
     await expect(page).toHaveURL(/\/admin\/leagues\/[0-9a-f-]+/);
-    await expect(
-      page.getByRole("heading", { name: "E2E Test League" }),
-    ).toBeVisible();
+    createdLeagueUrl = page.url();
+    await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
   });
 
   test("admin can add a team to a league", async ({ page }) => {
-    // Navigate to the E2E test league created above; find via leagues list
-    await page.goto("/admin/leagues");
-
-    await page.getByRole("link", { name: "E2E Test League" }).click();
-    await expect(page).toHaveURL(/\/admin\/leagues\/[0-9a-f-]+/);
+    await page.goto(createdLeagueUrl);
 
     // Add a team
     await page.getByRole("link", { name: /Add Team/i }).click();
 
-    await page.getByLabel("Name").fill("E2E Team Alpha");
-    await page.getByRole("button", { name: /Create|Add|Save/i }).click();
+    await page.getByLabel("Name").fill(teamName);
+    await page.getByRole("button", { name: "Create Team" }).click();
 
     // Team should appear on the league detail page
-    await expect(page.getByText("E2E Team Alpha")).toBeVisible();
+    await expect(page.getByText(teamName)).toBeVisible();
   });
 
   test("admin can add a driver to a league", async ({ page }) => {
-    await page.goto("/admin/leagues");
-    await page.getByRole("link", { name: "E2E Test League" }).click();
+    await page.goto(createdLeagueUrl);
 
     await page.getByRole("link", { name: /Add Driver/i }).click();
 
-    await page.getByLabel("Name").fill("E2E Driver One");
-    await page.getByRole("button", { name: /Add|Create|Save/i }).click();
+    await page
+      .getByLabel("Driver", { exact: true })
+      .selectOption({ label: "E2E Racer (#98)" });
+    await page.getByLabel("Team").selectOption({ label: teamName });
+    await page.getByRole("button", { name: "Add to League" }).click();
 
-    await expect(page.getByText("E2E Driver One")).toBeVisible();
+    await expect(page.getByText("E2E Racer")).toBeVisible();
   });
 
   test("seed leagues are visible in admin", async ({ page }) => {

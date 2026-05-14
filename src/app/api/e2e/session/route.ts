@@ -22,8 +22,12 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest): Promise<Response> {
-  // Block entirely in production
-  if (process.env.NODE_ENV === "production") {
+  // Block production deployments, but allow local Playwright to exercise the
+  // production build through scripts/start-e2e-server.mjs.
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.E2E_SESSION_ENABLED !== "true"
+  ) {
     return new Response(null, { status: 404 });
   }
 

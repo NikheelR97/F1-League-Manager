@@ -22,7 +22,7 @@ test.describe("Digital wheel flow", () => {
 
     // Wheel page should load
     await expect(
-      page.getByRole("heading", { name: /Wheel|Circuit|Spin/i }),
+      page.getByRole("heading", { name: "Digital Wheel Setup & Spin" }),
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -30,7 +30,9 @@ test.describe("Digital wheel flow", () => {
     browser,
   }) => {
     // Fresh context with no auth state
-    const context = await browser.newContext();
+    const context = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     const page = await context.newPage();
 
     await page.goto(`/admin/leagues/${INFORMAL_LEAGUE_ID}/wheel`);
