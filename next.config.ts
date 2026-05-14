@@ -47,7 +47,7 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "origin-when-cross-origin" },
   {
     key: "Content-Security-Policy",
-    value: `default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: ws: wss: ${getSupabaseConnectSrc()};`,
+    value: `default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ${getSupabaseConnectSrc()} ws: wss:;`,
   },
 ];
 

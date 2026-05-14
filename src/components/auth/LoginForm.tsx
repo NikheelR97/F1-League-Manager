@@ -97,7 +97,6 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           id="login-email"
           inputMode="email"
           name="email"
-          onBlur={validate}
           onChange={(event) => setEmail(event.target.value)}
           placeholder="you@example.com"
           type="email"
@@ -117,7 +116,6 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           className="h-11 border-f1-border bg-f1-dark text-f1-white placeholder:text-f1-muted focus-visible:border-f1-red"
           id="login-password"
           name="password"
-          onBlur={validate}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="Password"
           type="password"
