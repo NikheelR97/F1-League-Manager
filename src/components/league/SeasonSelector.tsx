@@ -41,7 +41,7 @@ export function SeasonSelector({
       </label>
       <select
         className="border border-f1-border bg-f1-dark px-2 py-1 text-xs text-f1-white focus:border-f1-red focus:outline-none"
-        defaultValue={currentSeasonId}
+        value={currentSeasonId}
         id="season-selector"
         onChange={handleChange}
       >

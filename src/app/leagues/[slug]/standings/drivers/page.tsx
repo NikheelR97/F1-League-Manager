@@ -1,6 +1,5 @@
 import "server-only";
 
-import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -8,7 +7,6 @@ import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { SeasonSelector } from "@/components/league/SeasonSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
-import { cacheTag } from "@/lib/cache/tags";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { resolveLeagueSeasons } from "@/lib/public/resolve-league-seasons";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -35,45 +33,33 @@ export default async function DriverStandingsPage({
   const seasonId =
     rawSeason && UUID_RE.test(rawSeason) ? rawSeason : league.season.id;
 
-  const fetchStandingsData = unstable_cache(
-    async (leagueId: string, sid: string) => {
-      const db = createSupabaseServiceRoleClient();
-      const [{ data: rows }, { data: lastSession }] = await Promise.all([
-        db
-          .from("driver_standings")
-          .select(
-            "position, previous_position, total_points, wins, podiums, fastest_laps, updated_at, drivers(id, display_name, racing_number), teams(id, name, color_hex)",
-          )
-          .eq("league_id", leagueId)
-          .eq("season_id", sid)
-          .order("position")
-          .limit(50),
-        db
-          .from("race_sessions")
-          .select("name, published_at")
-          .eq("league_id", leagueId)
-          .eq("season_id", sid)
-          .eq("status", "completed")
-          .order("published_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
-      return { rows: rows ?? [], lastSession };
-    },
-    [`driver-standings:${league.id}:${seasonId}`],
-    { tags: [cacheTag.standings(league.id)] },
-  );
+  const db = createSupabaseServiceRoleClient();
 
-  const [{ rows, lastSession }, seasons] = await Promise.all([
-    fetchStandingsData(league.id, seasonId),
+  const [{ data: rows }, { data: lastSession }, seasons] = await Promise.all([
+    db
+      .from("driver_standings")
+      .select(
+        "position, previous_position, total_points, wins, podiums, fastest_laps, updated_at, drivers(id, display_name, racing_number), teams(id, name, color_hex)",
+      )
+      .eq("league_id", league.id)
+      .eq("season_id", seasonId)
+      .order("position")
+      .limit(50),
+    db
+      .from("race_sessions")
+      .select("name, published_at")
+      .eq("league_id", league.id)
+      .eq("season_id", seasonId)
+      .eq("status", "completed")
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     resolveLeagueSeasons(league.id, { fallbackSeason: league.season }),
   ]);
 
   const standings = rows ?? [];
   const leaderPoints = standings[0]?.total_points ?? 0;
   const updatedAt = standings[0]?.updated_at ?? null;
-
-  // Determine the display season name (may differ from league.season.name when browsing history)
   const displaySeason =
     seasons.find((s) => s.id === seasonId)?.name ?? league.season.name;
 
