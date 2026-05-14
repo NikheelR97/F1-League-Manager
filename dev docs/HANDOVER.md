@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S10 regression and security audit complete on `feature/s10-regression-security`; next sprint is S11 performance and accessibility.
+**Status:** S11 performance and accessibility complete on `feature/s11-performance-accessibility`; next sprint is S12 production release.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -14,11 +14,11 @@ Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | `feature/s10-regression-security` — S10 in progress. |
-| Latest merged PR | PR #15, `feat(s9): spreadsheet import — xlsx upload, diff, confirmation lock` on `dev` |
-| Merge commit | `e2e7788` |
+| Active development branch | `feature/s11-performance-accessibility` — S11 complete, PR open. |
+| Latest merged PR | PR #16, `feat(s10): regression and security audit` on `dev` |
+| Merge commit | `451aa81` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
-| Latest migration applied locally | `20260513000000_s9_workbook_import.sql` |
+| Latest migration applied locally | `20260513000000_s9_workbook_import.sql` (no new migration in S10 or S11) |
 
 S10 is the regression and security audit sprint. Key findings and audit results:
 
@@ -93,23 +93,66 @@ Post-review fixes applied (commit `99c9098`, PR #15):
 | `void ps` dead code — `ps` parameter unused in `recalculate()` | Removed parameter from `recalculate()` signature and call site |
 | `void teamForEntry` dead code — reserve stint creation was never implemented | Removed unused variable and stale comment |
 
-Known cross-sprint deferred items (carried into S11/S12):
+Known cross-sprint deferred items (carried into S12):
 
 | Item | Originally deferred in | Now planned for |
 |------|------------------------|-----------------|
 | `/login` page (magic link or email/password) | Never built — all sprints redirect to `/login` | S12 pre-deploy (hard blocker for smoke tests) |
-| Playwright auth storage state helpers | S3, S6, S7 | S11 |
-| Admin browser E2E (league, result publish) | S3 | S11 |
-| Authenticated wheel E2E | S6 | S11 |
-| Racer garage E2E | S7 | S11 |
-| Standalone qualifying results page | S4 | S11 |
-| Public race reports page | S4, S5, S6 | S11 |
-| Season selector on public standings pages | S4 | S11 |
-| Cache/revalidation after publish | S4/S5 | S11 |
-| DiffReport ✓/✗ `aria-label` | S9 | S11 |
-| Rich wheel animation polish | S6 | S11 |
 | Real workbook end-to-end smoke | S9 | S12 pre-deploy |
 | `driver_penalty_totals` rebuild after import | S9 | S12 pre-deploy (manual: run carry-over API after import confirmation) |
+
+---
+
+### S11 Notes (archived)
+
+S11 delivers all deferred features from S3–S9 plus performance, accessibility, and UX polish:
+
+1. Playwright auth storage state helpers for admin and racer E2E tests via a test-only `/api/e2e/session` endpoint (NODE_ENV + `E2E_SECRET` guard; returns 404 in production).
+2. E2E seed script (`npm run seed:e2e`) — idempotent, uses email as the stable lookup key. Local GoTrue ignores the `user_id` parameter in `createUser`, so the seed uses dynamic UUIDs assigned by Supabase and upserts on unique columns (`profile_id` for drivers, `(league_id, driver_id, season_id)` for league driver entries).
+3. Admin browser E2E tests: dashboard redirect, league create, team add, driver add, seed data navigation.
+4. Authenticated wheel E2E tests: page navigation, unauthenticated redirect.
+5. Racer garage E2E tests: setup CRUD, cross-racer isolation (admin gets 404 on racer's setup).
+6. Standalone qualifying results page at `/leagues/[slug]/results/[sessionId]/qualifying` — pole position row highlighted.
+7. Public race report page at `/leagues/[slug]/results/[sessionId]/report` — winner/pole/fastest highlights, race classification, qualifying order, penalties (steward_notes and appeal_notes excluded per HANDOVER §7).
+8. Season selector on public standings and results pages (UUID-validated `?season=<id>` searchParam; selector hidden when only one season exists).
+9. Tag-based cache revalidation using `src/lib/cache/tags.ts` factory: `standings`, `results`, `session`, `penalties`, `wheel`, `league` tags.  `revalidateTag(tag, "default")` called in publish, transfer, wheel spin, and asset upload routes.
+10. `unstable_cache` wrapping on standings and results data-fetch functions for per-request cache even with `force-dynamic` pages.
+11. `DiffReport` ✓/✗ spans now carry `aria-label="match"` / `aria-label="mismatch"`.
+12. Digital wheel rewritten as a state machine (`idle → spinning → revealing → pending`) with slot-machine animation, `aria-live`, `role="alert"` on errors, `fieldset`/`legend` for circuit pool, and `focus:ring-2` on all interactive elements.
+
+S11 important rules:
+
+```text
+- /api/e2e/session must never run in production (NODE_ENV === "production" returns 404 first).
+- E2E_SECRET header is required even in development; missing secret → 404.
+- revalidateTag second argument must be "default" (Next.js 16 breaking change — required profile argument).
+- unstable_cache tags must match what revalidateTag fires — use cacheTag.* factory for both.
+- steward_notes and appeal_notes must never appear in public penalty queries (report page included).
+- Playwright auth files (e2e/.auth/*.json) are gitignored — regenerate with npm run seed:e2e then npm run test:e2e.
+- E2E_SECRET must be set in .env.local before running tests (it is NOT in .env.example with a real value — add it manually). Example: E2E_SECRET=dev-e2e-secret-for-local-testing-only
+- Do not use fixed auth user UUIDs anywhere — local GoTrue silently ignores user_id in createUser. Always look up users by email after creation.
+```
+
+S11 validation evidence:
+
+```powershell
+npm run type-check  # 0 errors
+npm run lint        # 0 warnings
+npm run test        # 337 tests, 19 files, all passed
+npm run seed:e2e    # seed confirmed working after fixing dynamic UUID approach
+# npm run test:e2e  # NOT yet run — requires dev server + seeded Supabase (see outstanding items)
+```
+
+Known S11 accepted limitations:
+
+| Item | Reason |
+|------|--------|
+| Lighthouse scores not captured | Requires live staging environment with real data. Deferred to S12 pre-deploy. |
+| `/login` page E2E auth | Login page not yet built. Authenticated E2E uses `/api/e2e/session` test-only endpoint instead. |
+| Wheel E2E spin flow | Full spin+confirm E2E deferred — requires seeded circuit pool on local Supabase; covered by unit tests in `wheel-service.test.ts`. |
+| `npm run test:e2e` not confirmed | Requires running dev server + Supabase simultaneously, which is memory-intensive. Run manually before merging PR #17. Steps: (1) `npm run seed:e2e`, (2) `npm run dev` in a separate terminal, (3) `npm run test:e2e`. |
+
+---
 
 Known deferred S9 items:
 

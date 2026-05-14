@@ -35,9 +35,9 @@ function DiffTable({ items, title }: { items: DiffItem[]; title: string }) {
                 </td>
                 <td className="py-2 text-center">
                   {item.match ? (
-                    <span className="text-xs font-bold text-team-sauber">✓</span>
+                    <span aria-label="match" className="text-xs font-bold text-team-sauber">✓</span>
                   ) : (
-                    <span className="text-xs font-bold text-f1-red">✗</span>
+                    <span aria-label="mismatch" className="text-xs font-bold text-f1-red">✗</span>
                   )}
                 </td>
               </tr>

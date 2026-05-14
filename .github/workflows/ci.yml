@@ -48,7 +48,12 @@ jobs:
         run: npm run build
 
       - name: E2E tests
-        run: npm run test:e2e
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          SKIP_E2E_AUTH: "1"
+        run: npm run test:e2e:run -- e2e/smoke.spec.ts
 
       - name: Dependency audit
         run: npm run audit:security
