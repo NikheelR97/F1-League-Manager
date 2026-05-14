@@ -61,6 +61,11 @@ async function authenticate(
 }
 
 export default async function globalSetup() {
+  if (process.env.SKIP_E2E_AUTH === "1") {
+    console.log("  [e2e] skipping auth setup");
+    return;
+  }
+
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 
   const browser = await chromium.launch();
