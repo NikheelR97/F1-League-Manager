@@ -22,6 +22,20 @@ export function getSupabaseRemotePatterns(): NonNullable<NextConfig["images"]>["
   }
 }
 
+export function getSupabaseConnectSrc(): string {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return "";
+
+  try {
+    const url = new URL(supabaseUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+
+    return url.origin;
+  } catch {
+    return "";
+  }
+}
+
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
   {
@@ -33,8 +47,7 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "origin-when-cross-origin" },
   {
     key: "Content-Security-Policy",
-    value:
-      "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: ws: wss:;",
+    value: `default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ${getSupabaseConnectSrc()} ws: wss:;`,
   },
 ];
 

@@ -18,7 +18,7 @@ export default async function GarageLayout({
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    redirect("/login");
+    redirect("/login?next=/garage");
   }
 
   const db = createSupabaseServiceRoleClient();

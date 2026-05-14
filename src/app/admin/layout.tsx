@@ -18,7 +18,7 @@ export default async function AdminLayout({
   );
 
   if (!authResult.ok) {
-    redirect(authResult.status === 401 ? "/login" : "/");
+    redirect(authResult.status === 401 ? "/login?next=/admin" : "/");
   }
 
   return <AdminShell role={authResult.role}>{children}</AdminShell>;
