@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S11 performance and accessibility complete on `feature/s11-performance-accessibility`; next sprint is S12 production release.
+**Status:** S11 performance and accessibility is merged to `dev`; S12 production release prep is next on `feature/s12-production-release`.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -1076,7 +1076,7 @@ Performance and accessibility work:
 | Lighthouse performance scores | Outstanding | Requires live staging with real data | Deferred to S12 pre-deploy |
 | WCAG AA contrast full audit | Outstanding | Tailwind color tokens visually reviewed; no automated audit tool run | Deferred to S12 pre-deploy |
 | Mobile screenshot capture | Outstanding | Requires running dev server | Deferred to S12 pre-deploy |
-| `npm run sprint-verify` gate | Outstanding | type-check ✓, lint ✓, 337 unit tests ✓, `npm run seed:e2e` ✓; `npm run test:e2e` not yet confirmed (requires dev server + Supabase simultaneously — memory-intensive) | Run `npm run seed:e2e` then `npm run dev` in one terminal, `npm run test:e2e` in another, before merging PR #17 |
+| `npm run sprint-verify` gate | Done | PR #17 merged to `dev`; GitHub CI `verify` passed; local checks passed: type-check, lint, 337 unit tests, smoke E2E, and full Playwright E2E before merge | None |
 
 ---
 

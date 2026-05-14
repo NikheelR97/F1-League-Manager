@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S11 performance and accessibility complete on `feature/s11-performance-accessibility`; next sprint is S12 production release.
+**Status:** S11 performance and accessibility is merged to `dev`; S12 production release prep is next on `feature/s12-production-release`.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -8,15 +8,15 @@
 
 ## Current Handover Notes
 
-Last updated: May 12, 2026.
+Last updated: May 14, 2026.
 
 Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | `feature/s11-performance-accessibility` — S11 complete, PR open. |
-| Latest merged PR | PR #16, `feat(s10): regression and security audit` on `dev` |
-| Merge commit | `451aa81` |
+| Active development branch | `feature/s12-production-release` — S12 housekeeping and production release prep. |
+| Latest merged PR | PR #17, `feat(s11): performance, accessibility, and UX polish` on `dev` |
+| Merge commit | `a6b36b8` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
 | Latest migration applied locally | `20260513000000_s9_workbook_import.sql` (no new migration in S10 or S11) |
 
@@ -140,7 +140,8 @@ npm run type-check  # 0 errors
 npm run lint        # 0 warnings
 npm run test        # 337 tests, 19 files, all passed
 npm run seed:e2e    # seed confirmed working after fixing dynamic UUID approach
-# npm run test:e2e  # NOT yet run — requires dev server + seeded Supabase (see outstanding items)
+npm run test:e2e    # full Playwright suite passed locally before PR #17 merge
+GitHub CI verify    # passed on PR #17 before merge
 ```
 
 Known S11 accepted limitations:
@@ -150,7 +151,6 @@ Known S11 accepted limitations:
 | Lighthouse scores not captured | Requires live staging environment with real data. Deferred to S12 pre-deploy. |
 | `/login` page E2E auth | Login page not yet built. Authenticated E2E uses `/api/e2e/session` test-only endpoint instead. |
 | Wheel E2E spin flow | Full spin+confirm E2E deferred — requires seeded circuit pool on local Supabase; covered by unit tests in `wheel-service.test.ts`. |
-| `npm run test:e2e` not confirmed | Requires running dev server + Supabase simultaneously, which is memory-intensive. Run manually before merging PR #17. Steps: (1) `npm run seed:e2e`, (2) `npm run dev` in a separate terminal, (3) `npm run test:e2e`. |
 
 ---
 
