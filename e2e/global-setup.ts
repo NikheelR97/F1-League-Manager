@@ -32,12 +32,6 @@ const TEST_PASSWORD = "E2eTestPassword!1";
 // Resolved from project root (process.cwd() during `npm run test:e2e`)
 const AUTH_DIR = path.resolve("e2e/.auth");
 
-if (!E2E_SECRET) {
-  throw new Error(
-    "E2E_SECRET env var is required. Add it to .env.local:\n  E2E_SECRET=dev-e2e-secret-32-chars-min",
-  );
-}
-
 async function authenticate(
   context: BrowserContext,
   email: string,
@@ -64,6 +58,12 @@ export default async function globalSetup() {
   if (process.env.SKIP_E2E_AUTH === "1") {
     console.log("  [e2e] skipping auth setup");
     return;
+  }
+
+  if (!E2E_SECRET) {
+    throw new Error(
+      "E2E_SECRET env var is required. Add it to .env.local:\n  E2E_SECRET=dev-e2e-secret-32-chars-min",
+    );
   }
 
   fs.mkdirSync(AUTH_DIR, { recursive: true });
