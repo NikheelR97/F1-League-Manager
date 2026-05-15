@@ -1126,6 +1126,9 @@ Deployment steps:
 | S12 docs refresh | Done | Stale-text scan found no old login-missing wording, old S12 branch, or PR #17 latest-merge references | None |
 | Local deploy gate | Done | May 15 rerun on `feature/s12-staging-prep`: `npm run deploy:check` passed locally after starting Docker/Supabase and running `npm run seed:e2e`; 347 tests, coverage thresholds, build, 19 Playwright tests, high audit, and secret scan | None |
 | Proxy convention cleanup | Done | PR #20, merge commit `c9b9d7e`; `src/middleware.ts` moved to `src/proxy.ts`; CI `verify` passed and local build no longer reports the deprecated middleware convention warning | None |
+| Vercel project shell | Done | May 15 `vercel link --yes --project f1-league-manager`; project exists under `nikheel-rajmans-projects` and is connected to GitHub | None |
+| Staging Vercel environment variables | Outstanding | `vercel env ls` reports no environment variables for `f1-league-manager` | Add non-production Supabase URL/public key/secret key, `NEXT_PUBLIC_SITE_URL`, `CSRF_SECRET`, Upstash values, and optional service values before staging deploy |
+| Non-production Supabase CLI visibility | Outstanding | `npx supabase projects list` requires `supabase login` or `SUPABASE_ACCESS_TOKEN` | Log in/link only to `f1-league-manager-nonprod`, then inspect migration state before staging smoke |
 | Real workbook smoke on staging | Outstanding | None yet | Requires staging/non-prod Supabase release target and workbook import run |
 | `driver_penalty_totals` verification after import | Outstanding | None yet | Run carry-over API after import confirmation and verify totals |
 | Lighthouse/accessibility/mobile screenshots | Outstanding | None yet | Requires live staging deployment with representative data |

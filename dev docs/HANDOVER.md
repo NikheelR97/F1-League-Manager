@@ -120,6 +120,15 @@ Resolved S12 deploy-gate warning:
 Next.js middleware file convention warning was resolved in PR #20 by using the current proxy convention.
 ```
 
+S12 staging prep status:
+
+```text
+- Vercel project `f1-league-manager` exists under `nikheel-rajmans-projects` and is connected to the GitHub repo.
+- `vercel env ls` currently reports no environment variables for the project.
+- Do not deploy staging until Vercel has non-production Supabase values, `NEXT_PUBLIC_SITE_URL`, `CSRF_SECRET`, and the configured optional service values.
+- Supabase CLI is not logged in locally, so non-production project migration state has not been inspected from this machine yet.
+```
+
 ---
 
 ### S11 Notes (archived)
