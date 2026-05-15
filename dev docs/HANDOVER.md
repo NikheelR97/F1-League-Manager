@@ -111,6 +111,7 @@ S12 login/auth status:
 - PR #18 CI passed before merge; local sprint gate passed with 346 tests and 19 Playwright tests.
 - S12 docs/deploy-gate pass: npm run deploy:check passed locally with 347 tests, coverage, build, 19 Playwright tests, high audit, and secret scan.
 - PR #20 moved the auth redirect entrypoint from `src/middleware.ts` to `src/proxy.ts`; CI passed and local build no longer reports the deprecated middleware file convention warning.
+- May 15 staging-prep baseline: `npm run deploy:check` passed locally after starting Docker/Supabase and running `npm run seed:e2e`; 347 tests, coverage, build, 19 Playwright tests, high audit, and secret scan.
 ```
 
 Resolved S12 deploy-gate warning:

@@ -1124,7 +1124,7 @@ Deployment steps:
 | `/login` email/password auth | Done | PR #18, merge commit `77dfaf5`; GitHub CI `verify` passed; local `npm run sprint-verify` passed with 346 tests and 19 Playwright tests | None |
 | Protected-route `next` redirects and sign-out controls | Done | PR #18; `/admin` and `/garage` login E2E coverage; safe next paths limited to admin/garage path families | None |
 | S12 docs refresh | Done | Stale-text scan found no old login-missing wording, old S12 branch, or PR #17 latest-merge references | None |
-| Local deploy gate | Done | `npm run deploy:check` passed locally: 347 tests, coverage thresholds, build, 19 Playwright tests, high audit, and secret scan | None |
+| Local deploy gate | Done | May 15 rerun on `feature/s12-staging-prep`: `npm run deploy:check` passed locally after starting Docker/Supabase and running `npm run seed:e2e`; 347 tests, coverage thresholds, build, 19 Playwright tests, high audit, and secret scan | None |
 | Proxy convention cleanup | Done | PR #20, merge commit `c9b9d7e`; `src/middleware.ts` moved to `src/proxy.ts`; CI `verify` passed and local build no longer reports the deprecated middleware convention warning | None |
 | Real workbook smoke on staging | Outstanding | None yet | Requires staging/non-prod Supabase release target and workbook import run |
 | `driver_penalty_totals` verification after import | Outstanding | None yet | Run carry-over API after import confirmation and verify totals |
