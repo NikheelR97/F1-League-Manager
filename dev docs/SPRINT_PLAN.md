@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Sprint Plan
 
-**Status:** S12 production release prep is in progress on `feature/s12-docs-deploy-gate`; `/login` auth is merged to `dev`.
+**Status:** S12 staging prep is in progress on `feature/s12-staging-prep`; `/login` auth and proxy convention cleanup are merged to `dev`.
 **Audience:** Interns, juniors, and developers new to the project.
 **Goal:** Build the app one safe sprint at a time, with tests proving each feature works before moving on.
 
@@ -1125,10 +1125,10 @@ Deployment steps:
 | Protected-route `next` redirects and sign-out controls | Done | PR #18; `/admin` and `/garage` login E2E coverage; safe next paths limited to admin/garage path families | None |
 | S12 docs refresh | Done | Stale-text scan found no old login-missing wording, old S12 branch, or PR #17 latest-merge references | None |
 | Local deploy gate | Done | `npm run deploy:check` passed locally: 347 tests, coverage thresholds, build, 19 Playwright tests, high audit, and secret scan | None |
+| Proxy convention cleanup | Done | PR #20, merge commit `c9b9d7e`; `src/middleware.ts` moved to `src/proxy.ts`; CI `verify` passed and local build no longer reports the deprecated middleware convention warning | None |
 | Real workbook smoke on staging | Outstanding | None yet | Requires staging/non-prod Supabase release target and workbook import run |
 | `driver_penalty_totals` verification after import | Outstanding | None yet | Run carry-over API after import confirmation and verify totals |
 | Lighthouse/accessibility/mobile screenshots | Outstanding | None yet | Requires live staging deployment with representative data |
-| Next middleware deprecation warning | Outstanding | `npm run deploy:check` passes, but Next warns that the middleware file convention is deprecated in favor of proxy | Track before staging release if warning becomes a release concern |
 
 ### Production Smoke Tests
 
