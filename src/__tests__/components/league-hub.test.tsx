@@ -167,4 +167,33 @@ describe("LeagueHub", () => {
       "images%2Fleagues%2Frace-control-hero.png",
     );
   });
+
+  it("renders the wheel section for a wheel-format league", () => {
+    render(
+      <LeagueHub
+        {...baseProps}
+        latestWheelSpin={{
+          id: "spin-1",
+          confirmed_at: "2026-05-07T18:00:00.000Z",
+          circuits: { name: "Suzuka", country: "Japan" },
+        }}
+        league={{ ...mockLeague, format: "standard" }}
+        wheelPoolRemaining={4}
+      />,
+    );
+    expect(screen.getByText("Wheel")).toBeInTheDocument();
+    expect(screen.getByText("Suzuka")).toBeInTheDocument();
+    expect(screen.getByText(/4 circuits remaining in pool/i)).toBeInTheDocument();
+  });
+
+  it("shows 'Awaiting spin' when a wheel league has no confirmed spin yet", () => {
+    render(<LeagueHub {...baseProps} league={{ ...mockLeague, format: "standard" }} />);
+    expect(screen.getByText("Wheel")).toBeInTheDocument();
+    expect(screen.getByText("Awaiting spin")).toBeInTheDocument();
+  });
+
+  it("omits the wheel section for a non-wheel-format league", () => {
+    render(<LeagueHub {...baseProps} />);
+    expect(screen.queryByText("Wheel")).not.toBeInTheDocument();
+  });
 });

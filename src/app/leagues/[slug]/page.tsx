@@ -18,6 +18,7 @@ export default async function LeaguePage({ params }: LeaguePageProps) {
   if (!league) notFound();
 
   const db = createSupabaseServiceRoleClient();
+  const isWheelLeague = league.format === "standard";
 
   const [
     { data: nextRace },
@@ -25,6 +26,8 @@ export default async function LeaguePage({ params }: LeaguePageProps) {
     { data: topDrivers },
     { data: topConstructors },
     { data: penaltyAlerts },
+    { data: latestWheelSpin },
+    { count: wheelPoolRemaining },
   ] = await Promise.all([
     db
       .from("race_sessions")
@@ -66,16 +69,37 @@ export default async function LeaguePage({ params }: LeaguePageProps) {
       .eq("ban_threshold_reached", true)
       .order("penalty_points", { ascending: false })
       .limit(10),
+    isWheelLeague
+      ? db
+          .from("wheel_spins")
+          .select("id, confirmed_at, circuits(name, country)")
+          .eq("league_id", league.id)
+          .eq("season_id", league.season.id)
+          .eq("status", "confirmed")
+          .order("confirmed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    isWheelLeague
+      ? db
+          .from("league_circuit_pools")
+          .select("id", { count: "exact", head: true })
+          .eq("league_id", league.id)
+          .eq("is_available", true)
+          .is("used_at", null)
+      : Promise.resolve({ count: null }),
   ]);
 
   return (
     <LeagueHub
       latestSession={latestSession ?? null}
+      latestWheelSpin={latestWheelSpin ?? null}
       league={league}
       nextRace={nextRace ?? null}
       penaltyAlerts={penaltyAlerts ?? []}
       topConstructors={topConstructors ?? []}
       topDrivers={topDrivers ?? []}
+      wheelPoolRemaining={isWheelLeague ? (wheelPoolRemaining ?? 0) : null}
     />
   );
 }
