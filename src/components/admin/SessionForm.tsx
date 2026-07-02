@@ -16,13 +16,23 @@ const formSchema = z.object({
   circuit_id: z.string().min(1, "Please select a circuit"),
   name: z.string().trim().min(1, "Name is required").max(120),
   points_system_id: z.string().min(1, "Please select a points system"),
-  race_length_percent: z.union([z.literal(25), z.literal(50), z.literal(100)]),
-  race_number: z.union([z.literal(1), z.literal(2)]),
+  // react-hook-form always reads radio-group values from the live DOM
+  // element as a string, regardless of `valueAsNumber` / `setValueAs` — so
+  // these two fields accept both the string and number forms and coerce.
+  race_length_percent: z
+    .union([z.literal(25), z.literal(50), z.literal(100), z.literal("25"), z.literal("50"), z.literal("100")])
+    .transform(Number),
+  race_number: z
+    .union([z.literal(1), z.literal(2), z.literal("1"), z.literal("2")])
+    .transform(Number),
   scheduled_at: z.string().min(1, "Please select a date"),
   session_code: z.string().regex(SESSION_CODE_RE, "Must be exactly 6 uppercase letters or digits"),
 });
 
-type FormData = z.infer<typeof formSchema>;
+// Input (what RHF holds — radios may be strings) vs output (post-transform
+// numbers). zodResolver bridges the two via useForm's three generics.
+type FormInput = z.input<typeof formSchema>;
+type FormOutput = z.output<typeof formSchema>;
 
 interface Circuit {
   country: string;
@@ -65,7 +75,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
   const csrfToken = useCsrfToken();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const form = useForm<FormData>({
+  const form = useForm<FormInput, unknown, FormOutput>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       circuit_id: session?.circuit_id ?? initialCircuitId ?? "",
@@ -93,7 +103,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
     }
   }
 
-  async function onSubmit(data: FormData) {
+  async function onSubmit(data: FormOutput) {
     setSubmitError(null);
 
     // Validate scheduled_at is a valid datetime
@@ -219,7 +229,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
                 className="accent-f1-red"
                 type="radio"
                 value={n}
-                {...register("race_number", { valueAsNumber: true })}
+                {...register("race_number")}
               />
               Race {n} {n === 2 ? "(Sprint)" : "(Feature)"}
             </label>
@@ -238,7 +248,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
                 className="accent-f1-red"
                 type="radio"
                 value={pct}
-                {...register("race_length_percent", { valueAsNumber: true })}
+                {...register("race_length_percent")}
               />
               {pct}%
             </label>
