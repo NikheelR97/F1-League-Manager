@@ -3,7 +3,6 @@ import { render, screen } from "@testing-library/react";
 import { LeagueHub } from "@/components/league/LeagueHub";
 import { RaceCountdown } from "@/components/league/RaceCountdown";
 import type { PublicLeague } from "@/lib/public/resolve-league";
-import { getLeagueSummaries } from "@/lib/ui/league-data";
 
 const mockLeague: PublicLeague = {
   id: "league-1",
@@ -162,12 +161,10 @@ describe("LeagueHub", () => {
     }
   });
 
-  it("uses local project images for league hero assets", () => {
-    const summaries = getLeagueSummaries();
-
-    expect.assertions(summaries.length);
-    for (const league of summaries) {
-      expect(league.heroImage).toMatch(/^\/images\/leagues\//u);
-    }
+  it("falls back to a local project image when no hero image is uploaded", () => {
+    render(<LeagueHub {...baseProps} />);
+    expect(screen.getByAltText("Standard League hero").getAttribute("src")).toContain(
+      "images%2Fleagues%2Frace-control-hero.png",
+    );
   });
 });
