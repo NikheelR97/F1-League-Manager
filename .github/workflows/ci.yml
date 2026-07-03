@@ -35,13 +35,6 @@ jobs:
           echo "CSRF_SECRET=ec1bd6a4c2bbf2fd9942774473b838218e8809759fa0603045207c66796e85e0" >> "$GITHUB_ENV"
           echo "NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000" >> "$GITHUB_ENV"
 
-      - name: Debug - verify seeded leagues are reachable
-        run: |
-          echo "--- via service-role key ---"
-          curl -s "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/leagues?select=id,name,status&limit=5" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
-          echo ""
-
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
