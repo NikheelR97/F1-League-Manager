@@ -6,6 +6,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
+import { FormError } from "@/components/ui/FormError";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
@@ -269,7 +270,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
         {errors.scheduled_at && <p className="text-xs text-destructive">{errors.scheduled_at.message}</p>}
       </div>
 
-      {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+      <FormError message={submitError} />
 
       <button
         className="w-full border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"

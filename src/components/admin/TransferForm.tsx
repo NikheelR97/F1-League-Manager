@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { FormError } from "@/components/ui/FormError";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
@@ -141,9 +142,7 @@ export function TransferForm({ drivers, leagueId, teams }: TransferFormProps) {
         )}
       </div>
 
-      {errors.root && (
-        <p className="text-sm text-f1-red">{errors.root.message}</p>
-      )}
+      <FormError message={errors.root?.message} />
 
       <button
         className="border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:cursor-not-allowed disabled:opacity-50"

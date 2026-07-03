@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { FormError } from "@/components/ui/FormError";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 
 // ---------------------------------------------------------------------------
@@ -994,9 +995,7 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
         )}
       </div>
 
-      {publishError && (
-        <p className="text-sm text-destructive">{publishError}</p>
-      )}
+      <FormError message={publishError} />
 
       {/* Navigation */}
       <div className="flex items-center justify-between gap-4">
