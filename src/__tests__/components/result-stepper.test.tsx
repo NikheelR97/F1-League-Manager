@@ -53,6 +53,124 @@ const defaultResultRow = {
   team_id: "team-1",
 };
 
+describe("ResultStepper full publish flow", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/csrf") {
+          return Promise.resolve(new Response(JSON.stringify({ token: "test-token" })));
+        }
+        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      }),
+    );
+  });
+
+  it("walks all four steps and publishes the entered results", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One"), makeDriver("driver-2", "Driver Two")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    // Qualifying: positions 1 and 2, pole for driver one
+    const qualiInputs = screen.getAllByPlaceholderText("—");
+    await user.type(qualiInputs[0], "1");
+    await user.type(qualiInputs[1], "2");
+    await user.click(screen.getAllByRole("checkbox")[0]);
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+
+    // Results: finishing positions, fastest lap for driver one, DNF for driver two
+    const posInputs = screen.getAllByPlaceholderText("—");
+    await user.type(posInputs[0], "1");
+    await user.click(screen.getAllByRole("checkbox")[0]);
+    const statusSelects = screen
+      .getAllByRole("combobox")
+      .filter((el) => (el as HTMLSelectElement).value === "classified");
+    await user.selectOptions(statusSelects[1], "dnf");
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+
+    // Penalties: one formal penalty for the default (first) driver
+    await user.click(screen.getByRole("button", { name: /Add Penalty/i }));
+    await user.type(screen.getByPlaceholderText("Collision at Turn 1"), "Turn 1 contact");
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+
+    // Review: points preview (25 base + 1 FL + 1 pole) and publish
+    expect(screen.getByText("Turn 1 contact")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Publish Results" }));
+
+    const publishCall = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
+      String(url).includes("/api/admin/sessions/session-1/publish"),
+    );
+    expect(publishCall).toBeDefined();
+    const body = JSON.parse(publishCall![1].body);
+    expect(body.qualifying).toContainEqual(
+      expect.objectContaining({ driver_id: "driver-1", is_pole: true, qualifying_position: 1 }),
+    );
+    expect(body.results).toContainEqual(
+      expect.objectContaining({ driver_id: "driver-1", finishing_position: 1, fastest_lap: true }),
+    );
+    expect(body.results).toContainEqual(
+      expect.objectContaining({ driver_id: "driver-2", result_status: "dnf", finishing_position: null }),
+    );
+    expect(body.penalties).toContainEqual(
+      expect.objectContaining({ driver_id: "driver-1", reason: "Turn 1 contact" }),
+    );
+
+    // Draft cleared and navigation triggered after successful publish
+    expect(sessionStorage.getItem(draftKey)).toBeNull();
+    expect(router.push).toHaveBeenCalledWith("/admin/leagues/league-1");
+  });
+
+  it("blocks publish while validation errors exist", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One"), makeDriver("driver-2", "Driver Two")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    // Duplicate finishing positions
+    const posInputs = screen.getAllByPlaceholderText("—");
+    await user.type(posInputs[0], "1");
+    await user.type(posInputs[1], "1");
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+
+    expect(screen.getByText(/Duplicate finishing positions/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish Results" })).toBeDisabled();
+    expect(
+      (fetch as ReturnType<typeof vi.fn>).mock.calls.some(([url]) =>
+        String(url).includes("/publish"),
+      ),
+    ).toBe(false);
+  });
+
+  it("surfaces a server error from a failed publish", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/csrf") {
+          return Promise.resolve(new Response(JSON.stringify({ token: "test-token" })));
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: "Session already published" }), { status: 409 }),
+        );
+      }),
+    );
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.type(screen.getByPlaceholderText("—"), "1");
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+    await user.click(screen.getByRole("button", { name: "Publish Results" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Session already published");
+    expect(router.push).not.toHaveBeenCalled();
+  });
+});
+
 describe("ResultStepper draft persistence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
