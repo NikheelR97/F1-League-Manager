@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 
@@ -97,6 +97,75 @@ function previewRacePoints(
   const fl = fastestLapEnabled && row.fastest_lap ? ps.fastest_lap_points : 0;
   const pole = poleEnabled && (qRow?.is_pole ?? false) ? ps.pole_position_points : 0;
   return base + fl + pole;
+}
+
+function defaultQualifyingRow(d: SessionDriver): QualifyingRow {
+  return { driver_id: d.driver_id, is_pole: false, qualifying_position: null, team_id: d.team_id };
+}
+
+function defaultResultRow(d: SessionDriver): RaceResultRow {
+  return {
+    driver_id: d.driver_id,
+    fastest_lap: false,
+    finishing_position: null,
+    manual_points_adjustment: 0,
+    notes: "",
+    penalty_points: 0,
+    raw_result: "",
+    result_status: "classified",
+    team_id: d.team_id,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Draft persistence (sessionStorage)
+// ---------------------------------------------------------------------------
+
+interface DraftShape {
+  penaltyRows: PenaltyRow[];
+  qualifyingRows: QualifyingRow[];
+  resultRows: RaceResultRow[];
+  step: Step;
+}
+
+function hasDriverId(row: unknown): row is { driver_id: string } {
+  return typeof row === "object" && row !== null && typeof (row as { driver_id?: unknown }).driver_id === "string";
+}
+
+function isDraftShape(value: unknown): value is DraftShape {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.step === "string" &&
+    (STEPS as string[]).includes(v.step) &&
+    Array.isArray(v.qualifyingRows) &&
+    v.qualifyingRows.every(hasDriverId) &&
+    Array.isArray(v.resultRows) &&
+    v.resultRows.every(hasDriverId) &&
+    Array.isArray(v.penaltyRows) &&
+    v.penaltyRows.every(hasDriverId)
+  );
+}
+
+// Conservative merge: keep saved data for drivers still in the session,
+// default rows for drivers that were added since the draft was saved, and
+// silently drop rows for drivers that were removed.
+function mergeRows<T extends { driver_id: string }>(
+  saved: T[],
+  drivers: SessionDriver[],
+  makeDefault: (d: SessionDriver) => T,
+): T[] {
+  return drivers.map((d) => saved.find((r) => r.driver_id === d.driver_id) ?? makeDefault(d));
+}
+
+function readStoredDraft(key: string): DraftShape | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    return isDraftShape(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -701,29 +770,77 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
 
   const [step, setStep] = useState<Step>("qualifying");
   const [qualifyingRows, setQualifyingRows] = useState<QualifyingRow[]>(() =>
-    drivers.map((d) => ({
-      driver_id: d.driver_id,
-      is_pole: false,
-      qualifying_position: null,
-      team_id: d.team_id,
-    })),
+    drivers.map(defaultQualifyingRow),
   );
   const [resultRows, setResultRows] = useState<RaceResultRow[]>(() =>
-    drivers.map((d) => ({
-      driver_id: d.driver_id,
-      fastest_lap: false,
-      finishing_position: null,
-      manual_points_adjustment: 0,
-      notes: "",
-      penalty_points: 0,
-      raw_result: "",
-      result_status: "classified" as ResultStatus,
-      team_id: d.team_id,
-    })),
+    drivers.map(defaultResultRow),
   );
   const [penaltyRows, setPenaltyRows] = useState<PenaltyRow[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  const draftKey = `result-stepper-draft:${session.id}`;
+  const draftRef = useRef<DraftShape | "pending" | null>("pending");
+
+  // Serialized untouched state — used to avoid persisting (or announcing) a
+  // draft the admin never actually typed into.
+  const pristineJson = useMemo(
+    () =>
+      JSON.stringify({
+        penaltyRows: [],
+        qualifyingRows: drivers.map(defaultQualifyingRow),
+        resultRows: drivers.map(defaultResultRow),
+        step: "qualifying",
+      }),
+    [drivers],
+  );
+
+  // Restore a saved draft after mount only — reading sessionStorage during
+  // the initial render (e.g. in a useState initializer) would produce a
+  // client/server markup mismatch since this component is server-rendered.
+  useEffect(() => {
+    if (draftRef.current !== "pending") return;
+    draftRef.current = readStoredDraft(draftKey);
+
+    const draft = draftRef.current;
+    if (draft === null) return;
+    // A draft identical to untouched state carries no work — skip the notice.
+    if (JSON.stringify(draft) === pristineJson) return;
+
+    setStep(draft.step);
+    setQualifyingRows(mergeRows(draft.qualifyingRows, drivers, defaultQualifyingRow));
+    setResultRows(mergeRows(draft.resultRows, drivers, defaultResultRow));
+    setPenaltyRows(draft.penaltyRows.filter((p) => drivers.some((d) => d.driver_id === p.driver_id)));
+    setDraftRestored(true);
+  }, [draftKey, drivers, pristineJson]);
+
+  // Persist on change. Skipping the pristine state means an untouched (or
+  // just-discarded) stepper never writes a draft, so the restore notice only
+  // ever appears when there is real work to restore. A quota or privacy-mode
+  // failure must never interrupt data entry, so setItem is best-effort.
+  useEffect(() => {
+    const json = JSON.stringify({ penaltyRows, qualifyingRows, resultRows, step });
+    if (json === pristineJson) return;
+    try {
+      sessionStorage.setItem(draftKey, json);
+    } catch {
+      // Ignore storage errors (quota exceeded, private browsing, etc.).
+    }
+  }, [draftKey, penaltyRows, pristineJson, qualifyingRows, resultRows, step]);
+
+  function discardDraft() {
+    try {
+      sessionStorage.removeItem(draftKey);
+    } catch {
+      // Ignore storage errors.
+    }
+    setStep("qualifying");
+    setQualifyingRows(drivers.map(defaultQualifyingRow));
+    setResultRows(drivers.map(defaultResultRow));
+    setPenaltyRows([]);
+    setDraftRestored(false);
+  }
 
   const stepIdx = STEPS.indexOf(step);
   const validation = validateResults(resultRows);
@@ -794,6 +911,12 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
         return;
       }
 
+      try {
+        sessionStorage.removeItem(draftKey);
+      } catch {
+        // Ignore storage errors.
+      }
+
       router.push(`/admin/leagues/${session.league_id}`);
       router.refresh();
     } finally {
@@ -820,6 +943,20 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
           </div>
         ))}
       </nav>
+
+      {/* Draft restored notice */}
+      {draftRestored && (
+        <div className="flex items-center justify-between gap-4 border border-f1-border bg-f1-dark px-4 py-2 text-xs text-f1-muted">
+          <span>Draft restored from this browser session.</span>
+          <button
+            className="font-bold uppercase text-f1-muted transition-colors hover:text-f1-white"
+            type="button"
+            onClick={discardDraft}
+          >
+            Discard draft
+          </button>
+        </div>
+      )}
 
       {/* Step content */}
       <div className="border border-f1-border bg-f1-dark p-4 sm:p-6">
