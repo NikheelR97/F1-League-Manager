@@ -73,7 +73,7 @@ export default async function TeamProfilePage({
   const entryIds = (entries ?? []).map((e) => e.id);
   const sessionIds = (completedSessions ?? []).map((s) => s.id);
 
-  const [{ data: activeStints }, { data: raceResults }] = await Promise.all([
+  const [{ data: activeStints }, { data: raceResults }, { count: poleCount }] = await Promise.all([
     entryIds.length > 0
       ? db
           .from("driver_team_stints")
@@ -93,6 +93,15 @@ export default async function TeamProfilePage({
           .order("race_session_id")
           .limit(50)
       : { data: [] },
+    sessionIds.length > 0
+      ? db
+          .from("qualifying_results")
+          .select("id", { count: "exact" })
+          .eq("team_id", teamId)
+          .eq("is_pole", true)
+          .in("race_session_id", sessionIds)
+          .limit(50)
+      : { count: 0 },
   ]);
 
   // Derive current drivers from active stints
@@ -111,6 +120,27 @@ export default async function TeamProfilePage({
   type Driver = { id: string; display_name: string };
 
   const sortedResults = [...(raceResults ?? [])].sort(comparePublicRaceResults);
+
+  // Season summary derived from the already-fetched race results — no extra queries
+  const classifiedFinishes = (raceResults ?? [])
+    .filter((r) => r.result_status === "classified" && r.finishing_position !== null)
+    .map((r) => r.finishing_position as number);
+  const bestFinish = classifiedFinishes.length > 0 ? Math.min(...classifiedFinishes) : null;
+  const fastestLapCount = (raceResults ?? []).filter((r) => r.fastest_lap).length;
+
+  const pointsByDriver = new Map<string, { id: string; name: string; points: number }>();
+  for (const r of raceResults ?? []) {
+    const driver = r.drivers as unknown as Driver | null;
+    if (!driver) continue;
+    const totalPts = r.points_awarded + r.manual_points_adjustment;
+    const existing = pointsByDriver.get(driver.id);
+    pointsByDriver.set(driver.id, {
+      id: driver.id,
+      name: driver.display_name,
+      points: (existing?.points ?? 0) + totalPts,
+    });
+  }
+  const driverBreakdown = [...pointsByDriver.values()].sort((a, b) => b.points - a.points);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -165,7 +195,37 @@ export default async function TeamProfilePage({
             </div>
           </div>
         )}
+        {bestFinish !== null && (
+          <div>
+            <p className="text-xs text-f1-muted">Best Finish</p>
+            <p className="font-mono font-bold text-f1-white">P{bestFinish}</p>
+          </div>
+        )}
+        <div>
+          <p className="text-xs text-f1-muted">Poles / FL</p>
+          <p className="font-mono text-f1-white">
+            {poleCount ?? 0} / {fastestLapCount}
+          </p>
+        </div>
       </div>
+
+      {/* Driver points breakdown */}
+      {driverBreakdown.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-xs font-bold uppercase text-f1-muted">Driver Points Breakdown</h2>
+          <ul className="grid gap-1 sm:grid-cols-2">
+            {driverBreakdown.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm"
+              >
+                <span className="text-f1-white">{d.name}</span>
+                <span className="font-mono font-bold text-f1-white">{d.points} pts</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Race results */}
       <section className="space-y-2">

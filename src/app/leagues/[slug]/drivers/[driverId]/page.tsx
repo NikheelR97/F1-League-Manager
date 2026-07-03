@@ -27,6 +27,7 @@ export default async function DriverProfilePage({
     { data: standing },
     { data: completedSessions },
     { data: lastSession },
+    { data: penaltyRows },
   ] = await Promise.all([
     db
       .from("drivers")
@@ -63,15 +64,23 @@ export default async function DriverProfilePage({
       .order("published_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    db
+      .from("penalties")
+      .select("penalty_points, status")
+      .eq("league_id", league.id)
+      .eq("season_id", league.season.id)
+      .eq("driver_id", driverId)
+      .neq("status", "rescinded")
+      .limit(100),
   ]);
 
   if (!driver || !leagueEntry) notFound();
 
-  // Step 2: fetch results scoped to this league's completed sessions
+  // Step 2: fetch results and team stints scoped to this league's completed sessions / entry
   const sessionIds = (completedSessions ?? []).map((s) => s.id);
-  const { data: results } =
+  const [{ data: results }, { data: stints }] = await Promise.all([
     sessionIds.length > 0
-      ? await db
+      ? db
           .from("race_results")
           .select(
             "race_session_id, finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, race_sessions(name, circuits(name))",
@@ -80,10 +89,20 @@ export default async function DriverProfilePage({
           .in("race_session_id", sessionIds)
           .order("race_session_id")
           .limit(50)
-      : { data: [] };
+      : { data: [] },
+    db
+      .from("driver_team_stints")
+      .select("team_id, starts_on, ends_on, teams(id, name, color_hex)")
+      .eq("league_driver_entry_id", leagueEntry.id)
+      .order("starts_on", { ascending: false })
+      .limit(10),
+  ]);
+
+  const penaltyPoints = (penaltyRows ?? []).reduce((sum, p) => sum + p.penalty_points, 0);
 
   type RaceSession = { name: string; circuits: unknown };
   type Circuit = { name: string };
+  type StintTeam = { id: string; name: string; color_hex: string };
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -126,7 +145,43 @@ export default async function DriverProfilePage({
             </div>
           </>
         ) : null}
+        {penaltyPoints > 0 && (
+          <div>
+            <p className="text-xs text-f1-muted">Penalty Points</p>
+            <p className="font-mono font-bold text-f1-red">{penaltyPoints}</p>
+          </div>
+        )}
       </div>
+
+      {/* Team history */}
+      {stints && stints.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-xs font-bold uppercase text-f1-muted">Team History</h2>
+          <ul className="space-y-1">
+            {stints.map((s) => {
+              const team = s.teams as unknown as StintTeam | null;
+              return (
+                <li
+                  key={`${s.team_id}-${s.starts_on}`}
+                  className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className="h-3 w-1 shrink-0"
+                      style={{ backgroundColor: team?.color_hex ?? "#444" }}
+                    />
+                    <span className="text-f1-white">{team?.name ?? "—"}</span>
+                  </div>
+                  <span className="font-mono text-xs text-f1-muted">
+                    {s.starts_on} – {s.ends_on ?? "present"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* Race results */}
       <section className="space-y-2">
