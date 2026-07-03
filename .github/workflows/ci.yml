@@ -25,6 +25,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Start Supabase
+        run: |
+          npx supabase start
+          STATUS=$(npx supabase status -o env)
+          echo "NEXT_PUBLIC_SUPABASE_URL=$(echo "$STATUS" | grep '^API_URL=' | cut -d= -f2- | tr -d '"')" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(echo "$STATUS" | grep '^ANON_KEY=' | cut -d= -f2- | tr -d '"')" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(echo "$STATUS" | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2- | tr -d '"')" >> "$GITHUB_ENV"
+          echo "CSRF_SECRET=ec1bd6a4c2bbf2fd9942774473b838218e8809759fa0603045207c66796e85e0" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000" >> "$GITHUB_ENV"
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
@@ -41,17 +51,10 @@ jobs:
         run: npm run test:coverage
 
       - name: Build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-          NEXT_PUBLIC_SITE_URL: http://localhost:3000
         run: npm run build
 
       - name: E2E tests
         env:
-          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-          NEXT_PUBLIC_SITE_URL: http://localhost:3000
           SKIP_E2E_AUTH: "1"
         run: npm run test:e2e:run -- e2e/smoke.spec.ts
 
