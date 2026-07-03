@@ -717,7 +717,8 @@ Required security controls:
 | Admin authorization | Check `profiles.role` on every admin request. |
 | Racer authorization | Owner checks in RLS and server service. |
 | CSRF | Required for all state-changing routes. |
-| Rate limiting | Required for auth and admin APIs. |
+| Rate limiting (admin) | Required for admin APIs; enforced via `createAdminRateLimiter` (`src/lib/admin/api-guard.ts`, Upstash-backed, fails closed in production). |
+| Rate limiting (auth) | Sign-in goes browser → Supabase directly (`LoginForm.tsx` calls `supabase.auth.signInWithPassword()`); there is no app-side auth API route to rate limit. Accepted control: Supabase Auth's built-in per-IP rate limits — verify they are enabled/appropriate in the Supabase dashboard for staging and production as a deploy step. `createAuthRateLimiter` (`src/lib/security/rate-limit.ts`) remains available if a server-side auth endpoint is ever added. |
 | Error handling | Generic in production, details only in Sentry. |
 | Secret scan | Run in CI/deploy checks. |
 | Dependency audit | No high/critical vulnerabilities before deploy. |

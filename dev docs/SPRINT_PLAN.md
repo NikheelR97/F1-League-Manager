@@ -1132,6 +1132,7 @@ Deployment steps:
 | Real workbook smoke on staging | Outstanding | None yet | Requires staging/non-prod Supabase release target and workbook import run |
 | `driver_penalty_totals` verification after import | Outstanding | None yet | Run carry-over API after import confirmation and verify totals |
 | Lighthouse/accessibility/mobile screenshots | Outstanding | None yet | Requires live staging deployment with representative data |
+| Supabase Auth rate limiting | Outstanding | Owner decision recorded 2026-07-03: auth sign-in is browser → Supabase direct (no app API route), so Supabase Auth's built-in per-IP rate limits are the accepted control in place of a server-side login proxy (see HANDOVER §7) | Confirm Supabase Auth rate limits are configured on `f1-league-manager-nonprod` and `f1-league-manager-prod` before release |
 
 ### Production Smoke Tests
 
