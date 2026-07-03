@@ -1,6 +1,6 @@
 import { writeAuditLog, type AuditLogWriter } from "@/lib/audit/audit-log";
 import { MAX_AUDIT_METADATA_BYTES } from "@/lib/constants";
-import { createAdminRateLimiter } from "@/lib/security/rate-limit";
+import { createAdminRateLimiter, createAuthRateLimiter } from "@/lib/security/rate-limit";
 import { sanitizeError } from "@/lib/security/errors";
 import { generateCsrfToken, verifyCsrfToken } from "@/lib/security/csrf";
 import nextConfig, { getSupabaseRemotePatterns } from "../../../next.config";
@@ -134,5 +134,28 @@ describe("security helpers", () => {
     expect(() =>
       createAdminRateLimiter({ NODE_ENV: "production" }),
     ).toThrow("Rate limiting requires Upstash Redis in production");
+    expect(() =>
+      createAuthRateLimiter({ NODE_ENV: "production" }),
+    ).toThrow("Rate limiting requires Upstash Redis in production");
+  });
+
+  it("allows the local E2E production build to skip the Redis requirement", () => {
+    // Only the exact string "true" disarms the guard
+    expect(
+      createAdminRateLimiter({ E2E_SESSION_ENABLED: "true", NODE_ENV: "production" }),
+    ).toBeNull();
+    expect(() =>
+      createAdminRateLimiter({ E2E_SESSION_ENABLED: "false", NODE_ENV: "production" }),
+    ).toThrow("Rate limiting requires Upstash Redis in production");
+  });
+
+  it("returns a limiter when Upstash credentials are configured", () => {
+    const env = {
+      NODE_ENV: "production",
+      UPSTASH_REDIS_REST_TOKEN: "test-token",
+      UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+    };
+    expect(createAdminRateLimiter(env)).not.toBeNull();
+    expect(createAuthRateLimiter(env)).not.toBeNull();
   });
 });
