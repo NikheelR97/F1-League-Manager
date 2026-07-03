@@ -49,7 +49,7 @@ export default async function LoginPage({
 
         <section className="border border-f1-border bg-f1-black p-6 shadow-2xl shadow-black/40">
           <div className="mb-6">
-            <p className="text-xs font-bold uppercase text-f1-red">Secure sign in</p>
+            <p className="text-xs font-bold uppercase text-f1-red-text">Secure sign in</p>
             <h2 className="mt-1 text-2xl font-black uppercase text-f1-white">
               Welcome back
             </h2>

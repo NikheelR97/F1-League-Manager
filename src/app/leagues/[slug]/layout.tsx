@@ -12,7 +12,7 @@ export default async function LeagueLayout({
   return (
     <>
       <LeagueSubNav slug={slug} />
-      {children}
+      <main>{children}</main>
     </>
   );
 }
