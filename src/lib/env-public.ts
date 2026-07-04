@@ -11,5 +11,16 @@ export type PublicEnv = z.infer<typeof publicEnvSchema>;
 type EnvSource = Record<string, string | undefined>;
 
 export function readPublicEnv(source: EnvSource = process.env): PublicEnv {
-  return publicEnvSchema.parse(source);
+  // Vercel Preview deployments get a unique URL every deploy, so a fixed
+  // NEXT_PUBLIC_SITE_URL can never match. Fall back to Vercel's own
+  // per-deployment URL (auto-exposed, no config needed) when unset —
+  // explicit config (required for prod's stable custom domain) still wins.
+  const fallbackSiteUrl = source.NEXT_PUBLIC_VERCEL_URL
+    ? `https://${source.NEXT_PUBLIC_VERCEL_URL}`
+    : undefined;
+
+  return publicEnvSchema.parse({
+    ...source,
+    NEXT_PUBLIC_SITE_URL: source.NEXT_PUBLIC_SITE_URL || fallbackSiteUrl,
+  });
 }
