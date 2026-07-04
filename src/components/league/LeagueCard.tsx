@@ -13,7 +13,7 @@ interface LeagueCardProps {
 
 export function LeagueCard({ league, priority = false }: LeagueCardProps) {
   return (
-    <article className="grid min-h-[320px] overflow-hidden border border-f1-border bg-f1-panel md:grid-cols-[1fr_1.2fr]">
+    <article className="grid min-h-48 overflow-hidden border border-f1-border bg-f1-panel md:min-h-[320px] md:grid-cols-[1fr_1.2fr]">
       <div className="relative min-h-48">
         <Image
           alt={league.heroAlt}

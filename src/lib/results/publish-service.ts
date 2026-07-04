@@ -27,7 +27,6 @@ export interface RaceResultEntry {
   result_status: "classified" | "dnf" | "dns" | "dsq" | "ban";
   fastest_lap: boolean;
   manual_points_adjustment: number;
-  penalty_points: number;
   raw_result: string | null;
   notes: string | null;
 }
@@ -81,6 +80,25 @@ export function validatePublishResults(
     return { ok: false, status: 422, error: "Only one driver may have the fastest lap" };
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Per-driver formal penalty total for this session (exported for unit tests)
+// ---------------------------------------------------------------------------
+
+// race_results.penalty_points is derived from this — never client-supplied —
+// so the per-session penalty display can't drift from the actual penalty
+// records (B1). Rescinded decisions don't count.
+export function computeSessionPenaltyTotals(
+  penalties: PenaltyEntry[],
+): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const p of penalties) {
+    if (p.status !== "rescinded") {
+      totals.set(p.driver_id, (totals.get(p.driver_id) ?? 0) + p.penalty_points);
+    }
+  }
+  return totals;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,6 +175,8 @@ export async function publishSession(
   // Build pole-position lookup from qualifying entries
   const poleDriverId = qualifying.find((q) => q.is_pole)?.driver_id ?? null;
 
+  const sessionPenaltyPtsByDriver = computeSessionPenaltyTotals(penalties);
+
   // 2. Calculate server-authoritative points_awarded for each result
   const resultRows = results.map((r) => ({
     race_session_id: sessionId,
@@ -174,7 +194,7 @@ export async function publishSession(
       league_pole_enabled: leagueData.pole_position_enabled,
       points_system: ps,
     }),
-    penalty_points: r.penalty_points,
+    penalty_points: sessionPenaltyPtsByDriver.get(r.driver_id) ?? 0,
     manual_points_adjustment: r.manual_points_adjustment,
     raw_result: r.raw_result,
     notes: r.notes,

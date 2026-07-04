@@ -108,7 +108,7 @@ export default async function LeagueCalendarPage({
             <h2 className="mb-4 text-xl font-bold uppercase text-f1-white">
               Completed Races
             </h2>
-            <div className="overflow-hidden border border-f1-border bg-f1-dark">
+            <div className="hidden overflow-hidden border border-f1-border bg-f1-dark md:block">
               <table className="w-full text-left text-sm text-f1-white">
                 <thead className="border-b border-f1-border bg-black/20 text-xs uppercase text-f1-muted">
                   <tr>
@@ -146,6 +146,34 @@ export default async function LeagueCalendarPage({
                 </tbody>
               </table>
             </div>
+
+            <ul className="space-y-2 md:hidden">
+              {completed.map((session) => {
+                const circuit = session.circuits as unknown as { name: string; country: string } | null;
+                return (
+                  <li key={session.id} className="border border-f1-border bg-f1-dark p-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-bold text-f1-white">
+                          {session.name}
+                        </p>
+                        <p className="text-xs text-f1-muted">
+                          {new Date(session.scheduled_at).toLocaleDateString()} · {circuit ? `${circuit.name}, ${circuit.country}` : "—"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <Link
+                          href={`/leagues/${slug}/results?session=${session.id}`}
+                          className="text-xs font-bold uppercase text-f1-red-text hover:text-white transition-colors"
+                        >
+                          View
+                        </Link>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         )}
       </div>

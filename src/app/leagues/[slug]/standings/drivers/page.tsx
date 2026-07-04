@@ -206,8 +206,8 @@ export default async function DriverStandingsPage({
                     <div className="flex items-center gap-3">
                       <span className="w-6 font-mono text-lg font-bold text-f1-white">{row.position}</span>
                       <PositionDelta current={row.position} previous={row.previous_position} />
-                      <div>
-                        <p className="font-bold text-f1-white">
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-f1-white">
                           {driver ? (
                             <Link href={`/leagues/${league.slug}/drivers/${driver.id}`}>
                               {driver.display_name}

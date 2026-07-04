@@ -17,6 +17,7 @@ function DiffTable({ items, title }: { items: DiffItem[]; title: string }) {
               <th className="py-2 pr-4 text-left">Name</th>
               <th className="py-2 pr-4 text-right">Workbook</th>
               <th className="py-2 pr-4 text-right">App</th>
+              <th className="py-2 pr-4 text-right">Delta</th>
               <th className="py-2 text-center">Match</th>
             </tr>
           </thead>
@@ -28,10 +29,23 @@ function DiffTable({ items, title }: { items: DiffItem[]; title: string }) {
               >
                 <td className="py-2 pr-4 text-f1-white">{item.name}</td>
                 <td className="py-2 pr-4 text-right font-mono text-f1-white">
-                  {item.workbookPoints >= 0 ? item.workbookPoints : "—"}
+                  {item.workbookPoints >= 0 ? (
+                    item.workbookPoints
+                  ) : (
+                    <span className="text-xs text-f1-muted">Not in workbook</span>
+                  )}
                 </td>
                 <td className="py-2 pr-4 text-right font-mono text-f1-white">
-                  {item.appPoints >= 0 ? item.appPoints : "—"}
+                  {item.appPoints >= 0 ? (
+                    item.appPoints
+                  ) : (
+                    <span className="text-xs text-f1-muted">Not in app</span>
+                  )}
+                </td>
+                <td className="py-2 pr-4 text-right font-mono text-f1-white">
+                  {!item.match && item.workbookPoints >= 0 && item.appPoints >= 0
+                    ? `${item.appPoints - item.workbookPoints > 0 ? "+" : ""}${item.appPoints - item.workbookPoints}`
+                    : ""}
                 </td>
                 <td className="py-2 text-center">
                   {item.match ? (

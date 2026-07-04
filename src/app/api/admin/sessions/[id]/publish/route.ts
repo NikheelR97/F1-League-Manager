@@ -21,7 +21,6 @@ const raceResultSchema = z.object({
   result_status: z.enum(["classified", "dnf", "dns", "dsq", "ban"]),
   fastest_lap: z.boolean(),
   manual_points_adjustment: z.number().int().default(0),
-  penalty_points: z.number().int().min(0).default(0),
   raw_result: z.string().nullable().default(null),
   notes: z.string().nullable().default(null),
 });

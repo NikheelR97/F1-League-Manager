@@ -56,10 +56,17 @@ interface RaceResultRow {
   finishing_position: number | null;
   manual_points_adjustment: number;
   notes: string;
-  penalty_points: number;
   raw_result: string;
   result_status: ResultStatus;
   team_id: string;
+}
+
+// A driver's penalty total prior to this session (from driver_penalty_totals),
+// used to project whether this session's formal penalties would cross the
+// league's ban threshold. See B2 — the old banAlert ignored this entirely.
+export interface ExistingPenaltyTotal {
+  driver_id: string;
+  penalty_points: number;
 }
 
 interface PenaltyRow {
@@ -111,7 +118,6 @@ function defaultResultRow(d: SessionDriver): RaceResultRow {
     finishing_position: null,
     manual_points_adjustment: 0,
     notes: "",
-    penalty_points: 0,
     raw_result: "",
     result_status: "classified",
     team_id: d.team_id,
@@ -329,7 +335,6 @@ function ResultsStep({
               <th className="pb-2 pr-3 w-28">Status</th>
               <th className="pb-2 pr-3 w-10 text-center">FL</th>
               <th className="pb-2 pr-3 w-20">Adj pts</th>
-              <th className="pb-2 pr-3 w-20">Pen pts</th>
               <th className="pb-2 w-32">Notes</th>
             </tr>
           </thead>
@@ -417,18 +422,6 @@ function ResultsStep({
                       value={row.manual_points_adjustment}
                       onChange={(e) =>
                         update(row.driver_id, { manual_points_adjustment: Number(e.target.value) || 0 })
-                      }
-                    />
-                  </td>
-                  <td className="py-2 pr-3">
-                    <input
-                      className="w-16 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus:border-f1-red focus:outline-none"
-                      min={0}
-                      placeholder="0"
-                      type="number"
-                      value={row.penalty_points}
-                      onChange={(e) =>
-                        update(row.driver_id, { penalty_points: Math.max(0, Number(e.target.value) || 0) })
                       }
                     />
                   </td>
@@ -600,14 +593,18 @@ function PenaltiesStep({
 
 function ReviewStep({
   drivers,
+  existingPenaltyTotals,
   penalties,
+  penaltyThreshold,
   qualifyingRows,
   results,
   session,
   validation,
 }: {
   drivers: SessionDriver[];
+  existingPenaltyTotals: ExistingPenaltyTotal[];
   penalties: PenaltyRow[];
+  penaltyThreshold: number | null;
   qualifyingRows: QualifyingRow[];
   results: RaceResultRow[];
   session: SessionInfo;
@@ -627,6 +624,10 @@ function ReviewStep({
       penaltyPtsByDriver.set(p.driver_id, (penaltyPtsByDriver.get(p.driver_id) ?? 0) + p.penalty_points);
     }
   }
+
+  const existingPenaltyTotalByDriver = new Map(
+    existingPenaltyTotals.map((t) => [t.driver_id, t.penalty_points]),
+  );
 
   return (
     <div className="space-y-6">
@@ -672,12 +673,15 @@ function ReviewStep({
                   session.pole_position_enabled,
                 );
                 const champTotal = racePts + row.manual_points_adjustment;
-                const banAlert =
-                  row.result_status === "ban" ||
-                  (penaltyPtsByDriver.get(row.driver_id) ?? 0) > 0;
+                const isBan = row.result_status === "ban";
+                const projectedPenaltyTotal =
+                  (existingPenaltyTotalByDriver.get(row.driver_id) ?? 0) +
+                  (penaltyPtsByDriver.get(row.driver_id) ?? 0);
+                const isThresholdAlert =
+                  !isBan && penaltyThreshold != null && projectedPenaltyTotal >= penaltyThreshold;
 
                 return (
-                  <tr key={row.driver_id} className={banAlert ? "bg-destructive/10" : ""}>
+                  <tr key={row.driver_id} className={isBan || isThresholdAlert ? "bg-destructive/10" : ""}>
                     <td className="py-2 pr-4 font-mono text-f1-muted">
                       {row.finishing_position ?? "—"}
                     </td>
@@ -691,7 +695,15 @@ function ReviewStep({
                         <span className="text-f1-white">{driver?.display_name ?? row.driver_id}</span>
                         {row.fastest_lap && <span className="text-xs text-purple-400">FL</span>}
                         {qRow?.is_pole && <span className="text-xs text-yellow-400">PP</span>}
-                        {banAlert && <span className="text-xs text-destructive uppercase">Ban alert</span>}
+                        {isBan && <span className="text-xs text-destructive uppercase">Ban</span>}
+                        {isThresholdAlert && (
+                          <span
+                            className="text-xs text-destructive uppercase"
+                            title="Alert only — admin decision required"
+                          >
+                            Threshold alert
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="py-2 pr-4">
@@ -710,7 +722,9 @@ function ReviewStep({
                         : "—"}
                     </td>
                     <td className="py-2 pr-3 text-right font-mono text-f1-muted">
-                      {row.penalty_points > 0 ? row.penalty_points : "—"}
+                      {(penaltyPtsByDriver.get(row.driver_id) ?? 0) > 0
+                        ? penaltyPtsByDriver.get(row.driver_id)
+                        : "—"}
                     </td>
                     <td className="py-2 text-right font-mono font-bold text-f1-white">{champTotal}</td>
                   </tr>
@@ -761,11 +775,19 @@ function ReviewStep({
 
 interface ResultStepperProps {
   drivers: SessionDriver[];
+  existingPenaltyTotals?: ExistingPenaltyTotal[];
+  penaltyThreshold?: number | null;
   session: SessionInfo;
   teams: LeagueTeam[];
 }
 
-export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
+export function ResultStepper({
+  drivers,
+  existingPenaltyTotals = [],
+  penaltyThreshold = null,
+  session,
+  teams,
+}: ResultStepperProps) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
 
@@ -875,7 +897,6 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
         finishing_position: r.finishing_position,
         manual_points_adjustment: r.manual_points_adjustment,
         notes: r.notes || null,
-        penalty_points: r.penalty_points,
         raw_result: r.raw_result || null,
         result_status: r.result_status,
         team_id: r.team_id,
@@ -986,7 +1007,9 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
         {step === "review" && (
           <ReviewStep
             drivers={drivers}
+            existingPenaltyTotals={existingPenaltyTotals}
             penalties={penaltyRows}
+            penaltyThreshold={penaltyThreshold}
             qualifyingRows={qualifyingRows}
             results={resultRows}
             session={session}

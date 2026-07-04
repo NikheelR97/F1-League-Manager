@@ -187,7 +187,7 @@ export default async function ConstructorStandingsPage({
                     <div className="flex items-center gap-3">
                       <span className="w-6 font-mono text-lg font-bold text-f1-white">{row.position}</span>
                       <PositionDelta current={row.position} previous={row.previous_position} />
-                      <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex items-center gap-2">
                         <span
                           aria-hidden="true"
                           className="h-4 w-1 shrink-0"
@@ -195,7 +195,7 @@ export default async function ConstructorStandingsPage({
                         />
                         {team ? (
                           <Link
-                            className="font-bold text-f1-white"
+                            className="truncate font-bold text-f1-white"
                             href={`/leagues/${league.slug}/teams/${team.id}`}
                           >
                             {team.name}

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { getDriverPenaltyTotals } from "@/lib/penalties/get-driver-penalty-totals";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { computeBiggestClimbers } from "@/lib/public/stats";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -27,7 +28,7 @@ export default async function LeagueStatsPage({
     { data: teamRows },
     { data: completedSessions, count: completedCount },
     { data: lastSession },
-    { data: penaltyRows },
+    driverPenaltyTotals,
   ] = await Promise.all([
     db
       .from("driver_standings")
@@ -59,13 +60,7 @@ export default async function LeagueStatsPage({
       .order("published_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    db
-      .from("penalties")
-      .select("driver_id, penalty_points, status")
-      .eq("league_id", league.id)
-      .eq("season_id", league.season.id)
-      .neq("status", "rescinded")
-      .limit(500),
+    getDriverPenaltyTotals(db, league.id, league.season.id),
   ]);
 
   const drivers = driverRows ?? [];
@@ -126,12 +121,11 @@ export default async function LeagueStatsPage({
     .sort((a, b) => b.count - a.count)
     .slice(0, 5);
 
-  const penaltyPointsByDriver = new Map<string, number>();
-  for (const p of penaltyRows ?? []) {
-    penaltyPointsByDriver.set(p.driver_id, (penaltyPointsByDriver.get(p.driver_id) ?? 0) + p.penalty_points);
-  }
-  const mostPenalized = [...penaltyPointsByDriver.entries()]
-    .map(([driverId, points]) => ({ driverId, points, name: driverNameById.get(driverId) ?? "—" }))
+  // Single source of truth for penalty totals (driver_penalty_totals, includes
+  // carry-over) — matches the league hub and driver profile instead of
+  // re-summing the penalties table, which excludes carry-over (see B12).
+  const mostPenalized = [...driverPenaltyTotals.entries()]
+    .map(([driverId, t]) => ({ driverId, points: t.penaltyPoints, name: driverNameById.get(driverId) ?? "—" }))
     .filter((p) => p.points > 0)
     .sort((a, b) => b.points - a.points)
     .slice(0, 5);

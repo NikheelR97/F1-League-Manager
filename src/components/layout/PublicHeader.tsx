@@ -40,7 +40,7 @@ export function PublicHeader() {
           <nav className="absolute right-0 top-12 z-10 grid w-52 gap-1 border border-f1-border bg-f1-panel p-2">
             {boundedLinks.map((link) => (
               <Link
-                className="px-3 py-2 text-sm font-bold uppercase text-f1-white"
+                className="min-h-11 px-3 py-3 text-sm font-bold uppercase text-f1-white"
                 href={link.href}
                 key={link.href}
               >

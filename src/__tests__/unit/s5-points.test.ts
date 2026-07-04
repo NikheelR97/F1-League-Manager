@@ -7,7 +7,9 @@ import {
 } from "@/lib/results/points";
 import {
   checkPublishPreconditions,
+  computeSessionPenaltyTotals,
   validatePublishResults,
+  type PenaltyEntry,
   type RaceResultEntry,
 } from "@/lib/results/publish-service";
 import {
@@ -394,6 +396,36 @@ describe("buildPenaltyTotals", () => {
   });
 });
 
+describe("computeSessionPenaltyTotals — race_results.penalty_points is server-derived (B1)", () => {
+  const mkPenalty = (
+    driver_id: string,
+    penalty_points: number,
+    status: PenaltyEntry["status"] = "open",
+  ): PenaltyEntry => ({
+    driver_id,
+    penalty_points,
+    reason: "test",
+    status,
+    steward_notes: null,
+    appeal_notes: null,
+  });
+
+  it("sums formal penalties per driver for this session", () => {
+    const totals = computeSessionPenaltyTotals([mkPenalty("d1", 3), mkPenalty("d1", 5)]);
+    expect(totals.get("d1")).toBe(8);
+  });
+
+  it("excludes rescinded penalties", () => {
+    const totals = computeSessionPenaltyTotals([mkPenalty("d1", 10, "rescinded")]);
+    expect(totals.get("d1")).toBeUndefined();
+  });
+
+  it("a driver with no penalties has no entry", () => {
+    const totals = computeSessionPenaltyTotals([mkPenalty("d1", 3)]);
+    expect(totals.get("d2")).toBeUndefined();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // 6. Publish preconditions (tests 9 & 10 from HANDOVER §13)
 // ---------------------------------------------------------------------------
@@ -450,7 +482,6 @@ describe("validatePublishResults — server-side cross-field validation (test 10
     result_status: "classified",
     fastest_lap: false,
     manual_points_adjustment: 0,
-    penalty_points: 0,
     raw_result: null,
     notes: null,
   };
@@ -498,7 +529,6 @@ describe("RaceResultEntry — client-supplied points are rejected (test 11)", ()
       result_status: "classified",
       fastest_lap: true,
       manual_points_adjustment: 0,
-      penalty_points: 0,
       raw_result: null,
       notes: null,
     };

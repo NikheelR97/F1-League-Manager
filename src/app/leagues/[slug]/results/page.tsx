@@ -104,7 +104,7 @@ export default async function ResultsIndexPage({
                         })}
                       </p>
                     )}
-                    <p className="text-xs text-f1-red">View →</p>
+                    <p className="text-xs text-f1-red-text">View →</p>
                   </div>
                 </Link>
               </li>

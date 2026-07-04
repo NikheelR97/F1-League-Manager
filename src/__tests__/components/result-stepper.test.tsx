@@ -47,7 +47,6 @@ const defaultResultRow = {
   finishing_position: null as number | null,
   manual_points_adjustment: 0,
   notes: "",
-  penalty_points: 0,
   raw_result: "",
   result_status: "classified" as const,
   team_id: "team-1",

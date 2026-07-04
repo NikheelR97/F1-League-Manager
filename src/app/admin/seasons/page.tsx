@@ -53,7 +53,7 @@ export default async function SeasonsPage() {
                   </Link>
                   <div className="flex gap-2">
                     {s.is_current && (
-                      <span className="border border-f1-red px-2 py-0.5 text-xs font-bold uppercase text-f1-red">
+                      <span className="border border-f1-red px-2 py-0.5 text-xs font-bold uppercase text-f1-red-text">
                         Current
                       </span>
                     )}
