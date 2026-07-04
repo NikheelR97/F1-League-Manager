@@ -37,7 +37,7 @@ export default async function LeagueCalendarPage({
   const completed = sessions?.filter((s) => s.status === "completed") ?? [];
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-8 border-b border-f1-border pb-4">
         <h1 className="text-3xl font-bold uppercase tracking-tight text-f1-white">
           Calendar
@@ -63,7 +63,7 @@ export default async function LeagueCalendarPage({
                 return (
                   <div key={session.id} className="flex flex-col border border-f1-border bg-f1-dark hover:border-f1-red transition-colors">
                     <div className="border-b border-f1-border p-4 bg-black/20">
-                      <p className="text-xs font-bold uppercase text-f1-red mb-1">
+                      <p className="text-xs font-bold uppercase text-f1-red-text mb-1">
                         Race {session.race_number}
                       </p>
                       <h3 className="text-lg font-bold text-f1-white line-clamp-1">{session.name}</h3>
@@ -135,7 +135,7 @@ export default async function LeagueCalendarPage({
                         <td className="px-4 py-3 text-right">
                           <Link
                             href={`/leagues/${slug}/results?session=${session.id}`}
-                            className="text-xs font-bold uppercase text-f1-red hover:text-white transition-colors"
+                            className="text-xs font-bold uppercase text-f1-red-text hover:text-white transition-colors"
                           >
                             View
                           </Link>
@@ -149,6 +149,6 @@ export default async function LeagueCalendarPage({
           </section>
         )}
       </div>
-    </main>
+    </div>
   );
 }

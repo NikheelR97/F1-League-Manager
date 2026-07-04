@@ -40,7 +40,7 @@ export function SeasonSelector({
         Season
       </label>
       <select
-        className="border border-f1-border bg-f1-dark px-2 py-1 text-xs text-f1-white focus:border-f1-red focus:outline-none"
+        className="min-h-11 border border-f1-border bg-f1-dark px-3 py-2 text-xs text-f1-white focus:border-f1-red focus:outline-none"
         value={currentSeasonId}
         id="season-selector"
         onChange={handleChange}

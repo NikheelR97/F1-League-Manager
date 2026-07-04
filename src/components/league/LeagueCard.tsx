@@ -8,9 +8,10 @@ import type { LeagueSummary } from "@/lib/ui/league-data";
 
 interface LeagueCardProps {
   league: LeagueSummary;
+  priority?: boolean;
 }
 
-export function LeagueCard({ league }: LeagueCardProps) {
+export function LeagueCard({ league, priority = false }: LeagueCardProps) {
   return (
     <article className="grid min-h-[320px] overflow-hidden border border-f1-border bg-f1-panel md:grid-cols-[1fr_1.2fr]">
       <div className="relative min-h-48">
@@ -18,7 +19,7 @@ export function LeagueCard({ league }: LeagueCardProps) {
           alt={league.heroAlt}
           className="object-cover"
           fill
-          priority={league.slug === "informal"}
+          priority={priority}
           sizes="(min-width: 768px) 45vw, 100vw"
           src={league.heroImage}
         />
@@ -30,10 +31,20 @@ export function LeagueCard({ league }: LeagueCardProps) {
             <RaceFormatTag>{league.formatLabel}</RaceFormatTag>
           </div>
           <h2 className="mt-5 text-3xl font-black uppercase">{league.name}</h2>
-          <p className="mt-3 text-sm leading-6 text-f1-silver">
-            Next operational focus: {league.nextRace}. Public standings and
-            results unlock as admins publish race data.
-          </p>
+          <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+            <div>
+              <dt className="text-xs font-bold uppercase text-f1-muted">Next race</dt>
+              <dd className="mt-0.5 text-f1-silver">{league.nextRace}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold uppercase text-f1-muted">Drivers&#39; leader</dt>
+              <dd className="mt-0.5 text-f1-silver">{league.leader}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold uppercase text-f1-muted">Constructors&#39; leader</dt>
+              <dd className="mt-0.5 text-f1-silver">{league.constructorLeader}</dd>
+            </div>
+          </dl>
         </div>
         <F1Button href={league.href} icon={ArrowRight}>
           Open League

@@ -6,6 +6,11 @@
 
 :root {
   --f1-red: #e8002d;
+  /* Lighter red for body text on dark backgrounds — --f1-red itself is
+     4.21:1 on --f1-black and 3.86:1 on --f1-dark, both below WCAG AA's
+     4.5:1 for normal text. This token clears 5.16:1 / 4.72:1 respectively.
+     Use for red TEXT only; buttons/icons/borders should keep --f1-red. */
+  --f1-red-text: #ee3d5f;
   --f1-white: #ffffff;
   --f1-black: #0a0a0a;
   --f1-dark: #15151e;
@@ -63,6 +68,7 @@
   --color-f1-muted: var(--f1-muted);
   --color-f1-panel: var(--f1-dark);
   --color-f1-red: var(--f1-red);
+  --color-f1-red-text: var(--f1-red-text);
   --color-f1-silver: var(--f1-silver);
   --color-f1-white: var(--f1-white);
   --color-team-sauber: var(--team-sauber);

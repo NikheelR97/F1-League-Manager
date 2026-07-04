@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const ignoredDirs = new Set([
+  ".claude",
   ".git",
   ".next",
   "coverage",

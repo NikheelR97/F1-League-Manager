@@ -1,7 +1,9 @@
+import { revalidateTag } from "next/cache";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
+import { cacheTag } from "@/lib/cache/tags";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import { validateWheelConfirmation } from "@/lib/wheel/wheel-service";
 
@@ -135,6 +137,10 @@ export async function POST(
         metadata: { league_id: leagueId, name: body.name, session_code: body.session_code },
       });
 
+      // The league hub caches next-race and wheel data under these tags
+      revalidateTag(cacheTag.results(leagueId), "default");
+      revalidateTag(cacheTag.wheel(leagueId), "default");
+
       return Response.json({ session }, { status: 201 });
     }
 
@@ -168,6 +174,9 @@ export async function POST(
       entityType: "race_session",
       metadata: { league_id: leagueId, name: body.name, session_code: body.session_code },
     });
+
+    // The league hub caches next-race data under this tag
+    revalidateTag(cacheTag.results(leagueId), "default");
 
     return Response.json({ session: data }, { status: 201 });
   });

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { FormError } from "@/components/ui/FormError";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
@@ -90,9 +91,7 @@ export function SeasonForm() {
         />
       </div>
 
-      {errors.root && (
-        <p className="text-sm text-destructive">{errors.root.message}</p>
-      )}
+      <FormError message={errors.root?.message} />
 
       <button
         className="w-full border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"

@@ -10,6 +10,7 @@ import {
 
 interface RateLimitEnv {
   [key: string]: string | undefined;
+  E2E_SESSION_ENABLED?: string;
   NODE_ENV?: string;
   UPSTASH_REDIS_REST_TOKEN?: string;
   UPSTASH_REDIS_REST_URL?: string;
@@ -21,7 +22,11 @@ function isProduction(env: RateLimitEnv): boolean {
 
 function createRedis(env: RateLimitEnv): Redis | null {
   if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
-    if (isProduction(env)) {
+    // E2E runs a production build (`next start`) locally without Upstash
+    // configured. E2E_SESSION_ENABLED already marks that controlled case
+    // for /api/e2e/session — reuse it here instead of failing every
+    // admin mutation in the local E2E suite.
+    if (isProduction(env) && env.E2E_SESSION_ENABLED !== "true") {
       throw new Error("Rate limiting requires Upstash Redis in production");
     }
 

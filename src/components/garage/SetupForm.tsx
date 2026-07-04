@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { FormError } from "@/components/ui/FormError";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MAX_SETUP_META_LENGTH, MAX_SETUP_NAME_LENGTH } from "@/lib/constants";
@@ -121,11 +122,7 @@ export function SetupForm({ circuits, drivers, leagues, setupId, defaultValues }
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
-      {serverError && (
-        <p className="border border-f1-red bg-black/20 px-4 py-2 text-sm text-f1-red">
-          {serverError}
-        </p>
-      )}
+      <FormError message={serverError} />
 
       {/* Driver — only shown on create */}
       {!setupId && (

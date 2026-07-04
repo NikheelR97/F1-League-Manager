@@ -3,7 +3,6 @@ import { render, screen } from "@testing-library/react";
 import { LeagueHub } from "@/components/league/LeagueHub";
 import { RaceCountdown } from "@/components/league/RaceCountdown";
 import type { PublicLeague } from "@/lib/public/resolve-league";
-import { getLeagueSummaries } from "@/lib/ui/league-data";
 
 const mockLeague: PublicLeague = {
   id: "league-1",
@@ -162,12 +161,39 @@ describe("LeagueHub", () => {
     }
   });
 
-  it("uses local project images for league hero assets", () => {
-    const summaries = getLeagueSummaries();
+  it("falls back to a local project image when no hero image is uploaded", () => {
+    render(<LeagueHub {...baseProps} />);
+    expect(screen.getByAltText("Standard League hero").getAttribute("src")).toContain(
+      "images%2Fleagues%2Frace-control-hero.png",
+    );
+  });
 
-    expect.assertions(summaries.length);
-    for (const league of summaries) {
-      expect(league.heroImage).toMatch(/^\/images\/leagues\//u);
-    }
+  it("renders the wheel section for a wheel-format league", () => {
+    render(
+      <LeagueHub
+        {...baseProps}
+        latestWheelSpin={{
+          id: "spin-1",
+          confirmed_at: "2026-05-07T18:00:00.000Z",
+          circuits: { name: "Suzuka", country: "Japan" },
+        }}
+        league={{ ...mockLeague, format: "standard" }}
+        wheelPoolRemaining={4}
+      />,
+    );
+    expect(screen.getByText("Wheel")).toBeInTheDocument();
+    expect(screen.getByText("Suzuka")).toBeInTheDocument();
+    expect(screen.getByText(/4 circuits remaining in pool/i)).toBeInTheDocument();
+  });
+
+  it("shows 'Awaiting spin' when a wheel league has no confirmed spin yet", () => {
+    render(<LeagueHub {...baseProps} league={{ ...mockLeague, format: "standard" }} />);
+    expect(screen.getByText("Wheel")).toBeInTheDocument();
+    expect(screen.getByText("Awaiting spin")).toBeInTheDocument();
+  });
+
+  it("omits the wheel section for a non-wheel-format league", () => {
+    render(<LeagueHub {...baseProps} />);
+    expect(screen.queryByText("Wheel")).not.toBeInTheDocument();
   });
 });

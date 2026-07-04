@@ -1,6 +1,6 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** S12 production release prep is in progress on `feature/s12-docs-deploy-gate`; `/login` auth is merged to `dev`.
+**Status:** S12 staging prep is in progress on `feature/s12-staging-prep`; `/login` auth and proxy convention cleanup are merged to `dev`.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
 
@@ -8,15 +8,15 @@
 
 ## Current Handover Notes
 
-Last updated: May 14, 2026.
+Last updated: May 15, 2026.
 
 Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | `feature/s12-docs-deploy-gate` — S12 docs refresh and deploy gate evidence. |
-| Latest merged PR | PR #18, `feat(s12): add login and sign-out flow` on `dev` |
-| Merge commit | `77dfaf5` |
+| Active development branch | `feature/s12-staging-prep` — staging smoke readiness and release prep evidence. |
+| Latest merged PR | PR #20, `fix(s12): migrate auth middleware to proxy` on `dev` |
+| Merge commit | `c9b9d7e` |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
 | Latest migration applied locally | `20260513000000_s9_workbook_import.sql` (no new migration in S10 or S11) |
 
@@ -110,13 +110,23 @@ S12 login/auth status:
 - Browser CSP allows only the configured Supabase origin for auth requests.
 - PR #18 CI passed before merge; local sprint gate passed with 346 tests and 19 Playwright tests.
 - S12 docs/deploy-gate pass: npm run deploy:check passed locally with 347 tests, coverage, build, 19 Playwright tests, high audit, and secret scan.
+- PR #20 moved the auth redirect entrypoint from `src/middleware.ts` to `src/proxy.ts`; CI passed and local build no longer reports the deprecated middleware file convention warning.
+- May 15 staging-prep baseline: `npm run deploy:check` passed locally after starting Docker/Supabase and running `npm run seed:e2e`; 347 tests, coverage, build, 19 Playwright tests, high audit, and secret scan.
 ```
 
-Known S12 deploy-gate warning:
+Resolved S12 deploy-gate warning:
 
 ```text
-Next.js reports that the middleware file convention is deprecated and should move to proxy.
-This is a warning only; deploy:check passes. Track before staging release if the warning becomes a release concern.
+Next.js middleware file convention warning was resolved in PR #20 by using the current proxy convention.
+```
+
+S12 staging prep status:
+
+```text
+- Vercel project `f1-league-manager` exists under `nikheel-rajmans-projects` and is connected to the GitHub repo.
+- `vercel env ls` currently reports no environment variables for the project.
+- Do not deploy staging until Vercel has non-production Supabase values, `NEXT_PUBLIC_SITE_URL`, `CSRF_SECRET`, and the configured optional service values.
+- Supabase CLI is not logged in locally, so non-production project migration state has not been inspected from this machine yet.
 ```
 
 ---
@@ -707,7 +717,8 @@ Required security controls:
 | Admin authorization | Check `profiles.role` on every admin request. |
 | Racer authorization | Owner checks in RLS and server service. |
 | CSRF | Required for all state-changing routes. |
-| Rate limiting | Required for auth and admin APIs. |
+| Rate limiting (admin) | Required for admin APIs; enforced via `createAdminRateLimiter` (`src/lib/admin/api-guard.ts`, Upstash-backed, fails closed in production). |
+| Rate limiting (auth) | Sign-in goes browser → Supabase directly (`LoginForm.tsx` calls `supabase.auth.signInWithPassword()`); there is no app-side auth API route to rate limit. Accepted control: Supabase Auth's built-in per-IP rate limits — verify they are enabled/appropriate in the Supabase dashboard for staging and production as a deploy step. `createAuthRateLimiter` (`src/lib/security/rate-limit.ts`) remains available if a server-side auth endpoint is ever added. |
 | Error handling | Generic in production, details only in Sentry. |
 | Secret scan | Run in CI/deploy checks. |
 | Dependency audit | No high/critical vulnerabilities before deploy. |

@@ -1,27 +1,17 @@
-import { getCountdownParts } from "@/lib/ui/countdown";
+import { RaceCountdownClient } from "@/components/league/RaceCountdownClient";
 
 interface RaceCountdownProps {
   now?: Date;
   targetIso: string | null;
 }
 
-export function RaceCountdown({
-  now = new Date(),
-  targetIso,
-}: RaceCountdownProps) {
-  const parts = getCountdownParts(now, targetIso);
-
-  if (parts.status === "missing") {
-    return <p className="font-mono text-sm text-f1-muted">Awaiting schedule</p>;
-  }
-
-  if (parts.status === "ready") {
-    return <p className="font-mono text-sm text-team-sauber">Race ready</p>;
-  }
-
+// Resolves "now" once on the server and hands it to the client component as
+// the initial state, so the first client render matches SSR output exactly.
+// The client component owns re-rendering every 60s from then on (see
+// RaceCountdownClient) — this file stays a plain (server-renderable) function
+// so callers keep using <RaceCountdown /> unchanged.
+export function RaceCountdown({ now = new Date(), targetIso }: RaceCountdownProps) {
   return (
-    <p className="font-mono text-sm text-f1-silver">
-      {parts.days}d {parts.hours}h {parts.minutes}m
-    </p>
+    <RaceCountdownClient initialNowIso={now.toISOString()} targetIso={targetIso} />
   );
 }

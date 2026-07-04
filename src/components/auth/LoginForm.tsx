@@ -103,7 +103,7 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           value={email}
         />
         {errors.email ? (
-          <p className="text-xs text-f1-red">{errors.email}</p>
+          <p className="text-xs text-f1-red-text">{errors.email}</p>
         ) : null}
       </div>
 
@@ -122,7 +122,7 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           value={password}
         />
         {errors.password ? (
-          <p className="text-xs text-f1-red">{errors.password}</p>
+          <p className="text-xs text-f1-red-text">{errors.password}</p>
         ) : null}
       </div>
 
@@ -139,7 +139,7 @@ export function LoginForm({ nextPath }: LoginFormProps) {
         Need access? Ask your league admin to create your account.
       </p>
       <p className="text-center text-xs">
-        <Link className="font-bold uppercase text-f1-red hover:text-white" href="/">
+        <Link className="font-bold uppercase text-f1-red-text hover:text-white" href="/">
           Back to leagues
         </Link>
       </p>

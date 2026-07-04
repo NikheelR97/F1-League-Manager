@@ -936,7 +936,7 @@ Never put production Supabase keys in the dev or staging Vercel environments.
 
 Done when:
 
-- [ ] Vercel project exists before deployment sprint.
+- [x] Vercel project exists before deployment sprint.
 - [ ] Branch-to-environment mapping is documented in Vercel.
 - [ ] Env vars use the matching Supabase project for each branch.
 
@@ -1162,7 +1162,7 @@ Checked means done. Unchecked means outstanding. Outstanding items need a reason
 - [x] GitHub PR review is enforced on `staging` and `prod`; `dev` review is recommended but not enforced.
 - [x] Supabase access works.
 - [x] Upstash access works.
-- [ ] Vercel access works or is scheduled.
+- [x] Vercel access works.
 - [ ] Sentry access works or is scheduled.
 
 ### Local Machine

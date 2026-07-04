@@ -1,3 +1,4 @@
+import { Dices } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -46,6 +47,12 @@ interface PenaltyAlert {
   drivers: unknown;
 }
 
+interface LatestWheelSpin {
+  id: string;
+  confirmed_at: string | null;
+  circuits: unknown;
+}
+
 interface LeagueHubProps {
   league: PublicLeague;
   nextRace: NextRace | null;
@@ -53,6 +60,8 @@ interface LeagueHubProps {
   topDrivers: TopDriver[];
   topConstructors: TopConstructor[];
   penaltyAlerts: PenaltyAlert[];
+  latestWheelSpin?: LatestWheelSpin | null;
+  wheelPoolRemaining?: number | null;
 }
 
 function castCircuit(v: unknown): { name: string; country?: string } | null {
@@ -90,6 +99,8 @@ export function LeagueHub({
   topDrivers,
   topConstructors,
   penaltyAlerts,
+  latestWheelSpin = null,
+  wheelPoolRemaining = null,
 }: LeagueHubProps) {
   const heroImage =
     getStoragePublicUrl(LEAGUE_ASSETS_BUCKET, league.hero_image_path) ??
@@ -97,6 +108,8 @@ export function LeagueHub({
 
   const nextRaceCircuit = castCircuit(nextRace?.circuits);
   const latestCircuit = castCircuit(latestSession?.circuits);
+  const isWheelLeague = league.format === "standard";
+  const wheelCircuit = castCircuit(latestWheelSpin?.circuits);
 
   const leaderPoints = topDrivers[0]?.total_points ?? 0;
   const constructorLeaderPoints = topConstructors[0]?.total_points ?? 0;
@@ -141,6 +154,41 @@ export function LeagueHub({
               </p>
               {nextRaceCircuit?.country && (
                 <p className="text-xs text-f1-muted">{nextRaceCircuit.country}</p>
+              )}
+            </div>
+          </section>
+        )}
+
+        {isWheelLeague && (
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-xs font-bold uppercase text-f1-muted">
+                <Dices className="text-f1-red" size={14} />
+                Wheel
+              </h2>
+              <Link
+                className="text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
+                href={`/leagues/${league.slug}/wheel`}
+              >
+                Wheel history -&gt;
+              </Link>
+            </div>
+            <div className="border border-f1-border bg-f1-dark p-4">
+              {wheelCircuit ? (
+                <>
+                  <p className="mb-1 text-xs font-bold uppercase text-f1-muted">Next circuit</p>
+                  <p className="font-bold text-f1-white">{wheelCircuit.name}</p>
+                  {wheelCircuit.country && (
+                    <p className="text-xs text-f1-muted">{wheelCircuit.country}</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-f1-muted">Awaiting spin</p>
+              )}
+              {wheelPoolRemaining !== null && (
+                <p className="mt-3 border-t border-f1-border pt-3 text-xs text-f1-muted">
+                  {wheelPoolRemaining} circuit{wheelPoolRemaining === 1 ? "" : "s"} remaining in pool
+                </p>
               )}
             </div>
           </section>

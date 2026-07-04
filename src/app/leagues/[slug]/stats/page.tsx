@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
+import { computeBiggestClimbers } from "@/lib/public/stats";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +21,13 @@ export default async function LeagueStatsPage({
 
   const db = createSupabaseServiceRoleClient();
 
+  // Step 1: parallel fetches that don't depend on each other
   const [
     { data: driverRows },
     { data: teamRows },
-    { count: completedCount },
+    { data: completedSessions, count: completedCount },
     { data: lastSession },
+    { data: penaltyRows },
   ] = await Promise.all([
     db
       .from("driver_standings")
@@ -42,10 +45,11 @@ export default async function LeagueStatsPage({
       .limit(15),
     db
       .from("race_sessions")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "exact" })
       .eq("league_id", league.id)
       .eq("season_id", league.season.id)
-      .eq("status", "completed"),
+      .eq("status", "completed")
+      .limit(50),
     db
       .from("race_sessions")
       .select("name, published_at")
@@ -55,11 +59,36 @@ export default async function LeagueStatsPage({
       .order("published_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    db
+      .from("penalties")
+      .select("driver_id, penalty_points, status")
+      .eq("league_id", league.id)
+      .eq("season_id", league.season.id)
+      .neq("status", "rescinded")
+      .limit(500),
   ]);
 
   const drivers = driverRows ?? [];
   const teams = teamRows ?? [];
   const racesCompleted = completedCount ?? 0;
+
+  // Step 2: qualifying/race results scoped to this league's completed sessions
+  const sessionIds = (completedSessions ?? []).map((s) => s.id);
+  const [{ data: qualiRows }, { data: raceRows }] =
+    sessionIds.length > 0
+      ? await Promise.all([
+          db
+            .from("qualifying_results")
+            .select("race_session_id, driver_id, qualifying_position, is_pole")
+            .in("race_session_id", sessionIds)
+            .limit(1000),
+          db
+            .from("race_results")
+            .select("race_session_id, driver_id, finishing_position, result_status")
+            .in("race_session_id", sessionIds)
+            .limit(1000),
+        ])
+      : [{ data: [] }, { data: [] }];
 
   type DriverRow = { id: string; display_name: string };
   type TeamRow = { id: string; name: string; color_hex: string };
@@ -71,6 +100,46 @@ export default async function LeagueStatsPage({
     .filter((d) => d.fastest_laps > 0)
     .sort((a, b) => b.fastest_laps - a.fastest_laps)
     .slice(0, 5);
+
+  // Name lookup reused for stats derived from unjoined driver_id columns
+  const driverNameById = new Map<string, string>();
+  for (const row of drivers) {
+    const driver = row.drivers as unknown as DriverRow | null;
+    if (driver) driverNameById.set(driver.id, driver.display_name);
+  }
+
+  const polesByDriver = new Map<string, number>();
+  for (const q of qualiRows ?? []) {
+    if (q.is_pole) polesByDriver.set(q.driver_id, (polesByDriver.get(q.driver_id) ?? 0) + 1);
+  }
+  const mostPoles = [...polesByDriver.entries()]
+    .map(([driverId, count]) => ({ driverId, count, name: driverNameById.get(driverId) ?? "—" }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const dnfsByDriver = new Map<string, number>();
+  for (const r of raceRows ?? []) {
+    if (r.result_status === "dnf") dnfsByDriver.set(r.driver_id, (dnfsByDriver.get(r.driver_id) ?? 0) + 1);
+  }
+  const mostDnfs = [...dnfsByDriver.entries()]
+    .map(([driverId, count]) => ({ driverId, count, name: driverNameById.get(driverId) ?? "—" }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const penaltyPointsByDriver = new Map<string, number>();
+  for (const p of penaltyRows ?? []) {
+    penaltyPointsByDriver.set(p.driver_id, (penaltyPointsByDriver.get(p.driver_id) ?? 0) + p.penalty_points);
+  }
+  const mostPenalized = [...penaltyPointsByDriver.entries()]
+    .map(([driverId, points]) => ({ driverId, points, name: driverNameById.get(driverId) ?? "—" }))
+    .filter((p) => p.points > 0)
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 5);
+
+  const biggestClimbers = computeBiggestClimbers(raceRows ?? [], qualiRows ?? []).map((c) => ({
+    ...c,
+    name: driverNameById.get(c.driverId) ?? "—",
+  }));
 
   const hasAnyData = drivers.length > 0;
 
@@ -180,6 +249,99 @@ export default async function LeagueStatsPage({
               )}
             </section>
           </div>
+
+          {/* Additional driver stat tables */}
+          <div className="grid gap-6 md:grid-cols-3">
+            {/* Most poles */}
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase text-f1-muted">Most Poles</h2>
+              {mostPoles.length === 0 ? (
+                <p className="text-xs text-f1-muted">No poles recorded yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {mostPoles.map((row, i) => (
+                    <li
+                      key={row.driverId}
+                      className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 font-mono text-xs text-f1-muted">{i + 1}</span>
+                        <span className="text-f1-white">{row.name}</span>
+                      </div>
+                      <span className="font-mono font-bold text-f1-white">{row.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {/* Most DNFs */}
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase text-f1-muted">Most DNFs</h2>
+              {mostDnfs.length === 0 ? (
+                <p className="text-xs text-f1-muted">No DNFs recorded yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {mostDnfs.map((row, i) => (
+                    <li
+                      key={row.driverId}
+                      className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 font-mono text-xs text-f1-muted">{i + 1}</span>
+                        <span className="text-f1-white">{row.name}</span>
+                      </div>
+                      <span className="font-mono font-bold text-f1-red">{row.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {/* Penalty points leaders */}
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase text-f1-muted">Penalty Points</h2>
+              {mostPenalized.length === 0 ? (
+                <p className="text-xs text-f1-muted">No penalties issued yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {mostPenalized.map((row, i) => (
+                    <li
+                      key={row.driverId}
+                      className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 font-mono text-xs text-f1-muted">{i + 1}</span>
+                        <span className="text-f1-white">{row.name}</span>
+                      </div>
+                      <span className="font-mono font-bold text-f1-red">{row.points}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+
+          {/* Biggest single-race climbs (grid vs finish, from qualifying results) */}
+          {biggestClimbers.length > 0 && (
+            <section className="space-y-2">
+              <h2 className="text-xs font-bold uppercase text-f1-muted">Biggest Single-Race Climbs</h2>
+              <ul className="grid gap-1 sm:grid-cols-2">
+                {biggestClimbers.map((row, i) => (
+                  <li
+                    key={row.driverId}
+                    className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 font-mono text-xs text-f1-muted">{i + 1}</span>
+                      <span className="text-f1-white">{row.name}</span>
+                    </div>
+                    <span className="font-mono font-bold text-team-sauber">+{row.gained}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* Constructor performance (only if enabled) */}
           {league.constructor_championship_enabled && teams.length > 0 && (

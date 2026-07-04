@@ -1,7 +1,9 @@
+import { revalidateTag } from "next/cache";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
+import { cacheTag } from "@/lib/cache/tags";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 const SESSION_CODE_RE = /^[A-Z0-9]{6}$/;
@@ -88,6 +90,9 @@ export async function PATCH(
       metadata: { league_id: existing.league_id, changes: body },
     });
 
+    // The league hub caches next-race data under this tag
+    revalidateTag(cacheTag.results(existing.league_id), "default");
+
     return Response.json({ session: data });
   });
 }
@@ -127,6 +132,9 @@ export async function DELETE(
       entityType: "race_session",
       metadata: { league_id: existing.league_id, name: existing.name },
     });
+
+    // The league hub caches next-race data under this tag
+    revalidateTag(cacheTag.results(existing.league_id), "default");
 
     return new Response(null, { status: 204 });
   });

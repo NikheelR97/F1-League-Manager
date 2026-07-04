@@ -1,5 +1,6 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -7,14 +8,60 @@ import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { SeasonSelector } from "@/components/league/SeasonSelector";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
+import { cacheTag } from "@/lib/cache/tags";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
-import { resolveLeagueSeasons } from "@/lib/public/resolve-league-seasons";
+import { resolveLeagueSeasons, type LeagueSeason } from "@/lib/public/resolve-league-seasons";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
 
+// Fallback revalidation window: self-heals standings even if a mutation
+// route misses the tag.
+//
+// ponytail note: revalidateTag() here is stale-while-revalidate, not a sync
+// purge — the first request right after a publish can render one stale read
+// before a background refetch catches up (~1-2s in manual testing). See the
+// longer note on the league hub page (src/app/leagues/[slug]/page.tsx) for
+// why, and why there's no framework API to make it synchronous here.
+const STANDINGS_REVALIDATE_SECONDS = 300;
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Data-fetching only — no cookies/headers/auth touched here, so this is safe
+// to wrap in unstable_cache. The service-role client is created inside so it
+// participates in the cached call rather than being reused across cache keys.
+async function getConstructorStandingsData(
+  leagueId: string,
+  seasonId: string,
+  fallbackSeason: LeagueSeason,
+) {
+  const db = createSupabaseServiceRoleClient();
+
+  const [{ data: rows }, { data: lastSession }, seasons] = await Promise.all([
+    db
+      .from("team_standings")
+      .select(
+        "position, previous_position, total_points, wins, podiums, updated_at, teams(id, name, color_hex)",
+      )
+      .eq("league_id", leagueId)
+      .eq("season_id", seasonId)
+      .order("position")
+      .limit(15),
+    db
+      .from("race_sessions")
+      .select("name, published_at")
+      .eq("league_id", leagueId)
+      .eq("season_id", seasonId)
+      .eq("status", "completed")
+      .order("published_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    resolveLeagueSeasons(leagueId, { fallbackSeason }),
+  ]);
+
+  return { rows: rows ?? [], lastSession: lastSession ?? null, seasons };
+}
 
 export default async function ConstructorStandingsPage({
   params,
@@ -34,31 +81,22 @@ export default async function ConstructorStandingsPage({
   const seasonId =
     rawSeason && UUID_RE.test(rawSeason) ? rawSeason : league.season.id;
 
-  const db = createSupabaseServiceRoleClient();
+  const getCachedConstructorStandings = unstable_cache(
+    getConstructorStandingsData,
+    ["constructor-standings"],
+    {
+      revalidate: STANDINGS_REVALIDATE_SECONDS,
+      tags: [cacheTag.standings(league.id)],
+    },
+  );
 
-  const [{ data: rows }, { data: lastSession }, seasons] = await Promise.all([
-    db
-      .from("team_standings")
-      .select(
-        "position, previous_position, total_points, wins, podiums, updated_at, teams(id, name, color_hex)",
-      )
-      .eq("league_id", league.id)
-      .eq("season_id", seasonId)
-      .order("position")
-      .limit(15),
-    db
-      .from("race_sessions")
-      .select("name, published_at")
-      .eq("league_id", league.id)
-      .eq("season_id", seasonId)
-      .eq("status", "completed")
-      .order("published_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    resolveLeagueSeasons(league.id, { fallbackSeason: league.season }),
-  ]);
+  const { rows, lastSession, seasons } = await getCachedConstructorStandings(
+    league.id,
+    seasonId,
+    league.season,
+  );
 
-  const standings = rows ?? [];
+  const standings = rows;
   const leaderPoints = standings[0]?.total_points ?? 0;
   const updatedAt = standings[0]?.updated_at ?? null;
 
