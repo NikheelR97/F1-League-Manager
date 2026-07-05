@@ -4,6 +4,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { MAX_RESERVE_ASSIGNMENTS_LIST } from "@/lib/constants";
+import { formatDate } from "@/lib/format-date";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 // B7 — this page used to be a dead-end stub telling admins to go elsewhere.
@@ -79,7 +80,7 @@ export default async function ReservesPage() {
               return (
                 <tr key={a.id}>
                   <td className="p-3 font-mono text-f1-muted">
-                    {session ? new Date(session.scheduled_at).toLocaleDateString() : "—"}
+                    {session ? formatDate(session.scheduled_at) : "—"}
                   </td>
                   <td className="p-3 text-f1-white">
                     {session?.name ?? "Unknown session"}
