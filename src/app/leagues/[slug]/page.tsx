@@ -108,11 +108,16 @@ async function getLeagueHubData(leagueId: string, seasonId: string, isWheelLeagu
 
 export default async function LeaguePage({ params }: LeaguePageProps) {
   const { slug } = await params;
-  // ponytail: resolvePublicLeague itself stays uncached. Its cache key would
-  // have to be the slug, but the only tag we have is league(id) — we don't
-  // know the id until after this lookup, and no mutation route revalidates a
-  // slug-keyed tag. Not worth the chicken-and-egg complexity for one query;
-  // the downstream cached data below is where the traffic savings matter.
+  // ponytail: resolvePublicLeague itself stays uncached, by choice not by
+  // blocker. Checked: `leagues.slug` is `unique` (20260507161000_s1_core_schema.sql),
+  // so this is a single indexed lookup, and it runs exactly once per request
+  // (no shared layout under leagues/[slug], no generateMetadata reusing it) —
+  // there's nothing to dedupe and nothing measurably slow to cache. Slugs are
+  // also immutable post-creation (no rename route exists) and leagues are
+  // never deleted, so a coarse slug->id cache would even be *safe* to add —
+  // it just isn't worth wiring revalidation into the create/status routes to
+  // save a sub-millisecond unique-index hit. The downstream cached data below
+  // (standings/results/wheel joins) is where the real traffic savings are.
   const league = await resolvePublicLeague(slug);
   if (!league) notFound();
 

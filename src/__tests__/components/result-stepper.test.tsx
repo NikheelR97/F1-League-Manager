@@ -486,7 +486,7 @@ describe("ResultStepper team-as-of-date note (M7)", () => {
   });
 });
 
-describe("ResultStepper banned-last-round badge (B2/B3)", () => {
+describe("ResultStepper banned-driver badge (B3)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
@@ -496,30 +496,56 @@ describe("ResultStepper banned-last-round badge (B2/B3)", () => {
     );
   });
 
-  it("flags a banned driver in both Qualifying and Results steps", async () => {
+  it("flags a banned driver, naming the session, in both Qualifying and Results steps", async () => {
     const user = userEvent.setup();
     const drivers = [makeDriver("driver-1", "Driver One"), makeDriver("driver-2", "Driver Two")];
     render(
       <ResultStepper
-        bannedLastRoundDriverIds={["driver-1"]}
+        bannedDrivers={[{ driver_id: "driver-1", session_name: "Round 3" }]}
         drivers={drivers}
         session={session}
         teams={teams}
       />,
     );
 
-    expect(screen.getByText("Banned last round")).toBeInTheDocument();
-    expect(screen.queryByText(/Driver Two.*Banned last round/)).not.toBeInTheDocument();
+    expect(screen.getByText("Banned in Round 3")).toBeInTheDocument();
+    expect(screen.queryByText(/Driver Two.*Banned in Round 3/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
-    expect(screen.getByText("Banned last round")).toBeInTheDocument();
+    expect(screen.getByText("Banned in Round 3")).toBeInTheDocument();
   });
 
-  it("shows no badge when no driver was banned last round", () => {
+  it("shows no badge when no driver has a recorded ban", () => {
     const drivers = [makeDriver("driver-1", "Driver One")];
     render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
 
-    expect(screen.queryByText("Banned last round")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Banned in/)).not.toBeInTheDocument();
+  });
+});
+
+describe("ResultStepper departed-driver row (M9 correction mode)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
+    );
+  });
+
+  it("shows a 'Left roster' chip for a driver unioned in from published data", async () => {
+    const user = userEvent.setup();
+    const drivers = [
+      makeDriver("driver-1", "Driver One"),
+      makeDriver("driver-2", "Departed Driver", undefined, { left_roster: true }),
+    ];
+    render(
+      <ResultStepper correctionMode drivers={drivers} session={session} teams={teams} />,
+    );
+
+    expect(screen.getByText("Left roster")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    expect(screen.getByText("Left roster")).toBeInTheDocument();
   });
 });
 
@@ -650,7 +676,7 @@ describe("ResultStepper season projection (M3)", () => {
     const drivers = [makeDriver("driver-1", "Driver One")];
     render(
       <ResultStepper
-        driverStandings={[{ driver_id: "driver-1", total_points: 100 }]}
+        driverStandings={[{ driver_id: "driver-1", total_points: 100, wins: 0 }]}
         drivers={drivers}
         session={session}
         teams={teams}
@@ -673,7 +699,7 @@ describe("ResultStepper season projection (M3)", () => {
     render(
       <ResultStepper
         correctionMode
-        driverStandings={[{ driver_id: "driver-1", total_points: 100 }]}
+        driverStandings={[{ driver_id: "driver-1", total_points: 100, wins: 1 }]}
         drivers={drivers}
         initialResultRows={[{ ...defaultResultRow, driver_id: "driver-1", finishing_position: 1 }]}
         previousSessionPoints={[{ driver_id: "driver-1", points: 25 }]}
@@ -689,6 +715,64 @@ describe("ResultStepper season projection (M3)", () => {
     // 100 current already includes this session's 25 pts; re-entering the
     // same P1 result must project back to 100, not 125.
     expect(screen.getAllByText("100")).toHaveLength(2);
+  });
+
+  it("tie-breaks the projected top-3 by wins, marking equal points+wins with '='", async () => {
+    const user = userEvent.setup();
+    const drivers = [
+      makeDriver("driver-1", "Driver One"),
+      makeDriver("driver-2", "Driver Two"),
+    ];
+    render(
+      <ResultStepper
+        driverStandings={[
+          // Both start at 75 points; driver-2 has more wins, so a projected
+          // points tie should resolve driver-2 ahead without relying on
+          // insertion order.
+          { driver_id: "driver-1", total_points: 75, wins: 0 },
+          { driver_id: "driver-2", total_points: 100, wins: 3 },
+        ]}
+        drivers={drivers}
+        session={session}
+        teams={teams}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    const posInputs = screen.getAllByPlaceholderText("—");
+    // driver-1 finishes P1 this session (+25, +1 win) landing on 100 pts/1 win.
+    // driver-2 does not score (no position entered), staying at 100 pts/3 wins.
+    // Points tie at 100 — wins tie-break must put driver-2 first.
+    await user.type(posInputs[0], "1");
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+
+    expect(screen.getByText(/1\. Driver Two 100 · 2\. Driver One 100/)).toBeInTheDocument();
+  });
+
+  it("marks a genuine points+wins tie in the projected top-3 with an '=' prefix", async () => {
+    const user = userEvent.setup();
+    const drivers = [
+      makeDriver("driver-1", "Driver One"),
+      makeDriver("driver-2", "Driver Two"),
+    ];
+    render(
+      <ResultStepper
+        driverStandings={[
+          { driver_id: "driver-1", total_points: 100, wins: 1 },
+          { driver_id: "driver-2", total_points: 100, wins: 1 },
+        ]}
+        drivers={drivers}
+        session={session}
+        teams={teams}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+
+    expect(screen.getByText(/=1\. Driver (One|Two) 100 · =1\. Driver (One|Two) 100/)).toBeInTheDocument();
   });
 });
 
