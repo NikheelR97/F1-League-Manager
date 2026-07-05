@@ -11,7 +11,12 @@ import {
 
 let nextRacingNumber = 1;
 
-function makeDriver(id: string, name: string, racingNumber?: number): SessionDriver {
+function makeDriver(
+  id: string,
+  name: string,
+  racingNumber?: number,
+  overrides: Partial<SessionDriver> = {},
+): SessionDriver {
   return {
     color_hex: "#ffffff",
     display_name: name,
@@ -19,10 +24,14 @@ function makeDriver(id: string, name: string, racingNumber?: number): SessionDri
     racing_number: racingNumber ?? nextRacingNumber++,
     team_id: "team-1",
     team_name: "Team One",
+    ...overrides,
   };
 }
 
-const teams: LeagueTeam[] = [{ color_hex: "#ffffff", id: "team-1", name: "Team One" }];
+const teams: LeagueTeam[] = [
+  { color_hex: "#ffffff", id: "team-1", name: "Team One" },
+  { color_hex: "#00ffff", id: "team-2", name: "Team Two" },
+];
 
 const session: SessionInfo = {
   fastest_lap_enabled: true,
@@ -438,5 +447,148 @@ describe("ResultStepper inline result validation (M2)", () => {
     render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
 
     expect(screen.getAllByText("Only one fastest lap")).toHaveLength(2);
+  });
+});
+
+describe("ResultStepper team-as-of-date note (M7)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
+    );
+  });
+
+  it("shows a note when the row's team differs from the driver's present-day team", async () => {
+    const user = userEvent.setup();
+    const drivers = [
+      makeDriver("driver-1", "Driver One", undefined, { present_team_id: "team-2" }),
+    ];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+
+    expect(screen.getByText("Team as of race date")).toBeInTheDocument();
+  });
+
+  it("shows no note when present-day team matches the resolved team", async () => {
+    const user = userEvent.setup();
+    const drivers = [
+      makeDriver("driver-1", "Driver One", undefined, { present_team_id: "team-1" }),
+    ];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+
+    expect(screen.queryByText("Team as of race date")).not.toBeInTheDocument();
+  });
+});
+
+describe("ResultStepper banned-last-round badge (B2/B3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
+    );
+  });
+
+  it("flags a banned driver in both Qualifying and Results steps", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One"), makeDriver("driver-2", "Driver Two")];
+    render(
+      <ResultStepper
+        bannedLastRoundDriverIds={["driver-1"]}
+        drivers={drivers}
+        session={session}
+        teams={teams}
+      />,
+    );
+
+    expect(screen.getByText("Banned last round")).toBeInTheDocument();
+    expect(screen.queryByText(/Driver Two.*Banned last round/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    expect(screen.getByText("Banned last round")).toBeInTheDocument();
+  });
+
+  it("shows no badge when no driver was banned last round", () => {
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    expect(screen.queryByText("Banned last round")).not.toBeInTheDocument();
+  });
+});
+
+describe("ResultStepper reserve assignment (B7)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/csrf") {
+          return Promise.resolve(new Response(JSON.stringify({ token: "test-token" })));
+        }
+        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      }),
+    );
+  });
+
+  it("shows the reserve consequence note only when a roster driver is a reserve", async () => {
+    const user = userEvent.setup();
+    const withReserve = [
+      makeDriver("driver-1", "Driver One"),
+      makeDriver("driver-2", "Reserve Driver", undefined, { is_reserve: true }),
+    ];
+    render(<ResultStepper drivers={withReserve} session={session} teams={teams} />);
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+
+    expect(screen.getByText(/constructor points go to that team/i)).toBeInTheDocument();
+  });
+
+  it("hides the reserve consequence note when no roster driver is a reserve", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+
+    expect(screen.queryByText(/constructor points go to that team/i)).not.toBeInTheDocument();
+  });
+
+  it("sends covering_for_driver_id for a reserve driver's row on publish", async () => {
+    const user = userEvent.setup();
+    const drivers = [
+      makeDriver("driver-1", "Primary Driver"),
+      makeDriver("driver-2", "Reserve Driver", undefined, { is_reserve: true }),
+    ];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    const posInputs = screen.getAllByPlaceholderText("—");
+    await user.type(posInputs[0], "1");
+    await user.type(posInputs[1], "2");
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Covering for Reserve Driver" }),
+      "driver-1",
+    );
+
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+    await user.click(screen.getByRole("button", { name: "Publish Results" }));
+
+    const publishCall = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
+      String(url).includes("/publish"),
+    );
+    const body = JSON.parse(publishCall![1].body);
+    expect(body.results).toContainEqual(
+      expect.objectContaining({ driver_id: "driver-2", covering_for_driver_id: "driver-1" }),
+    );
+    expect(body.results).toContainEqual(
+      expect.objectContaining({ driver_id: "driver-1", covering_for_driver_id: null }),
+    );
   });
 });

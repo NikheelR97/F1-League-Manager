@@ -6,8 +6,10 @@ import {
   type PointsSystem,
 } from "@/lib/results/points";
 import {
+  buildReserveAssignmentRows,
   checkPublishPreconditions,
   computeSessionPenaltyTotals,
+  resolveStintForDate,
   validatePublishResults,
   type PenaltyEntry,
   type RaceResultEntry,
@@ -517,6 +519,87 @@ describe("validatePublishResults — server-side cross-field validation (test 10
       { ...base, driver_id: "d2", finishing_position: 2, fastest_lap: false },
     ]);
     expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Team-as-of-date resolution (M7 — historical sessions must not prefill a
+//    driver's present-day team when an intervening transfer moved them).
+// ---------------------------------------------------------------------------
+
+describe("resolveStintForDate", () => {
+  const stints = [
+    { starts_on: "2026-01-01", ends_on: "2026-03-01", team_id: "old-team" },
+    { starts_on: "2026-03-01", ends_on: null, team_id: "new-team" },
+  ];
+
+  it("returns the stint whose [starts_on, ends_on) range contains the date", () => {
+    expect(resolveStintForDate(stints, "2026-02-01")?.team_id).toBe("old-team");
+  });
+
+  it("ends_on is exclusive — the transfer date itself belongs to the new stint", () => {
+    expect(resolveStintForDate(stints, "2026-03-01")?.team_id).toBe("new-team");
+  });
+
+  it("falls back to the still-active (ends_on null) stint when no range matches", () => {
+    const gappy = [
+      { starts_on: "2026-01-01", ends_on: "2026-02-01", team_id: "old-team" },
+      { starts_on: "2026-03-01", ends_on: null, team_id: "new-team" },
+    ];
+    // 2026-02-15 falls in the gap between stints — no range matches.
+    expect(resolveStintForDate(gappy, "2026-02-15")?.team_id).toBe("new-team");
+  });
+
+  it("falls back to any stint when none is active and none matches", () => {
+    const allEnded = [{ starts_on: "2026-01-01", ends_on: "2026-02-01", team_id: "only-team" }];
+    expect(resolveStintForDate(allEnded, "2026-05-01")?.team_id).toBe("only-team");
+  });
+
+  it("returns undefined for an empty stint list", () => {
+    expect(resolveStintForDate([], "2026-05-01")).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. Reserve assignment rows (B7 — reserve coverage becomes a visible record)
+// ---------------------------------------------------------------------------
+
+describe("buildReserveAssignmentRows", () => {
+  const base: RaceResultEntry = {
+    driver_id: "reserve-1",
+    team_id: "team-1",
+    finishing_position: 5,
+    result_status: "classified",
+    fastest_lap: false,
+    manual_points_adjustment: 0,
+    raw_result: null,
+    notes: null,
+  };
+
+  it("writes a row for a reserve driver's result naming who they covered for", () => {
+    const rows = buildReserveAssignmentRows(
+      [{ ...base, covering_for_driver_id: "primary-1" }],
+      "session-1",
+      "actor-1",
+    );
+    expect(rows).toEqual([
+      {
+        race_session_id: "session-1",
+        original_driver_id: "primary-1",
+        reserve_driver_id: "reserve-1",
+        team_id: "team-1",
+        assigned_by: "actor-1",
+      },
+    ]);
+  });
+
+  it("skips rows with no covering_for_driver_id — never blocks publish over it", () => {
+    const rows = buildReserveAssignmentRows(
+      [base, { ...base, driver_id: "d2", covering_for_driver_id: null }],
+      "session-1",
+      "actor-1",
+    );
+    expect(rows).toEqual([]);
   });
 });
 
