@@ -2,16 +2,17 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+// CRLF-normalize like schema.test.ts — the multi-line assertions below break
+// on Windows checkouts otherwise.
+const readSrc = (path: string) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
+
 // M11: stewards had no way to record post-race point adjustments (bonuses,
 // penalties, corrections) without SQL. These tests mirror the source-scan
 // style used in penalty-status.test.ts / s10-security.test.ts for route-shape
 // assertions that would otherwise need a full DB mock.
 
 describe("adjustments POST route", () => {
-  const routeSrc = readFileSync(
-    "src/app/api/admin/leagues/[id]/adjustments/route.ts",
-    "utf8",
-  );
+  const routeSrc = readSrc("src/app/api/admin/leagues/[id]/adjustments/route.ts");
 
   it("restricts adjustment_kind to the DB enum", () => {
     expect(routeSrc).toContain('z.enum(["bonus", "penalty", "correction"])');
@@ -51,7 +52,7 @@ describe("adjustments POST route", () => {
 });
 
 describe("adjustments DELETE route", () => {
-  const routeSrc = readFileSync("src/app/api/admin/adjustments/[id]/route.ts", "utf8");
+  const routeSrc = readSrc("src/app/api/admin/adjustments/[id]/route.ts");
 
   it("validates the adjustment id as a UUID", () => {
     expect(routeSrc).toContain("z.string().uuid()");
@@ -73,10 +74,7 @@ describe("adjustments DELETE route", () => {
 });
 
 describe("adjustment delete button", () => {
-  const componentSrc = readFileSync(
-    "src/components/admin/AdjustmentDeleteButton.tsx",
-    "utf8",
-  );
+  const componentSrc = readSrc("src/components/admin/AdjustmentDeleteButton.tsx");
 
   it("gates deletion behind a native confirm naming the target", () => {
     const confirmIdx = componentSrc.indexOf("confirm(");
@@ -92,7 +90,7 @@ describe("adjustment delete button", () => {
 });
 
 describe("adjustment create form", () => {
-  const componentSrc = readFileSync("src/components/admin/AdjustmentForm.tsx", "utf8");
+  const componentSrc = readSrc("src/components/admin/AdjustmentForm.tsx");
 
   it("uses a single target select rather than two mutually-exclusive fields", () => {
     expect(componentSrc).toContain('values.target.split(":")');

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import {
   ResultStepper,
+  type BannedDriverInfo,
   type DriverStandingEntry,
   type LeagueTeam,
   type PenaltyRow,
@@ -139,58 +140,73 @@ export default async function SessionPublishPage({
     penalty_points: penaltyTotals.get(d.driver_id)?.penaltyPoints ?? 0,
   }));
 
-  // B3 — surface (never block on) a ban recorded in the immediately previous
-  // session for this league+season, so it doesn't silently vanish from view
-  // the next time this roster is entered.
-  // ponytail: only the one prior session is checked; a durable ban ledger
-  // across every session since the ban is the upgrade path if needed.
-  const { data: previousSession } = await db
+  // B3 — surface (never block on) a ban recorded in ANY earlier completed
+  // session for this league+season, badging the driver with the specific
+  // session they were most recently banned in (not just "last round"), so a
+  // ban from two rounds ago — or one published out of order — still shows.
+  // Two queries total (session ids, then a single .in() on results), never
+  // one query per session.
+  const { data: earlierSessions } = await db
     .from("race_sessions")
-    .select("id")
+    .select("id, name, scheduled_at")
     .eq("league_id", leagueId)
     .eq("season_id", session.season_id)
     .eq("status", "completed")
-    .lt("scheduled_at", session.scheduled_at)
-    .order("scheduled_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .lt("scheduled_at", session.scheduled_at);
 
-  let bannedLastRoundDriverIds: string[] = [];
-  if (previousSession) {
+  let bannedDrivers: BannedDriverInfo[] = [];
+  if (earlierSessions && earlierSessions.length > 0) {
+    const sessionById = new Map(earlierSessions.map((s) => [s.id, s]));
     const { data: banResults } = await db
       .from("race_results")
-      .select("driver_id")
-      .eq("race_session_id", previousSession.id)
+      .select("driver_id, race_session_id")
+      .in(
+        "race_session_id",
+        earlierSessions.map((s) => s.id),
+      )
       .eq("result_status", "ban");
-    bannedLastRoundDriverIds = (banResults ?? []).map((r) => r.driver_id);
+
+    const mostRecentBanByDriver = new Map<string, { name: string; scheduled_at: string }>();
+    for (const row of banResults ?? []) {
+      const banSession = sessionById.get(row.race_session_id);
+      if (!banSession) continue;
+      const existing = mostRecentBanByDriver.get(row.driver_id);
+      if (!existing || banSession.scheduled_at > existing.scheduled_at) {
+        mostRecentBanByDriver.set(row.driver_id, banSession);
+      }
+    }
+    bannedDrivers = [...mostRecentBanByDriver.entries()].map(([driver_id, s]) => ({
+      driver_id,
+      session_name: s.name,
+    }));
   }
 
   // M3 — current season standings, used by the Review step to preview each
   // driver's projected championship total (current -> projected).
   const { data: standingsRows } = await db
     .from("driver_standings")
-    .select("driver_id, total_points")
+    .select("driver_id, total_points, wins")
     .eq("league_id", leagueId)
     .eq("season_id", session.season_id);
   const driverStandings: DriverStandingEntry[] = (standingsRows ?? []).map((s) => ({
     driver_id: s.driver_id,
     total_points: s.total_points,
+    wins: s.wins,
   }));
 
   // M9 — correction mode: load this session's already-published data so the
   // stepper reopens pre-filled instead of blank. ResultStepper bypasses the
   // sessionStorage draft entirely in correction mode, so this published data
   // always wins over anything stale left in the browser.
-  // ponytail: a driver who has since left the league roster (`entries` above
-  // only includes currently-active drivers) won't appear in the correction
-  // form even if they have a published result here; their old race_results
-  // row is left untouched (upsert, not delete-then-insert) rather than lost.
-  // Upgrade path if this bites: include departed drivers with a result for
-  // this specific session, not just the active roster.
+  // A driver who has since left the league roster (`entries` above only
+  // includes currently-active drivers) is unioned back in below from their
+  // published row, so their result stays editable rather than just preserved
+  // untouched by the upsert.
   let initialQualifyingRows: QualifyingRow[] | undefined;
   let initialResultRows: RaceResultRow[] | undefined;
   let initialPenaltyRows: PenaltyRow[] | undefined;
   let previousSessionPoints: PreviousSessionPoints[] = [];
+  let departedDrivers: SessionDriver[] = [];
 
   if (correctionMode) {
     const [
@@ -260,7 +276,50 @@ export default async function SessionPublishPage({
       driver_id: r.driver_id,
       points: r.points_awarded + r.manual_points_adjustment,
     }));
+
+    // Union in drivers present in this session's published data who are no
+    // longer on the active roster, so their row stays editable in correction
+    // mode. Team comes from their own published row (team at race time, not
+    // present-day roster data); identity comes from a minimal `drivers` fetch.
+    const activeDriverIds = new Set(drivers.map((d) => d.driver_id));
+    const publishedTeamByDriver = new Map<string, string>();
+    for (const r of publishedResults ?? []) {
+      if (!publishedTeamByDriver.has(r.driver_id)) publishedTeamByDriver.set(r.driver_id, r.team_id);
+    }
+    for (const q of publishedQualifying ?? []) {
+      if (!publishedTeamByDriver.has(q.driver_id)) publishedTeamByDriver.set(q.driver_id, q.team_id);
+    }
+    const departedDriverIds = [...publishedTeamByDriver.keys()].filter(
+      (id) => !activeDriverIds.has(id),
+    );
+
+    if (departedDriverIds.length > 0) {
+      const { data: departedDriverRows } = await db
+        .from("drivers")
+        .select("id, display_name, racing_number")
+        .in("id", departedDriverIds);
+      const teamById = new Map(leagueTeams.map((t) => [t.id, t]));
+      departedDrivers = (departedDriverRows ?? []).map((d) => {
+        const teamId = publishedTeamByDriver.get(d.id) ?? "";
+        const team = teamById.get(teamId);
+        return {
+          color_hex: team?.color_hex ?? "#444444",
+          display_name: d.display_name,
+          driver_id: d.id,
+          is_reserve: false,
+          left_roster: true,
+          racing_number: d.racing_number,
+          team_id: teamId,
+          team_name: team?.name ?? "Unassigned",
+        };
+      });
+    }
   }
+
+  // Normal first-publish path is untouched — departedDrivers is only ever
+  // populated in correction mode.
+  const rosterDrivers: SessionDriver[] =
+    departedDrivers.length > 0 ? [...drivers, ...departedDrivers] : drivers;
 
   return (
     <div className="space-y-8">
@@ -273,10 +332,10 @@ export default async function SessionPublishPage({
         title={session.name}
       />
       <ResultStepper
-        bannedLastRoundDriverIds={bannedLastRoundDriverIds}
+        bannedDrivers={bannedDrivers}
         correctionMode={correctionMode}
         driverStandings={driverStandings}
-        drivers={drivers}
+        drivers={rosterDrivers}
         existingPenaltyTotals={existingPenaltyTotals}
         initialPenaltyRows={initialPenaltyRows}
         initialQualifyingRows={initialQualifyingRows}

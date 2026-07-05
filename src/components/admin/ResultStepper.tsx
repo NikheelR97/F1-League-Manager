@@ -21,6 +21,10 @@ export interface SessionDriver {
   display_name: string;
   driver_id: string;
   is_reserve?: boolean;
+  // M9 correction-mode upgrade — true for a driver unioned in from this
+  // session's published data because they've since left the active roster.
+  // Their row stays editable; the chip just explains why they're present.
+  left_roster?: boolean;
   // M7 — the driver's present-day team, used only to flag when it differs
   // from `team_id` (which is resolved as of the session's own date).
   present_team_id?: string;
@@ -75,10 +79,21 @@ export interface ExistingPenaltyTotal {
 }
 
 // M3 — a driver's current season standing, used to preview the championship
-// consequence (current -> projected) of publishing this session.
+// consequence (current -> projected) of publishing this session. `wins` is
+// used only as a tie-break for the projected top-3 preview (see ReviewStep).
 export interface DriverStandingEntry {
   driver_id: string;
   total_points: number;
+  wins: number;
+}
+
+// B3 — a driver's most recent recorded ban among this league+season's earlier
+// completed sessions, named by which session it happened in (not just "last
+// round"), so a ban from two rounds ago or an out-of-order publish still
+// surfaces here.
+export interface BannedDriverInfo {
+  driver_id: string;
+  session_name: string;
 }
 
 // M9 — a driver's points from this session's most recent publish
@@ -284,12 +299,12 @@ function validateResults(rows: RaceResultRow[]): ValidationResult {
 // ---------------------------------------------------------------------------
 
 function QualifyingStep({
-  bannedLastRoundDriverIds,
+  bannedByDriver,
   drivers,
   rows,
   onChange,
 }: {
-  bannedLastRoundDriverIds: string[];
+  bannedByDriver: Map<string, string>;
   drivers: SessionDriver[];
   rows: QualifyingRow[];
   onChange: (rows: QualifyingRow[]) => void;
@@ -332,12 +347,15 @@ function QualifyingStep({
                       {driver?.is_reserve && (
                         <span className="text-xs text-f1-muted uppercase">Reserve</span>
                       )}
-                      {bannedLastRoundDriverIds.includes(row.driver_id) && (
+                      {driver?.left_roster && (
+                        <span className="text-xs text-f1-muted uppercase">Left roster</span>
+                      )}
+                      {bannedByDriver.has(row.driver_id) && (
                         <span
                           className="text-xs text-destructive uppercase"
-                          title="Recorded ban in the previous session — verify eligibility before scoring."
+                          title={`Recorded ban in ${bannedByDriver.get(row.driver_id)} — verify eligibility before scoring.`}
                         >
-                          Banned last round
+                          Banned in {bannedByDriver.get(row.driver_id)}
                         </span>
                       )}
                     </div>
@@ -378,7 +396,7 @@ function QualifyingStep({
 }
 
 function ResultsStep({
-  bannedLastRoundDriverIds,
+  bannedByDriver,
   drivers,
   qualifyingRows,
   rows,
@@ -386,7 +404,7 @@ function ResultsStep({
   validation,
   onChange,
 }: {
-  bannedLastRoundDriverIds: string[];
+  bannedByDriver: Map<string, string>;
   drivers: SessionDriver[];
   qualifyingRows: QualifyingRow[];
   rows: RaceResultRow[];
@@ -472,12 +490,15 @@ function ResultsStep({
                       {driver?.is_reserve && (
                         <span className="text-xs text-f1-muted uppercase">Res</span>
                       )}
-                      {bannedLastRoundDriverIds.includes(row.driver_id) && (
+                      {driver?.left_roster && (
+                        <span className="text-xs text-f1-muted uppercase">Left roster</span>
+                      )}
+                      {bannedByDriver.has(row.driver_id) && (
                         <span
                           className="text-xs text-destructive uppercase"
-                          title="Recorded ban in the previous session — verify eligibility before scoring."
+                          title={`Recorded ban in ${bannedByDriver.get(row.driver_id)} — verify eligibility before scoring.`}
                         >
-                          Banned last round
+                          Banned in {bannedByDriver.get(row.driver_id)}
                         </span>
                       )}
                     </div>
@@ -817,10 +838,12 @@ function ReviewStep({
   // includes this session's *previous* publish, so that amount is subtracted
   // first to avoid double-counting it.
   const standingsByDriver = new Map(driverStandings.map((s) => [s.driver_id, s.total_points]));
+  const winsByDriver = new Map(driverStandings.map((s) => [s.driver_id, s.wins]));
   const previousSessionPointsByDriver = new Map(
     previousSessionPoints.map((p) => [p.driver_id, p.points]),
   );
   const projectedByDriver = new Map<string, number>();
+  const projectedWinsByDriver = new Map<string, number>();
   const allProjectedDriverIds = new Set([
     ...standingsByDriver.keys(),
     ...results.map((r) => r.driver_id),
@@ -839,17 +862,36 @@ function ReviewStep({
       : 0;
     const previousPts = correctionMode ? (previousSessionPointsByDriver.get(driverId) ?? 0) : 0;
     projectedByDriver.set(driverId, (standingsByDriver.get(driverId) ?? 0) - previousPts + sessionPts);
+    // Cheap tie-break level: this session's previewed P1 counts as a win.
+    // ponytail: only a wins tie-break — full F1 countback (2nds, 3rds, ...)
+    // stays server-side in buildDriverStandings.
+    const winThisSession = row?.result_status === "classified" && row.finishing_position === 1 ? 1 : 0;
+    projectedWinsByDriver.set(driverId, (winsByDriver.get(driverId) ?? 0) + winThisSession);
   }
-  // ponytail: points-only sort — countback (F1-style tie-break by best finish)
-  // lives server-side in buildDriverStandings; this preview just ranks totals.
-  const projectedTop3 = [...projectedByDriver.entries()]
-    .sort((a, b) => b[1] - a[1])
+  const sortedProjected = [...projectedByDriver.entries()].sort((a, b) => {
+    if (b[1] !== a[1]) return b[1] - a[1];
+    return (projectedWinsByDriver.get(b[0]) ?? 0) - (projectedWinsByDriver.get(a[0]) ?? 0);
+  });
+  const projectedTop3 = sortedProjected
     .slice(0, 3)
-    .map(([driverId, total], i) => {
-      const driver = drivers.find((d) => d.driver_id === driverId);
-      return `${i + 1}. ${driver?.display_name ?? driverId} ${total}`;
-    })
-    .join(" · ");
+    .reduce<{ lines: string[]; rank: number }>(
+      (acc, [driverId, total], i) => {
+        const wins = projectedWinsByDriver.get(driverId) ?? 0;
+        const prev = sortedProjected[i - 1];
+        const next = sortedProjected[i + 1];
+        const tiedWithPrev =
+          !!prev && prev[1] === total && (projectedWinsByDriver.get(prev[0]) ?? 0) === wins;
+        const tiedWithNext =
+          !!next && next[1] === total && (projectedWinsByDriver.get(next[0]) ?? 0) === wins;
+        const rank = tiedWithPrev ? acc.rank : i + 1;
+        const driver = drivers.find((d) => d.driver_id === driverId);
+        const prefix = tiedWithPrev || tiedWithNext ? "=" : "";
+        acc.lines.push(`${prefix}${rank}. ${driver?.display_name ?? driverId} ${total}`);
+        acc.rank = rank;
+        return acc;
+      },
+      { lines: [], rank: 0 },
+    ).lines.join(" · ");
 
   return (
     <div className="space-y-6">
@@ -1004,11 +1046,9 @@ function ReviewStep({
 // ---------------------------------------------------------------------------
 
 interface ResultStepperProps {
-  // B2 — driver_ids recorded with result_status "ban" in the immediately
-  // previous session for this league+season. ponytail: checks only the
-  // one prior session; a durable ban ledger (spanning every session since
-  // the ban) is the upgrade path if that's ever needed.
-  bannedLastRoundDriverIds?: string[];
+  // B3 — each driver's most recent recorded ban among this league+season's
+  // earlier completed sessions (badge only, never a blocker on entry).
+  bannedDrivers?: BannedDriverInfo[];
   // M9 — true when correcting an already-published session. Prefills from
   // published data (initial*Rows below) instead of blank rows, bypasses the
   // sessionStorage draft entirely, and republishes rather than blocking.
@@ -1031,7 +1071,7 @@ interface ResultStepperProps {
 }
 
 export function ResultStepper({
-  bannedLastRoundDriverIds = [],
+  bannedDrivers = [],
   correctionMode = false,
   driverStandings = [],
   drivers,
@@ -1046,6 +1086,12 @@ export function ResultStepper({
   teams,
 }: ResultStepperProps) {
   const csrfToken = useCsrfToken();
+
+  // B3 — driver_id -> the session name of their most recent recorded ban.
+  const bannedByDriver = useMemo(
+    () => new Map(bannedDrivers.map((b) => [b.driver_id, b.session_name])),
+    [bannedDrivers],
+  );
 
   // M1 — Qualifying step's starting grid order (see sortedByRacingNumber).
   const qualifyingDrivers = useMemo(() => sortedByRacingNumber(drivers), [drivers]);
@@ -1323,7 +1369,7 @@ export function ResultStepper({
         <h2 className="mb-4 text-sm font-bold uppercase text-f1-white">{STEP_LABELS[step]}</h2>
         {step === "qualifying" && (
           <QualifyingStep
-            bannedLastRoundDriverIds={bannedLastRoundDriverIds}
+            bannedByDriver={bannedByDriver}
             drivers={drivers}
             rows={qualifyingRows}
             onChange={setQualifyingRows}
@@ -1331,7 +1377,7 @@ export function ResultStepper({
         )}
         {step === "results" && (
           <ResultsStep
-            bannedLastRoundDriverIds={bannedLastRoundDriverIds}
+            bannedByDriver={bannedByDriver}
             drivers={drivers}
             qualifyingRows={qualifyingRows}
             rows={resultRows}
