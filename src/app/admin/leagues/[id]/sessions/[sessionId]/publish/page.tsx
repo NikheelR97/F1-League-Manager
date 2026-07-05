@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ResultStepper, type LeagueTeam, type SessionDriver, type SessionInfo } from "@/components/admin/ResultStepper";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { getDriverPenaltyTotals } from "@/lib/penalties/get-driver-penalty-totals";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export default async function SessionPublishPage({
@@ -24,14 +25,14 @@ export default async function SessionPublishPage({
     db
       .from("race_sessions")
       .select(
-        "id, name, status, league_id, points_systems(points_by_position, fastest_lap_points, pole_position_points)",
+        "id, name, status, league_id, season_id, points_systems(points_by_position, fastest_lap_points, pole_position_points)",
       )
       .eq("id", sessionId)
       .eq("league_id", leagueId)
       .single(),
     db
       .from("leagues")
-      .select("id, fastest_lap_enabled, pole_position_enabled")
+      .select("id, fastest_lap_enabled, pole_position_enabled, penalty_threshold, slug")
       .eq("id", leagueId)
       .single(),
     db
@@ -108,13 +109,29 @@ export default async function SessionPublishPage({
     name: t.name,
   }));
 
+  // Prior-season-inclusive penalty totals (driver_penalty_totals), used so the
+  // review step can warn against the league's real ban threshold instead of
+  // just flagging any formal penalty (B2).
+  const penaltyTotals = await getDriverPenaltyTotals(db, leagueId, session.season_id);
+  const existingPenaltyTotals = drivers.map((d) => ({
+    driver_id: d.driver_id,
+    penalty_points: penaltyTotals.get(d.driver_id)?.penaltyPoints ?? 0,
+  }));
+
   return (
     <div className="space-y-8">
       <AdminPageHeader
         description={`Publish results for this session`}
         title={session.name}
       />
-      <ResultStepper drivers={drivers} session={sessionInfo} teams={leagueTeams} />
+      <ResultStepper
+        drivers={drivers}
+        existingPenaltyTotals={existingPenaltyTotals}
+        leagueSlug={league.slug}
+        penaltyThreshold={league.penalty_threshold ?? null}
+        session={sessionInfo}
+        teams={leagueTeams}
+      />
     </div>
   );
 }

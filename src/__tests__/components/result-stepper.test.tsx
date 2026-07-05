@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,21 +9,14 @@ import {
   type SessionInfo,
 } from "@/components/admin/ResultStepper";
 
-const router = {
-  push: vi.fn(),
-  refresh: vi.fn(),
-};
+let nextRacingNumber = 1;
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => router,
-}));
-
-function makeDriver(id: string, name: string): SessionDriver {
+function makeDriver(id: string, name: string, racingNumber?: number): SessionDriver {
   return {
     color_hex: "#ffffff",
     display_name: name,
     driver_id: id,
-    racing_number: 1,
+    racing_number: racingNumber ?? nextRacingNumber++,
     team_id: "team-1",
     team_name: "Team One",
   };
@@ -47,7 +40,6 @@ const defaultResultRow = {
   finishing_position: null as number | null,
   manual_points_adjustment: 0,
   notes: "",
-  penalty_points: 0,
   raw_result: "",
   result_status: "classified" as const,
   team_id: "team-1",
@@ -71,7 +63,9 @@ describe("ResultStepper full publish flow", () => {
   it("walks all four steps and publishes the entered results", async () => {
     const user = userEvent.setup();
     const drivers = [makeDriver("driver-1", "Driver One"), makeDriver("driver-2", "Driver Two")];
-    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+    render(
+      <ResultStepper drivers={drivers} leagueSlug="apex-gp" session={session} teams={teams} />,
+    );
 
     // Qualifying: positions 1 and 2, pole for driver one
     const qualiInputs = screen.getAllByPlaceholderText("—");
@@ -117,9 +111,17 @@ describe("ResultStepper full publish flow", () => {
       expect.objectContaining({ driver_id: "driver-1", reason: "Turn 1 contact" }),
     );
 
-    // Draft cleared and navigation triggered after successful publish
+    // Draft cleared, and a success banner (not a silent redirect) is shown
     expect(sessionStorage.getItem(draftKey)).toBeNull();
-    expect(router.push).toHaveBeenCalledWith("/admin/leagues/league-1");
+    expect(screen.getByRole("status")).toHaveTextContent("Results published.");
+    expect(screen.getByRole("link", { name: /view public result/i })).toHaveAttribute(
+      "href",
+      "/leagues/apex-gp/results/session-1",
+    );
+    expect(screen.getByRole("link", { name: /back to league/i })).toHaveAttribute(
+      "href",
+      "/admin/leagues/league-1",
+    );
   });
 
   it("blocks publish while validation errors exist", async () => {
@@ -167,7 +169,38 @@ describe("ResultStepper full publish flow", () => {
     await user.click(screen.getByRole("button", { name: "Publish Results" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Session already published");
-    expect(router.push).not.toHaveBeenCalled();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("falls back to a fixed message when the server error is not a string", async () => {
+    // N5(c) — a 422 body can carry an object `error` (e.g. a field-error map).
+    // FormError only ever renders a string, so a non-string must be coerced.
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/csrf") {
+          return Promise.resolve(new Response(JSON.stringify({ token: "test-token" })));
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: { finishing_position: "required" } }), {
+            status: 422,
+          }),
+        );
+      }),
+    );
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.type(screen.getByPlaceholderText("—"), "1");
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+    await user.click(screen.getByRole("button", { name: "Publish Results" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Validation failed on the server — check the review step.",
+    );
   });
 });
 
@@ -179,6 +212,9 @@ describe("ResultStepper draft persistence", () => {
       "fetch",
       vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
     );
+    // M4 — discard now confirms first; default to "yes" so existing discard
+    // tests exercise the post-confirm behavior.
+    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   it("writes a draft to sessionStorage when data is entered", async () => {
@@ -245,11 +281,36 @@ describe("ResultStepper draft persistence", () => {
 
     await user.click(screen.getByRole("button", { name: "Discard draft" }));
 
+    expect(window.confirm).toHaveBeenCalledWith(
+      "Discard the entire draft? All entered qualifying, race, and penalty data will be lost.",
+    );
     // The discard reset must not itself be re-saved as a new draft.
     expect(sessionStorage.getItem(draftKey)).toBeNull();
     expect(
       screen.queryByText("Draft restored from this browser session."),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the draft when the discard confirmation is declined", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    sessionStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        step: "qualifying",
+        qualifyingRows: [{ driver_id: "driver-1", is_pole: false, qualifying_position: 7, team_id: "team-1" }],
+        resultRows: [{ ...defaultResultRow, driver_id: "driver-1" }],
+        penaltyRows: [],
+      }),
+    );
+
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: "Discard draft" }));
+
+    expect(sessionStorage.getItem(draftKey)).toBeTruthy();
+    expect(screen.getByText("Draft restored from this browser session.")).toBeInTheDocument();
   });
 
   it("does not apply a saved row for a driver no longer in the list", () => {
@@ -277,5 +338,105 @@ describe("ResultStepper draft persistence", () => {
     // Only one driver row is rendered, and it kept its saved value.
     expect(screen.getAllByRole("spinbutton")).toHaveLength(1);
     expect(screen.getByRole("spinbutton")).toHaveValue(4);
+  });
+});
+
+describe("ResultStepper row ordering (M1)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
+    );
+  });
+
+  it("orders the Qualifying step's initial roster by racing number, not roster order", () => {
+    const drivers = [
+      makeDriver("driver-c", "Driver C", 30),
+      makeDriver("driver-a", "Driver A", 10),
+      makeDriver("driver-b", "Driver B", 20),
+    ];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    const rows = screen.getAllByRole("row").slice(1); // drop header row
+    const names = rows.map((r) => within(r).getByText(/^Driver [ABC]$/).textContent);
+    expect(names).toEqual(["Driver A", "Driver B", "Driver C"]);
+  });
+
+  it("orders the Results step by qualifying position; drivers with no position sort last", async () => {
+    const user = userEvent.setup();
+    const drivers = [
+      makeDriver("driver-a", "Driver A"),
+      makeDriver("driver-b", "Driver B"),
+      makeDriver("driver-c", "Driver C"),
+      makeDriver("driver-d", "Driver D"),
+    ];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    const qualiInputs = screen.getAllByPlaceholderText("—");
+    await user.type(qualiInputs[0], "3"); // Driver A -> P3
+    await user.type(qualiInputs[1], "1"); // Driver B -> P1
+    await user.type(qualiInputs[2], "2"); // Driver C -> P2
+    // Driver D left blank (no quali position, e.g. DNS) — sorts last.
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+
+    const rows = screen.getAllByRole("row").slice(1);
+    const names = rows.map((r) => within(r).getByText(/^Driver [ABCD]$/).textContent);
+    expect(names).toEqual(["Driver B", "Driver C", "Driver A", "Driver D"]);
+  });
+});
+
+describe("ResultStepper inline result validation (M2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
+    );
+  });
+
+  it("highlights offending rows inline when duplicate positions are typed, without blocking navigation", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One"), makeDriver("driver-2", "Driver Two")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    const posInputs = screen.getAllByPlaceholderText("—");
+    await user.type(posInputs[0], "1");
+    await user.type(posInputs[1], "1");
+
+    // Each offending row renders its own copy of the message with a stable id.
+    const messages = screen.getAllByText(/P1 assigned to Driver One and Driver Two/);
+    expect(messages).toHaveLength(2);
+    expect(posInputs[0]).toHaveAttribute("aria-invalid", "true");
+    expect(posInputs[0]).toHaveAttribute("aria-describedby", "pos-error-driver-1");
+    expect(posInputs[1]).toHaveAttribute("aria-describedby", "pos-error-driver-2");
+
+    // Errors are surfaced, not enforced — step navigation stays open.
+    expect(screen.getByRole("button", { name: /Next: Penalties/i })).toBeEnabled();
+  });
+
+  it("highlights every row when a restored draft has more than one fastest lap", () => {
+    sessionStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        step: "results",
+        qualifyingRows: [
+          { driver_id: "driver-1", is_pole: false, qualifying_position: null, team_id: "team-1" },
+          { driver_id: "driver-2", is_pole: false, qualifying_position: null, team_id: "team-1" },
+        ],
+        resultRows: [
+          { ...defaultResultRow, driver_id: "driver-1", fastest_lap: true },
+          { ...defaultResultRow, driver_id: "driver-2", fastest_lap: true },
+        ],
+        penaltyRows: [],
+      }),
+    );
+    const drivers = [makeDriver("driver-1", "Driver One"), makeDriver("driver-2", "Driver Two")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    expect(screen.getAllByText("Only one fastest lap")).toHaveLength(2);
   });
 });

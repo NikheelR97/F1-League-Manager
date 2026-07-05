@@ -92,6 +92,8 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           Email
         </Label>
         <Input
+          aria-describedby={errors.email ? "login-email-error" : undefined}
+          aria-invalid={!!errors.email}
           autoComplete="email"
           className="h-11 border-f1-border bg-f1-dark text-f1-white placeholder:text-f1-muted focus-visible:border-f1-red"
           id="login-email"
@@ -103,7 +105,7 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           value={email}
         />
         {errors.email ? (
-          <p className="text-xs text-f1-red-text">{errors.email}</p>
+          <p className="text-xs text-f1-red-text" id="login-email-error">{errors.email}</p>
         ) : null}
       </div>
 
@@ -112,6 +114,8 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           Password
         </Label>
         <Input
+          aria-describedby={errors.password ? "login-password-error" : undefined}
+          aria-invalid={!!errors.password}
           autoComplete="current-password"
           className="h-11 border-f1-border bg-f1-dark text-f1-white placeholder:text-f1-muted focus-visible:border-f1-red"
           id="login-password"
@@ -122,7 +126,7 @@ export function LoginForm({ nextPath }: LoginFormProps) {
           value={password}
         />
         {errors.password ? (
-          <p className="text-xs text-f1-red-text">{errors.password}</p>
+          <p className="text-xs text-f1-red-text" id="login-password-error">{errors.password}</p>
         ) : null}
       </div>
 

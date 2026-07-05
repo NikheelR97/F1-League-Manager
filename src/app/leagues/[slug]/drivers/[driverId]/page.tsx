@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { getDriverPenaltyTotals } from "@/lib/penalties/get-driver-penalty-totals";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -27,7 +28,7 @@ export default async function DriverProfilePage({
     { data: standing },
     { data: completedSessions },
     { data: lastSession },
-    { data: penaltyRows },
+    penaltyTotals,
   ] = await Promise.all([
     db
       .from("drivers")
@@ -43,7 +44,7 @@ export default async function DriverProfilePage({
       .maybeSingle(),
     db
       .from("driver_standings")
-      .select("position, previous_position, total_points, wins, podiums, fastest_laps")
+      .select("position, previous_position, total_points, wins, podiums, fastest_laps, teams(id, name, color_hex)")
       .eq("league_id", league.id)
       .eq("season_id", league.season.id)
       .eq("driver_id", driverId)
@@ -64,14 +65,7 @@ export default async function DriverProfilePage({
       .order("published_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    db
-      .from("penalties")
-      .select("penalty_points, status")
-      .eq("league_id", league.id)
-      .eq("season_id", league.season.id)
-      .eq("driver_id", driverId)
-      .neq("status", "rescinded")
-      .limit(100),
+    getDriverPenaltyTotals(db, league.id, league.season.id),
   ]);
 
   if (!driver || !leagueEntry) notFound();
@@ -98,11 +92,12 @@ export default async function DriverProfilePage({
       .limit(10),
   ]);
 
-  const penaltyPoints = (penaltyRows ?? []).reduce((sum, p) => sum + p.penalty_points, 0);
+  const penaltyPoints = penaltyTotals.get(driverId)?.penaltyPoints ?? 0;
 
   type RaceSession = { name: string; circuits: unknown };
   type Circuit = { name: string };
   type StintTeam = { id: string; name: string; color_hex: string };
+  const standingTeam = standing?.teams as unknown as StintTeam | null;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -131,6 +126,19 @@ export default async function DriverProfilePage({
         )}
         {standing ? (
           <>
+            {standingTeam && (
+              <div>
+                <p className="text-xs text-f1-muted">Team</p>
+                <div className="flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="h-3 w-1 shrink-0"
+                    style={{ backgroundColor: standingTeam.color_hex }}
+                  />
+                  <span className="font-bold text-f1-white">{standingTeam.name}</span>
+                </div>
+              </div>
+            )}
             <div>
               <p className="text-xs text-f1-muted">Championship</p>
               <p className="font-mono font-bold text-f1-white">
@@ -148,7 +156,7 @@ export default async function DriverProfilePage({
         {penaltyPoints > 0 && (
           <div>
             <p className="text-xs text-f1-muted">Penalty Points</p>
-            <p className="font-mono font-bold text-f1-red">{penaltyPoints}</p>
+            <p className="font-mono font-bold text-f1-red-text">{penaltyPoints}</p>
           </div>
         )}
       </div>
@@ -174,7 +182,8 @@ export default async function DriverProfilePage({
                     <span className="text-f1-white">{team?.name ?? "—"}</span>
                   </div>
                   <span className="font-mono text-xs text-f1-muted">
-                    {s.starts_on} – {s.ends_on ?? "present"}
+                    {new Date(s.starts_on).toLocaleDateString("en-GB")} –{" "}
+                    {s.ends_on ? new Date(s.ends_on).toLocaleDateString("en-GB") : "present"}
                   </span>
                 </li>
               );

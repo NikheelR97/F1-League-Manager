@@ -33,9 +33,11 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
   const [poolIds, setPoolIds] = useState<Set<string>>(new Set(initialPoolIds));
   const [isSavingPool, setIsSavingPool] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [poolSaveMessage, setPoolSaveMessage] = useState<string | null>(null);
 
   const [spinState, setSpinState] = useState<SpinState>(pendingSpin ? "pending" : "idle");
   const [localPendingSpin, setLocalPendingSpin] = useState<WheelSpin | null>(pendingSpin ?? null);
+  const [announcement, setAnnouncement] = useState("");
 
   // Slot-machine cycling display during spin
   const [cyclingName, setCyclingName] = useState<string>("");
@@ -51,14 +53,21 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
       return;
     }
 
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     // Total duration ≈ 2 400ms. Intervals: 6×80ms → 6×120ms → 6×200ms → 3×350ms → 1×500ms
-    const schedule: number[] = [
-      ...Array(8).fill(70),
-      ...Array(8).fill(110),
-      ...Array(6).fill(180),
-      ...Array(4).fill(300),
-      ...Array(2).fill(450),
-    ];
+    // ponytail: reduced-motion collapses the schedule to a single immediate step instead of a parallel code path
+    const schedule: number[] = prefersReducedMotion
+      ? [0]
+      : [
+          ...Array(8).fill(70),
+          ...Array(8).fill(110),
+          ...Array(6).fill(180),
+          ...Array(4).fill(300),
+          ...Array(2).fill(450),
+        ];
 
     let i = 0;
     function tick() {
@@ -99,6 +108,7 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
   async function handleSavePool() {
     setIsSavingPool(true);
     setError(null);
+    setPoolSaveMessage(null);
     try {
       const res = await fetch(`/api/admin/leagues/${leagueId}/circuit-pool`, {
         method: "PUT",
@@ -116,7 +126,7 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
       }
 
       router.refresh();
-      alert("Pool saved successfully.");
+      setPoolSaveMessage("Pool saved successfully.");
     } finally {
       setIsSavingPool(false);
     }
@@ -124,6 +134,7 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
 
   async function handleSpin() {
     setError(null);
+    setAnnouncement("");
     setSpinState("spinning");
     setCyclingName(poolCircuits[0]?.name ?? "");
 
@@ -179,6 +190,7 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
 
       setLocalPendingSpin(null);
       setSpinState("idle");
+      setAnnouncement("");
       router.refresh();
     } catch {
       setError("Failed to void spin");
@@ -187,14 +199,18 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
 
   function handleConfirm() {
     if (!localPendingSpin) return;
+    setAnnouncement("");
     router.push(
       `/admin/leagues/${leagueId}/sessions/new?spin_id=${localPendingSpin.id}&circuit_id=${localPendingSpin.circuit_id}`,
     );
   }
 
-  // After reveal, transition to pending state
+  // After reveal, transition to pending state and announce the outcome once
   function handleRevealDone() {
     setSpinState("pending");
+    setAnnouncement(
+      `Wheel landed on ${localPendingSpin?.circuit?.name ?? "Unknown Circuit"}. Confirm to create the session, or void the spin.`,
+    );
   }
 
   return (
@@ -209,10 +225,13 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
           </p>
         )}
 
+        <p aria-live="assertive" className="sr-only">
+          {announcement}
+        </p>
+
         {spinState === "spinning" && (
           <div
             aria-label="Spinning the wheel"
-            aria-live="polite"
             className="flex flex-col items-center justify-center py-12"
           >
             {/* Slot machine frame */}
@@ -328,6 +347,12 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
             {isSavingPool ? "Saving…" : "Save Pool"}
           </button>
         </div>
+
+        {poolSaveMessage && (
+          <p className="text-sm font-bold text-green-400" role="status">
+            {poolSaveMessage}
+          </p>
+        )}
 
         <p className="text-sm text-f1-muted">
           Select which circuits are eligible to be chosen by the wheel. Circuits already used in this league will be excluded automatically.

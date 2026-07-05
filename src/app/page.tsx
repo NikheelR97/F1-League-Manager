@@ -2,6 +2,7 @@ import "server-only";
 
 import { LeagueCard } from "@/components/league/LeagueCard";
 import { PublicShell } from "@/components/layout/PublicShell";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { TeamBadge } from "@/components/ui/TeamBadge";
 import {
   F1_INFORMAL_RACE_PCT,
@@ -111,9 +112,13 @@ export default async function Home() {
             </p>
           </div>
           <div className="grid gap-6">
-            {leagues.map((league, index) => (
-              <LeagueCard key={league.slug} league={league} priority={index === 0} />
-            ))}
+            {leagues.length === 0 ? (
+              <EmptyState title="No leagues yet" message="Public leagues will appear here once they are published." />
+            ) : (
+              leagues.map((league, index) => (
+                <LeagueCard key={league.slug} league={league} priority={index === 0} />
+              ))
+            )}
           </div>
         </div>
       </section>

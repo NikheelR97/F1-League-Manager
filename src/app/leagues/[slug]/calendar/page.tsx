@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Calendar, MapPin } from "lucide-react";
 
 import { ErrorState } from "@/components/ui/ErrorState";
+import { formatDate } from "@/lib/format-date";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -78,9 +79,7 @@ export default async function LeagueCalendarPage({
                       <div className="mb-4">
                         <p className="text-xs text-f1-muted uppercase font-bold">Scheduled Date</p>
                         <p className="text-f1-white text-lg">
-                          {new Date(session.scheduled_at).toLocaleDateString(undefined, {
-                            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
-                          })}
+                          {formatDate(session.scheduled_at)}
                         </p>
                         <p className="text-sm text-f1-muted">
                           {new Date(session.scheduled_at).toLocaleTimeString(undefined, {
@@ -108,14 +107,14 @@ export default async function LeagueCalendarPage({
             <h2 className="mb-4 text-xl font-bold uppercase text-f1-white">
               Completed Races
             </h2>
-            <div className="overflow-hidden border border-f1-border bg-f1-dark">
+            <div className="hidden overflow-hidden border border-f1-border bg-f1-dark md:block">
               <table className="w-full text-left text-sm text-f1-white">
                 <thead className="border-b border-f1-border bg-black/20 text-xs uppercase text-f1-muted">
                   <tr>
-                    <th className="px-4 py-3 font-bold">Date</th>
-                    <th className="px-4 py-3 font-bold">Race</th>
-                    <th className="px-4 py-3 font-bold">Circuit</th>
-                    <th className="px-4 py-3 font-bold text-right">Results</th>
+                    <th className="px-4 py-3 font-bold" scope="col">Date</th>
+                    <th className="px-4 py-3 font-bold" scope="col">Race</th>
+                    <th className="px-4 py-3 font-bold" scope="col">Circuit</th>
+                    <th className="px-4 py-3 font-bold text-right" scope="col">Results</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-f1-border">
@@ -124,7 +123,7 @@ export default async function LeagueCalendarPage({
                     return (
                       <tr key={session.id} className="transition-colors hover:bg-black/20">
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {new Date(session.scheduled_at).toLocaleDateString()}
+                          {formatDate(session.scheduled_at)}
                         </td>
                         <td className="px-4 py-3 font-bold">
                           {session.name}
@@ -146,6 +145,34 @@ export default async function LeagueCalendarPage({
                 </tbody>
               </table>
             </div>
+
+            <ul className="space-y-2 md:hidden">
+              {completed.map((session) => {
+                const circuit = session.circuits as unknown as { name: string; country: string } | null;
+                return (
+                  <li key={session.id} className="border border-f1-border bg-f1-dark p-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-bold text-f1-white">
+                          {session.name}
+                        </p>
+                        <p className="text-xs text-f1-muted">
+                          {formatDate(session.scheduled_at)} · {circuit ? `${circuit.name}, ${circuit.country}` : "—"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <Link
+                          href={`/leagues/${slug}/results?session=${session.id}`}
+                          className="text-xs font-bold uppercase text-f1-red-text hover:text-white transition-colors"
+                        >
+                          View
+                        </Link>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         )}
       </div>

@@ -84,7 +84,7 @@ export default async function LeagueDetailPage({
     currentSeason?.id ??
     league.season_id;
 
-  const [{ data: entries, error: entriesError }, { data: sessions }] =
+  const [{ data: entries, error: entriesError }, { data: sessions }, { data: banWatch }] =
     await Promise.all([
       db
         .from("league_driver_entries")
@@ -101,6 +101,16 @@ export default async function LeagueDetailPage({
         .eq("season_id", effectiveSeasonId)
         .order("scheduled_at", { ascending: false })
         .limit(MAX_SESSIONS_LIST),
+      // Mirrors the public hub's penalty-watch query (driver_penalty_totals,
+      // ban_threshold_reached) so admin and public never disagree — see B2/B12.
+      db
+        .from("driver_penalty_totals")
+        .select("driver_id, penalty_points, drivers(display_name)")
+        .eq("league_id", leagueId)
+        .eq("season_id", effectiveSeasonId)
+        .eq("ban_threshold_reached", true)
+        .order("penalty_points", { ascending: false })
+        .limit(10),
     ]);
 
   if (entriesError) {
@@ -316,6 +326,30 @@ export default async function LeagueDetailPage({
           </ul>
         )}
       </section>
+
+      {/* Ban Watch */}
+      {!!banWatch?.length && (
+        <section className="space-y-4">
+          <h2 className="text-sm font-bold uppercase text-f1-muted">
+            Ban Watch ({banWatch.length})
+          </h2>
+          <ul className="space-y-2">
+            {banWatch.map((row) => {
+              const driver = row.drivers as unknown as { display_name: string } | null;
+              return (
+                <li key={row.driver_id}>
+                  <div className="flex items-center justify-between border border-f1-red/30 bg-f1-dark px-4 py-2 text-sm">
+                    <span className="text-f1-white">{driver?.display_name ?? "Unknown"}</span>
+                    <span className="font-mono text-xs text-f1-red-text">
+                      {row.penalty_points} pts &middot; Alert only &mdash; pending admin decision.
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* Drivers */}
       <section className="space-y-4">

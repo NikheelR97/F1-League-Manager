@@ -36,7 +36,7 @@ export function LeagueSubNav({ slug }: LeagueSubNavProps) {
             <Link
               key={link.href}
               href={link.href}
-              className={`shrink-0 border-b-2 px-4 py-3 text-xs font-bold uppercase transition-colors ${
+              className={`min-h-11 inline-flex shrink-0 items-center border-b-2 px-4 py-3 text-xs font-bold uppercase transition-colors ${
                 isActive
                   ? "border-f1-red text-f1-white"
                   : "border-transparent text-f1-muted hover:text-f1-white"

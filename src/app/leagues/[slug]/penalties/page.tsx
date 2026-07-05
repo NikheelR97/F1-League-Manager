@@ -75,11 +75,11 @@ export default async function PenaltiesPage({
           <table className="hidden w-full text-sm md:table">
             <thead>
               <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
-                <th className="pb-2 pr-4">Driver</th>
-                <th className="pb-2 pr-4">Race</th>
-                <th className="pb-2 pr-4">Reason</th>
-                <th className="pb-2 pr-4 text-right">Pts</th>
-                <th className="pb-2 text-right">Status</th>
+                <th className="pb-2 pr-4" scope="col">Driver</th>
+                <th className="pb-2 pr-4" scope="col">Race</th>
+                <th className="pb-2 pr-4" scope="col">Reason</th>
+                <th className="pb-2 pr-4 text-right" scope="col">Pts</th>
+                <th className="pb-2 text-right" scope="col">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -91,7 +91,7 @@ export default async function PenaltiesPage({
                     <td className="py-2 pr-4 font-bold text-f1-white">{driver?.display_name ?? "—"}</td>
                     <td className="py-2 pr-4 text-f1-muted">{race?.name ?? "—"}</td>
                     <td className="py-2 pr-4 text-f1-muted">{p.reason}</td>
-                    <td className="py-2 pr-4 text-right font-mono font-bold text-f1-red">{p.penalty_points}</td>
+                    <td className="py-2 pr-4 text-right font-mono font-bold text-f1-red-text">{p.penalty_points}</td>
                     <td className="py-2 text-right font-mono text-xs text-f1-muted">
                       {STATUS_LABEL[p.status] ?? p.status}
                     </td>
@@ -115,7 +115,7 @@ export default async function PenaltiesPage({
                       <p className="mt-1 text-xs text-f1-muted">{p.reason}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-mono font-bold text-f1-red">{p.penalty_points} pts</p>
+                      <p className="font-mono font-bold text-f1-red-text">{p.penalty_points} pts</p>
                       <p className="font-mono text-xs text-f1-muted">{STATUS_LABEL[p.status] ?? p.status}</p>
                     </div>
                   </div>

@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
+import Link from "next/link";
+
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 
 import { DiffReport } from "./DiffReport";
@@ -92,6 +94,14 @@ export function ImportForm({ leagues, seasons }: ImportFormProps) {
 
   async function handleConfirm() {
     if (!csrfToken || state.phase !== "done") return;
+    const seasonName = seasons.find((s) => s.id === seasonId)?.name ?? "this season";
+    if (
+      !confirm(
+        `Confirm import for ${seasonName}? This locks the season permanently — re-import will be rejected.`,
+      )
+    ) {
+      return;
+    }
     setState({ phase: "confirming" });
 
     try {
@@ -120,9 +130,17 @@ export function ImportForm({ leagues, seasons }: ImportFormProps) {
 
   const busy = state.phase === "uploading" || state.phase === "confirming";
   const disableUpload = busy || !csrfToken || !leagueId || !seasonId;
+  const selectedLeague = leagues.find((l) => l.id === leagueId);
 
   return (
     <div className="space-y-6">
+      <ol className="list-inside list-decimal space-y-1 text-sm text-f1-muted">
+        <li>Upload parses and imports the workbook, then recalculates standings.</li>
+        <li>Review the diff against the workbook&apos;s own standings.</li>
+        <li>Re-upload freely until clean — nothing is final until you confirm.</li>
+        <li>Confirming locks this season permanently (re-import rejected).</li>
+      </ol>
+
       <form className="space-y-4 border border-f1-border bg-f1-dark p-6" onSubmit={handleUpload}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1">
@@ -186,6 +204,11 @@ export function ImportForm({ leagues, seasons }: ImportFormProps) {
         >
           {state.phase === "uploading" ? "Uploading…" : "Upload & Validate"}
         </button>
+        {state.phase === "uploading" && (
+          <p className="text-sm text-f1-muted">
+            Parsing and importing — this can take up to a minute for a full season.
+          </p>
+        )}
       </form>
 
       {state.phase === "error" && (
@@ -214,16 +237,34 @@ export function ImportForm({ leagues, seasons }: ImportFormProps) {
             </div>
           ) : (
             <p className="border border-f1-red bg-f1-dark px-4 py-3 text-sm text-f1-red">
-              Diff has discrepancies — correct the data and re-upload before confirming.
+              Diff has discrepancies — correct the data and re-upload before confirming. Re-uploading
+              is safe and replaces this draft — nothing is written permanently until you confirm.
             </p>
           )}
         </div>
       )}
 
       {state.phase === "confirmed" && (
-        <p className="border border-team-sauber bg-f1-dark px-4 py-3 text-sm text-team-sauber">
-          Import confirmed. This season is now locked against re-import.
-        </p>
+        <div className="space-y-2 border border-team-sauber bg-f1-dark px-4 py-3 text-sm text-team-sauber">
+          <p>
+            Import confirmed. This season is now locked against re-import. Penalty totals are not yet
+            updated for this season — run Carry-Over on{" "}
+            <Link className="underline" href={`/admin/seasons/${seasonId}`}>
+              the Season page
+            </Link>{" "}
+            before relying on ban alerts.
+          </p>
+          {selectedLeague?.slug && (
+            <p>
+              <Link
+                className="underline"
+                href={`/leagues/${selectedLeague.slug}/standings/drivers`}
+              >
+                View public standings
+              </Link>
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

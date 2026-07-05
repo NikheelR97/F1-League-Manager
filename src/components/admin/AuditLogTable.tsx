@@ -44,11 +44,11 @@ export function AuditLogTable({ limit, logs, offset }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-f1-border text-left text-xs uppercase text-f1-muted">
-              <th className="pb-2 pr-4">Time</th>
-              <th className="pb-2 pr-4">Actor</th>
-              <th className="pb-2 pr-4">Action</th>
-              <th className="pb-2 pr-4">Entity</th>
-              <th className="pb-2">Metadata</th>
+              <th className="pb-2 pr-4" scope="col">Time</th>
+              <th className="pb-2 pr-4" scope="col">Actor</th>
+              <th className="pb-2 pr-4" scope="col">Action</th>
+              <th className="pb-2 pr-4" scope="col">Entity</th>
+              <th className="pb-2" scope="col">Metadata</th>
             </tr>
           </thead>
           <tbody>

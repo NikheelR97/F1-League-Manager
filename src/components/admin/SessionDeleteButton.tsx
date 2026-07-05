@@ -10,6 +10,7 @@ export function SessionDeleteButton({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
 
   async function handleDelete() {
     if (!confirm("Are you sure you want to delete this session? This action cannot be undone.")) return;
@@ -29,10 +30,21 @@ export function SessionDeleteButton({ sessionId }: { sessionId: string }) {
         return;
       }
 
-      router.refresh();
+      setIsDeleted(true);
+      // ponytail: fixed delay so screen readers get to announce the status
+      // message before router.refresh() removes this row from the list
+      setTimeout(() => router.refresh(), 1000);
     } finally {
       setIsDeleting(false);
     }
+  }
+
+  if (isDeleted) {
+    return (
+      <p className="text-xs font-bold uppercase text-f1-muted" role="status">
+        Session deleted.
+      </p>
+    );
   }
 
   return (

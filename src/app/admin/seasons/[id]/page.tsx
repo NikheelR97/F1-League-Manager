@@ -57,7 +57,7 @@ export default async function SeasonDetailPage({
           <h2 className="text-sm font-bold uppercase text-f1-muted">Status</h2>
           <div className="flex flex-wrap gap-2">
             {season.is_current && (
-              <span className="border border-f1-red px-2 py-0.5 text-xs font-bold uppercase text-f1-red">
+              <span className="border border-f1-red px-2 py-0.5 text-xs font-bold uppercase text-f1-red-text">
                 Current
               </span>
             )}

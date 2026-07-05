@@ -1,3 +1,4 @@
+import { PublicHeader } from "@/components/layout/PublicHeader";
 import { LeagueSubNav } from "@/components/league/LeagueSubNav";
 
 export default async function LeagueLayout({
@@ -11,8 +12,9 @@ export default async function LeagueLayout({
 
   return (
     <>
+      <PublicHeader />
       <LeagueSubNav slug={slug} />
-      <main>{children}</main>
+      <main id="main-content">{children}</main>
     </>
   );
 }

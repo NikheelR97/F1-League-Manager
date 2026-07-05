@@ -82,6 +82,8 @@ export function TransferForm({ drivers, leagueId, teams }: TransferFormProps) {
       <div className="space-y-2">
         <Label htmlFor="driver_entry_id">Driver</Label>
         <select
+          aria-describedby={errors.driver_entry_id ? "driver_entry_id-error" : undefined}
+          aria-invalid={!!errors.driver_entry_id}
           className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none"
           id="driver_entry_id"
           {...register("driver_entry_id")}
@@ -94,25 +96,29 @@ export function TransferForm({ drivers, leagueId, teams }: TransferFormProps) {
           ))}
         </select>
         {errors.driver_entry_id && (
-          <p className="text-xs text-f1-red">{errors.driver_entry_id.message}</p>
+          <p className="text-xs text-f1-red" id="driver_entry_id-error">{errors.driver_entry_id.message}</p>
         )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="effective_date">Effective Date</Label>
         <Input
+          aria-describedby={errors.effective_date ? "effective_date-error" : undefined}
+          aria-invalid={!!errors.effective_date}
           id="effective_date"
           type="date"
           {...register("effective_date")}
         />
         {errors.effective_date && (
-          <p className="text-xs text-f1-red">{errors.effective_date.message}</p>
+          <p className="text-xs text-f1-red" id="effective_date-error">{errors.effective_date.message}</p>
         )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="new_team_id">New Team (leave blank if driver is departing)</Label>
         <select
+          aria-describedby={errors.new_team_id ? "new_team_id-error" : undefined}
+          aria-invalid={!!errors.new_team_id}
           className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none"
           id="new_team_id"
           {...register("new_team_id")}
@@ -125,20 +131,22 @@ export function TransferForm({ drivers, leagueId, teams }: TransferFormProps) {
           ))}
         </select>
         {errors.new_team_id && (
-          <p className="text-xs text-f1-red">{errors.new_team_id.message}</p>
+          <p className="text-xs text-f1-red" id="new_team_id-error">{errors.new_team_id.message}</p>
         )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="transfer_reason">Reason (optional)</Label>
         <Input
+          aria-describedby={errors.transfer_reason ? "transfer_reason-error" : undefined}
+          aria-invalid={!!errors.transfer_reason}
           id="transfer_reason"
           maxLength={240}
           placeholder="e.g. Season swap"
           {...register("transfer_reason")}
         />
         {errors.transfer_reason && (
-          <p className="text-xs text-f1-red">{errors.transfer_reason.message}</p>
+          <p className="text-xs text-f1-red" id="transfer_reason-error">{errors.transfer_reason.message}</p>
         )}
       </div>
 

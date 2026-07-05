@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FormError } from "@/components/ui/FormError";
@@ -56,10 +56,17 @@ interface RaceResultRow {
   finishing_position: number | null;
   manual_points_adjustment: number;
   notes: string;
-  penalty_points: number;
   raw_result: string;
   result_status: ResultStatus;
   team_id: string;
+}
+
+// A driver's penalty total prior to this session (from driver_penalty_totals),
+// used to project whether this session's formal penalties would cross the
+// league's ban threshold. See B2 — the old banAlert ignored this entirely.
+export interface ExistingPenaltyTotal {
+  driver_id: string;
+  penalty_points: number;
 }
 
 interface PenaltyRow {
@@ -111,11 +118,40 @@ function defaultResultRow(d: SessionDriver): RaceResultRow {
     finishing_position: null,
     manual_points_adjustment: 0,
     notes: "",
-    penalty_points: 0,
     raw_result: "",
     result_status: "classified",
     team_id: d.team_id,
   };
+}
+
+// M1 — grid order for the Qualifying step's starting roster. Drivers without
+// a racing number (shouldn't normally happen) sort after, keeping their
+// existing relative order (Array#sort is a stable sort).
+function sortedByRacingNumber(drivers: SessionDriver[]): SessionDriver[] {
+  return [...drivers].sort((a, b) => {
+    if (a.racing_number === null && b.racing_number === null) return 0;
+    if (a.racing_number === null) return 1;
+    if (b.racing_number === null) return -1;
+    return a.racing_number - b.racing_number;
+  });
+}
+
+// M1 — Results step row order follows the quali grid entered a step earlier
+// instead of roster/join-date order. Drivers with no quali position (DNS,
+// etc.) sort after, in their existing order (stable sort).
+function orderByQualifying<T extends { driver_id: string }>(
+  rows: T[],
+  qualifyingRows: QualifyingRow[],
+): T[] {
+  const posByDriver = new Map(qualifyingRows.map((q) => [q.driver_id, q.qualifying_position]));
+  return [...rows].sort((a, b) => {
+    const pa = posByDriver.get(a.driver_id) ?? null;
+    const pb = posByDriver.get(b.driver_id) ?? null;
+    if (pa === null && pb === null) return 0;
+    if (pa === null) return 1;
+    if (pb === null) return -1;
+    return pa - pb;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -173,8 +209,17 @@ function readStoredDraft(key: string): DraftShape | null {
 // Validation
 // ---------------------------------------------------------------------------
 
+// M2 — offending-row info so the Results step can highlight the specific
+// inputs, not just name the position in a Review-step summary.
+interface PositionConflict {
+  driverIds: string[];
+  position: number;
+}
+
 interface ValidationResult {
+  duplicatePositions: PositionConflict[];
   errors: string[];
+  fastestLapDriverIds: string[];
   valid: boolean;
 }
 
@@ -189,18 +234,27 @@ function validateResults(rows: RaceResultRow[]): ValidationResult {
     errors.push("At least one driver must be classified with a finishing position.");
   }
 
-  const positions = classified.map((r) => r.finishing_position!);
-  const dupes = positions.filter((p, i) => positions.indexOf(p) !== i);
-  if (dupes.length > 0) {
-    errors.push(`Duplicate finishing positions: ${[...new Set(dupes)].join(", ")}.`);
+  const byPosition = new Map<number, string[]>();
+  for (const r of classified) {
+    const pos = r.finishing_position!;
+    byPosition.set(pos, [...(byPosition.get(pos) ?? []), r.driver_id]);
+  }
+  const duplicatePositions: PositionConflict[] = [...byPosition.entries()]
+    .filter(([, driverIds]) => driverIds.length > 1)
+    .map(([position, driverIds]) => ({ driverIds, position }));
+  if (duplicatePositions.length > 0) {
+    errors.push(
+      `Duplicate finishing positions: ${duplicatePositions.map((c) => c.position).join(", ")}.`,
+    );
   }
 
-  const fastestLapDrivers = rows.filter((r) => r.fastest_lap);
-  if (fastestLapDrivers.length > 1) {
+  const fastestLapRows = rows.filter((r) => r.fastest_lap);
+  const fastestLapDriverIds = fastestLapRows.length > 1 ? fastestLapRows.map((r) => r.driver_id) : [];
+  if (fastestLapDriverIds.length > 0) {
     errors.push("Only one driver can have the fastest lap.");
   }
 
-  return { errors, valid: errors.length === 0 };
+  return { duplicatePositions, errors, fastestLapDriverIds, valid: errors.length === 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +312,8 @@ function QualifyingStep({
                   </td>
                   <td className="py-2 pr-4">
                     <input
-                      className="w-20 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Qualifying position for ${driver?.display_name ?? row.driver_id}`}
+                      className="w-20 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       min={1}
                       placeholder="—"
                       type="number"
@@ -268,12 +323,14 @@ function QualifyingStep({
                           qualifying_position: e.target.value ? Number(e.target.value) : null,
                         })
                       }
+                      onWheel={(e) => e.currentTarget.blur()}
                     />
                   </td>
                   <td className="py-2 text-center">
                     <input
+                      aria-label={`Pole for ${driver?.display_name ?? row.driver_id}`}
                       checked={row.is_pole}
-                      className="accent-f1-red"
+                      className="accent-f1-red focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       type="checkbox"
                       onChange={() => setPole(row.driver_id)}
                     />
@@ -290,13 +347,17 @@ function QualifyingStep({
 
 function ResultsStep({
   drivers,
+  qualifyingRows,
   rows,
   teams,
+  validation,
   onChange,
 }: {
   drivers: SessionDriver[];
+  qualifyingRows: QualifyingRow[];
   rows: RaceResultRow[];
   teams: LeagueTeam[];
+  validation: ValidationResult;
   onChange: (rows: RaceResultRow[]) => void;
 }) {
   function update(driverId: string, field: Partial<RaceResultRow>) {
@@ -311,7 +372,19 @@ function ResultsStep({
     }
   }
 
+  function driverName(id: string) {
+    return drivers.find((d) => d.driver_id === id)?.display_name ?? id;
+  }
+
   const statuses: ResultStatus[] = ["classified", "dnf", "dns", "dsq", "ban"];
+
+  // M1 — display order follows the quali grid entered a step earlier, not
+  // roster order. Underlying `rows`/`onChange` stay untouched (still keyed
+  // by driver_id) so entered data never jumps.
+  const orderedRows = useMemo(
+    () => orderByQualifying(rows, qualifyingRows),
+    [rows, qualifyingRows],
+  );
 
   return (
     <div className="space-y-3">
@@ -325,19 +398,26 @@ function ResultsStep({
             <tr className="border-b border-f1-border text-left text-xs text-f1-muted">
               <th className="pb-2 pr-3">Driver</th>
               <th className="pb-2 pr-3 w-28">Team</th>
-              <th className="pb-2 pr-3 w-16">Pos</th>
               <th className="pb-2 pr-3 w-28">Status</th>
+              <th className="pb-2 pr-3 w-16">Pos</th>
               <th className="pb-2 pr-3 w-10 text-center">FL</th>
               <th className="pb-2 pr-3 w-20">Adj pts</th>
-              <th className="pb-2 pr-3 w-20">Pen pts</th>
               <th className="pb-2 w-32">Notes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-f1-border">
-            {rows.map((row) => {
+            {orderedRows.map((row) => {
               const driver = drivers.find((d) => d.driver_id === row.driver_id);
               const currentTeam = teams.find((t) => t.id === row.team_id);
               const isNonClassified = row.result_status !== "classified";
+              // M2 — offending rows, highlighted where the data was entered
+              // instead of only in the Review-step summary.
+              const posConflict = validation.duplicatePositions.find((c) =>
+                c.driverIds.includes(row.driver_id),
+              );
+              const hasFlConflict = validation.fastestLapDriverIds.includes(row.driver_id);
+              const posErrorId = `pos-error-${row.driver_id}`;
+              const flErrorId = `fl-error-${row.driver_id}`;
               return (
                 <tr key={row.driver_id}>
                   <td className="py-2 pr-3">
@@ -355,7 +435,8 @@ function ResultsStep({
                   </td>
                   <td className="py-2 pr-3">
                     <select
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Team for ${driverName(row.driver_id)}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       value={row.team_id}
                       onChange={(e) => update(row.driver_id, { team_id: e.target.value })}
                     >
@@ -368,23 +449,9 @@ function ResultsStep({
                     </select>
                   </td>
                   <td className="py-2 pr-3">
-                    <input
-                      className="w-14 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus:border-f1-red focus:outline-none disabled:opacity-40"
-                      disabled={isNonClassified}
-                      min={1}
-                      placeholder="—"
-                      type="number"
-                      value={row.finishing_position ?? ""}
-                      onChange={(e) =>
-                        update(row.driver_id, {
-                          finishing_position: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                    />
-                  </td>
-                  <td className="py-2 pr-3">
                     <select
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus:border-f1-red focus:outline-none uppercase"
+                      aria-label={`Status for ${driverName(row.driver_id)}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none uppercase"
                       value={row.result_status}
                       onChange={(e) => {
                         const status = e.target.value as ResultStatus;
@@ -400,41 +467,67 @@ function ResultsStep({
                       ))}
                     </select>
                   </td>
+                  <td className="py-2 pr-3">
+                    <input
+                      aria-describedby={posConflict ? posErrorId : undefined}
+                      aria-invalid={posConflict ? true : undefined}
+                      aria-label={`Finishing position for ${driverName(row.driver_id)}`}
+                      className={`w-14 border bg-f1-black px-2 py-1 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none disabled:opacity-40 ${
+                        posConflict ? "border-destructive" : "border-f1-border"
+                      }`}
+                      disabled={isNonClassified}
+                      min={1}
+                      placeholder="—"
+                      type="number"
+                      value={row.finishing_position ?? ""}
+                      onChange={(e) =>
+                        update(row.driver_id, {
+                          finishing_position: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      onWheel={(e) => e.currentTarget.blur()}
+                    />
+                    {posConflict && (
+                      <p className="mt-1 w-32 text-xs text-destructive" id={posErrorId}>
+                        P{posConflict.position} assigned to{" "}
+                        {posConflict.driverIds.map((id) => driverName(id)).join(" and ")}
+                      </p>
+                    )}
+                  </td>
                   <td className="py-2 pr-3 text-center">
                     <input
+                      aria-describedby={hasFlConflict ? flErrorId : undefined}
+                      aria-invalid={hasFlConflict ? true : undefined}
+                      aria-label={`Fastest lap for ${driverName(row.driver_id)}`}
                       checked={row.fastest_lap}
-                      className="accent-f1-red"
+                      className={`accent-f1-red focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none ${hasFlConflict ? "outline outline-1 outline-destructive" : ""}`}
                       disabled={isNonClassified}
                       type="checkbox"
                       onChange={(e) => setFastestLap(row.driver_id, e.target.checked)}
                     />
+                    {hasFlConflict && (
+                      <p className="mt-1 w-24 text-xs text-destructive" id={flErrorId}>
+                        Only one fastest lap
+                      </p>
+                    )}
                   </td>
                   <td className="py-2 pr-3">
                     <input
-                      className="w-16 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Points adjustment for ${driverName(row.driver_id)}`}
+                      className="w-16 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       placeholder="0"
                       type="number"
                       value={row.manual_points_adjustment}
                       onChange={(e) =>
                         update(row.driver_id, { manual_points_adjustment: Number(e.target.value) || 0 })
                       }
-                    />
-                  </td>
-                  <td className="py-2 pr-3">
-                    <input
-                      className="w-16 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus:border-f1-red focus:outline-none"
-                      min={0}
-                      placeholder="0"
-                      type="number"
-                      value={row.penalty_points}
-                      onChange={(e) =>
-                        update(row.driver_id, { penalty_points: Math.max(0, Number(e.target.value) || 0) })
-                      }
+                      onWheel={(e) => e.currentTarget.blur()}
                     />
                   </td>
                   <td className="py-2">
                     <input
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Notes for ${driverName(row.driver_id)}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       placeholder="Optional"
                       type="text"
                       value={row.notes}
@@ -494,11 +587,13 @@ function PenaltiesStep({
         <div className="space-y-4">
           {rows.map((row, i) => {
             const driver = drivers.find((d) => d.driver_id === row.driver_id);
+            const entryLabel = driver?.display_name ?? `entry ${i + 1}`;
             return (
               <div className="border border-f1-border bg-f1-dark p-4 space-y-3" key={row.id}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase text-f1-muted">Penalty {i + 1}</span>
                   <button
+                    aria-label={`Remove penalty for ${entryLabel}`}
                     className="text-xs text-f1-muted hover:text-destructive"
                     type="button"
                     onClick={() => remove(i)}
@@ -510,7 +605,8 @@ function PenaltiesStep({
                   <div className="space-y-1">
                     <label className="text-xs text-f1-muted">Driver</label>
                     <select
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Driver for penalty ${entryLabel}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       value={row.driver_id}
                       onChange={(e) => update(i, { driver_id: e.target.value })}
                     >
@@ -525,7 +621,8 @@ function PenaltiesStep({
                   <div className="space-y-1">
                     <label className="text-xs text-f1-muted">Status</label>
                     <select
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Status for penalty ${entryLabel}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       value={row.status}
                       onChange={(e) =>
                         update(i, { status: e.target.value as PenaltyRow["status"] })
@@ -540,7 +637,8 @@ function PenaltiesStep({
                   <div className="space-y-1">
                     <label className="text-xs text-f1-muted">Penalty points</label>
                     <input
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Penalty points for ${entryLabel}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       min={0}
                       type="number"
                       value={row.penalty_points}
@@ -552,7 +650,8 @@ function PenaltiesStep({
                   <div className="space-y-1">
                     <label className="text-xs text-f1-muted">Reason</label>
                     <input
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Reason for penalty ${entryLabel}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       placeholder="Collision at Turn 1"
                       type="text"
                       value={row.reason}
@@ -562,7 +661,8 @@ function PenaltiesStep({
                   <div className="space-y-1 sm:col-span-2">
                     <label className="text-xs text-f1-muted">Steward notes</label>
                     <textarea
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none resize-none"
+                      aria-label={`Steward notes for penalty ${entryLabel}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none resize-none"
                       placeholder="Optional steward notes…"
                       rows={2}
                       value={row.steward_notes}
@@ -573,7 +673,8 @@ function PenaltiesStep({
                     <div className="space-y-1 sm:col-span-2">
                       <label className="text-xs text-f1-muted">Appeal notes</label>
                       <textarea
-                        className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none resize-none"
+                        aria-label={`Appeal notes for penalty ${entryLabel}`}
+                        className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none resize-none"
                         placeholder="Optional appeal notes…"
                         rows={2}
                         value={row.appeal_notes}
@@ -600,14 +701,18 @@ function PenaltiesStep({
 
 function ReviewStep({
   drivers,
+  existingPenaltyTotals,
   penalties,
+  penaltyThreshold,
   qualifyingRows,
   results,
   session,
   validation,
 }: {
   drivers: SessionDriver[];
+  existingPenaltyTotals: ExistingPenaltyTotal[];
   penalties: PenaltyRow[];
+  penaltyThreshold: number | null;
   qualifyingRows: QualifyingRow[];
   results: RaceResultRow[];
   session: SessionInfo;
@@ -627,6 +732,10 @@ function ReviewStep({
       penaltyPtsByDriver.set(p.driver_id, (penaltyPtsByDriver.get(p.driver_id) ?? 0) + p.penalty_points);
     }
   }
+
+  const existingPenaltyTotalByDriver = new Map(
+    existingPenaltyTotals.map((t) => [t.driver_id, t.penalty_points]),
+  );
 
   return (
     <div className="space-y-6">
@@ -672,12 +781,15 @@ function ReviewStep({
                   session.pole_position_enabled,
                 );
                 const champTotal = racePts + row.manual_points_adjustment;
-                const banAlert =
-                  row.result_status === "ban" ||
-                  (penaltyPtsByDriver.get(row.driver_id) ?? 0) > 0;
+                const isBan = row.result_status === "ban";
+                const projectedPenaltyTotal =
+                  (existingPenaltyTotalByDriver.get(row.driver_id) ?? 0) +
+                  (penaltyPtsByDriver.get(row.driver_id) ?? 0);
+                const isThresholdAlert =
+                  !isBan && penaltyThreshold != null && projectedPenaltyTotal >= penaltyThreshold;
 
                 return (
-                  <tr key={row.driver_id} className={banAlert ? "bg-destructive/10" : ""}>
+                  <tr key={row.driver_id} className={isBan || isThresholdAlert ? "bg-destructive/10" : ""}>
                     <td className="py-2 pr-4 font-mono text-f1-muted">
                       {row.finishing_position ?? "—"}
                     </td>
@@ -691,7 +803,15 @@ function ReviewStep({
                         <span className="text-f1-white">{driver?.display_name ?? row.driver_id}</span>
                         {row.fastest_lap && <span className="text-xs text-purple-400">FL</span>}
                         {qRow?.is_pole && <span className="text-xs text-yellow-400">PP</span>}
-                        {banAlert && <span className="text-xs text-destructive uppercase">Ban alert</span>}
+                        {isBan && <span className="text-xs text-destructive uppercase">Ban</span>}
+                        {isThresholdAlert && (
+                          <span
+                            className="text-xs text-destructive uppercase"
+                            title="Alert only — admin decision required"
+                          >
+                            Threshold alert
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="py-2 pr-4">
@@ -710,7 +830,9 @@ function ReviewStep({
                         : "—"}
                     </td>
                     <td className="py-2 pr-3 text-right font-mono text-f1-muted">
-                      {row.penalty_points > 0 ? row.penalty_points : "—"}
+                      {(penaltyPtsByDriver.get(row.driver_id) ?? 0) > 0
+                        ? penaltyPtsByDriver.get(row.driver_id)
+                        : "—"}
                     </td>
                     <td className="py-2 text-right font-mono font-bold text-f1-white">{champTotal}</td>
                   </tr>
@@ -761,17 +883,29 @@ function ReviewStep({
 
 interface ResultStepperProps {
   drivers: SessionDriver[];
+  existingPenaltyTotals?: ExistingPenaltyTotal[];
+  leagueSlug?: string;
+  penaltyThreshold?: number | null;
   session: SessionInfo;
   teams: LeagueTeam[];
 }
 
-export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
-  const router = useRouter();
+export function ResultStepper({
+  drivers,
+  existingPenaltyTotals = [],
+  leagueSlug = "",
+  penaltyThreshold = null,
+  session,
+  teams,
+}: ResultStepperProps) {
   const csrfToken = useCsrfToken();
+
+  // M1 — Qualifying step's starting grid order (see sortedByRacingNumber).
+  const qualifyingDrivers = useMemo(() => sortedByRacingNumber(drivers), [drivers]);
 
   const [step, setStep] = useState<Step>("qualifying");
   const [qualifyingRows, setQualifyingRows] = useState<QualifyingRow[]>(() =>
-    drivers.map(defaultQualifyingRow),
+    qualifyingDrivers.map(defaultQualifyingRow),
   );
   const [resultRows, setResultRows] = useState<RaceResultRow[]>(() =>
     drivers.map(defaultResultRow),
@@ -779,6 +913,7 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
   const [penaltyRows, setPenaltyRows] = useState<PenaltyRow[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishSuccess, setPublishSuccess] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
 
   const draftKey = `result-stepper-draft:${session.id}`;
@@ -790,11 +925,11 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
     () =>
       JSON.stringify({
         penaltyRows: [],
-        qualifyingRows: drivers.map(defaultQualifyingRow),
+        qualifyingRows: qualifyingDrivers.map(defaultQualifyingRow),
         resultRows: drivers.map(defaultResultRow),
         step: "qualifying",
       }),
-    [drivers],
+    [drivers, qualifyingDrivers],
   );
 
   // Restore a saved draft after mount only — reading sessionStorage during
@@ -810,11 +945,11 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
     if (JSON.stringify(draft) === pristineJson) return;
 
     setStep(draft.step);
-    setQualifyingRows(mergeRows(draft.qualifyingRows, drivers, defaultQualifyingRow));
+    setQualifyingRows(mergeRows(draft.qualifyingRows, qualifyingDrivers, defaultQualifyingRow));
     setResultRows(mergeRows(draft.resultRows, drivers, defaultResultRow));
     setPenaltyRows(draft.penaltyRows.filter((p) => drivers.some((d) => d.driver_id === p.driver_id)));
     setDraftRestored(true);
-  }, [draftKey, drivers, pristineJson]);
+  }, [draftKey, drivers, pristineJson, qualifyingDrivers]);
 
   // Persist on change. Skipping the pristine state means an untouched (or
   // just-discarded) stepper never writes a draft, so the restore notice only
@@ -831,13 +966,20 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
   }, [draftKey, penaltyRows, pristineJson, qualifyingRows, resultRows, step]);
 
   function discardDraft() {
+    if (
+      !confirm(
+        "Discard the entire draft? All entered qualifying, race, and penalty data will be lost.",
+      )
+    ) {
+      return;
+    }
     try {
       sessionStorage.removeItem(draftKey);
     } catch {
       // Ignore storage errors.
     }
     setStep("qualifying");
-    setQualifyingRows(drivers.map(defaultQualifyingRow));
+    setQualifyingRows(qualifyingDrivers.map(defaultQualifyingRow));
     setResultRows(drivers.map(defaultResultRow));
     setPenaltyRows([]);
     setDraftRestored(false);
@@ -875,7 +1017,6 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
         finishing_position: r.finishing_position,
         manual_points_adjustment: r.manual_points_adjustment,
         notes: r.notes || null,
-        penalty_points: r.penalty_points,
         raw_result: r.raw_result || null,
         result_status: r.result_status,
         team_id: r.team_id,
@@ -907,8 +1048,17 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setPublishError((body as { error?: string }).error ?? "Failed to publish session.");
+        const body: unknown = await res.json().catch(() => ({}));
+        const rawError = (body as { error?: unknown }).error;
+        // N5(c) — the 422 path can send an object instead of a string; render
+        // never gets a non-string into FormError.
+        setPublishError(
+          typeof rawError === "string"
+            ? rawError
+            : rawError !== undefined
+            ? "Validation failed on the server — check the review step."
+            : "Failed to publish session.",
+        );
         return;
       }
 
@@ -918,11 +1068,40 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
         // Ignore storage errors.
       }
 
-      router.push(`/admin/leagues/${session.league_id}`);
-      router.refresh();
+      // P1 — stay put and show a success banner instead of an unannounced
+      // redirect; the banner links out to the public result and back to the
+      // league admin page.
+      setPublishSuccess(true);
     } finally {
       setPublishing(false);
     }
+  }
+
+  if (publishSuccess) {
+    return (
+      <div
+        className="space-y-3 border border-green-700 bg-green-900/10 p-6"
+        role="status"
+      >
+        <p className="text-sm font-bold text-green-400">Results published.</p>
+        <div className="flex gap-4 text-xs font-bold uppercase">
+          {leagueSlug && (
+            <Link
+              className="text-f1-white underline hover:text-f1-red"
+              href={`/leagues/${leagueSlug}/results/${session.id}`}
+            >
+              View public result
+            </Link>
+          )}
+          <Link
+            className="text-f1-white underline hover:text-f1-red"
+            href={`/admin/leagues/${session.league_id}`}
+          >
+            Back to league
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -945,6 +1124,12 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
         ))}
       </nav>
 
+      {/* M20a — announce step changes to screen readers; the visual nav above
+          gives no other signal that the panel below has changed. */}
+      <div aria-live="polite" className="sr-only">
+        {`Step ${stepIdx + 1} of ${STEPS.length}: ${STEP_LABELS[step]}`}
+      </div>
+
       {/* Draft restored notice */}
       {draftRestored && (
         <div className="flex items-center justify-between gap-4 border border-f1-border bg-f1-dark px-4 py-2 text-xs text-f1-muted">
@@ -961,6 +1146,7 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
 
       {/* Step content */}
       <div className="border border-f1-border bg-f1-dark p-4 sm:p-6">
+        <h2 className="mb-4 text-sm font-bold uppercase text-f1-white">{STEP_LABELS[step]}</h2>
         {step === "qualifying" && (
           <QualifyingStep
             drivers={drivers}
@@ -971,8 +1157,10 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
         {step === "results" && (
           <ResultsStep
             drivers={drivers}
+            qualifyingRows={qualifyingRows}
             rows={resultRows}
             teams={teams}
+            validation={validation}
             onChange={setResultRows}
           />
         )}
@@ -986,7 +1174,9 @@ export function ResultStepper({ drivers, session, teams }: ResultStepperProps) {
         {step === "review" && (
           <ReviewStep
             drivers={drivers}
+            existingPenaltyTotals={existingPenaltyTotals}
             penalties={penaltyRows}
+            penaltyThreshold={penaltyThreshold}
             qualifyingRows={qualifyingRows}
             results={resultRows}
             session={session}

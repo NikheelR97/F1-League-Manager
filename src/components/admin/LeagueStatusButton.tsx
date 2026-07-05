@@ -20,9 +20,16 @@ export function LeagueStatusButton({ leagueId, currentStatus }: LeagueStatusButt
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   const next = NEXT_STATUS[currentStatus];
-  if (!next) return null;
+  if (!next) {
+    return message ? (
+      <p className="text-xs font-bold uppercase text-f1-muted" role="status">
+        {message}
+      </p>
+    ) : null;
+  }
 
   async function handleClick() {
     if (!csrfToken) return;
@@ -43,6 +50,7 @@ export function LeagueStatusButton({ leagueId, currentStatus }: LeagueStatusButt
         const data = (await res.json()) as { error?: string };
         setError(data.error ?? "Failed to update status");
       } else {
+        setMessage(next.target === "archived" ? "League archived." : "League activated.");
         router.refresh();
       }
     } catch {
@@ -69,6 +77,11 @@ export function LeagueStatusButton({ leagueId, currentStatus }: LeagueStatusButt
         {busy ? "Updating…" : next.label}
       </button>
       {error && <p className="text-xs text-f1-red">{error}</p>}
+      {message && (
+        <p className="text-xs font-bold uppercase text-f1-muted" role="status">
+          {message}
+        </p>
+      )}
     </div>
   );
 }
