@@ -44,7 +44,7 @@ export interface SessionInfo {
   points_system: PointsSystemPreview;
 }
 
-interface QualifyingRow {
+export interface QualifyingRow {
   driver_id: string;
   is_pole: boolean;
   qualifying_position: number | null;
@@ -53,7 +53,7 @@ interface QualifyingRow {
 
 type ResultStatus = "classified" | "dnf" | "dns" | "dsq" | "ban";
 
-interface RaceResultRow {
+export interface RaceResultRow {
   driver_id: string;
   fastest_lap: boolean;
   finishing_position: number | null;
@@ -74,7 +74,23 @@ export interface ExistingPenaltyTotal {
   penalty_points: number;
 }
 
-interface PenaltyRow {
+// M3 — a driver's current season standing, used to preview the championship
+// consequence (current -> projected) of publishing this session.
+export interface DriverStandingEntry {
+  driver_id: string;
+  total_points: number;
+}
+
+// M9 — a driver's points from this session's most recent publish
+// (points_awarded + manual_points_adjustment). Used only in correction mode
+// so the Season projection doesn't double-count points this session already
+// contributed before the correction.
+export interface PreviousSessionPoints {
+  driver_id: string;
+  points: number;
+}
+
+export interface PenaltyRow {
   id: string;
   appeal_notes: string;
   driver_id: string;
@@ -753,19 +769,25 @@ function PenaltiesStep({
 }
 
 function ReviewStep({
+  correctionMode,
+  driverStandings,
   drivers,
   existingPenaltyTotals,
   penalties,
   penaltyThreshold,
+  previousSessionPoints,
   qualifyingRows,
   results,
   session,
   validation,
 }: {
+  correctionMode: boolean;
+  driverStandings: DriverStandingEntry[];
   drivers: SessionDriver[];
   existingPenaltyTotals: ExistingPenaltyTotal[];
   penalties: PenaltyRow[];
   penaltyThreshold: number | null;
+  previousSessionPoints: PreviousSessionPoints[];
   qualifyingRows: QualifyingRow[];
   results: RaceResultRow[];
   session: SessionInfo;
@@ -789,6 +811,45 @@ function ReviewStep({
   const existingPenaltyTotalByDriver = new Map(
     existingPenaltyTotals.map((t) => [t.driver_id, t.penalty_points]),
   );
+
+  // M3 — championship consequence preview: current season total, plus this
+  // session's previewed points. In correction mode the current total already
+  // includes this session's *previous* publish, so that amount is subtracted
+  // first to avoid double-counting it.
+  const standingsByDriver = new Map(driverStandings.map((s) => [s.driver_id, s.total_points]));
+  const previousSessionPointsByDriver = new Map(
+    previousSessionPoints.map((p) => [p.driver_id, p.points]),
+  );
+  const projectedByDriver = new Map<string, number>();
+  const allProjectedDriverIds = new Set([
+    ...standingsByDriver.keys(),
+    ...results.map((r) => r.driver_id),
+  ]);
+  for (const driverId of allProjectedDriverIds) {
+    const row = results.find((r) => r.driver_id === driverId);
+    const qRow = qualifyingRows.find((q) => q.driver_id === driverId);
+    const sessionPts = row
+      ? previewRacePoints(
+          row,
+          qRow,
+          session.points_system,
+          session.fastest_lap_enabled,
+          session.pole_position_enabled,
+        ) + row.manual_points_adjustment
+      : 0;
+    const previousPts = correctionMode ? (previousSessionPointsByDriver.get(driverId) ?? 0) : 0;
+    projectedByDriver.set(driverId, (standingsByDriver.get(driverId) ?? 0) - previousPts + sessionPts);
+  }
+  // ponytail: points-only sort — countback (F1-style tie-break by best finish)
+  // lives server-side in buildDriverStandings; this preview just ranks totals.
+  const projectedTop3 = [...projectedByDriver.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([driverId, total], i) => {
+      const driver = drivers.find((d) => d.driver_id === driverId);
+      return `${i + 1}. ${driver?.display_name ?? driverId} ${total}`;
+    })
+    .join(" · ");
 
   return (
     <div className="space-y-6">
@@ -819,7 +880,8 @@ function ReviewStep({
                 <th className="pb-2 pr-3 text-right">Race pts</th>
                 <th className="pb-2 pr-3 text-right">Adj</th>
                 <th className="pb-2 pr-3 text-right">Pen pts</th>
-                <th className="pb-2 text-right">Total champ</th>
+                <th className="pb-2 pr-3 text-right">Total champ</th>
+                <th className="pb-2 text-right">Season</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-f1-border">
@@ -834,6 +896,8 @@ function ReviewStep({
                   session.pole_position_enabled,
                 );
                 const champTotal = racePts + row.manual_points_adjustment;
+                const currentSeasonTotal = standingsByDriver.get(row.driver_id) ?? 0;
+                const projectedSeasonTotal = projectedByDriver.get(row.driver_id) ?? currentSeasonTotal;
                 const isBan = row.result_status === "ban";
                 const penPts = penaltyPtsByDriver.get(row.driver_id) ?? 0;
                 const projectedPenaltyTotal =
@@ -885,13 +949,20 @@ function ReviewStep({
                     <td className="py-2 pr-3 text-right font-mono text-f1-muted">
                       {penPts > 0 ? penPts : "—"}
                     </td>
-                    <td className="py-2 text-right font-mono font-bold text-f1-white">{champTotal}</td>
+                    <td className="py-2 pr-3 text-right font-mono font-bold text-f1-white">{champTotal}</td>
+                    <td className="py-2 text-right font-mono text-f1-muted">
+                      <span>{currentSeasonTotal}</span> <span aria-hidden="true">&rarr;</span>{" "}
+                      <span className="text-f1-white">{projectedSeasonTotal}</span>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
+        {projectedTop3 && (
+          <p className="mt-2 text-xs text-f1-muted">Projected: {projectedTop3}</p>
+        )}
       </section>
 
       {/* Formal penalties */}
@@ -938,20 +1009,39 @@ interface ResultStepperProps {
   // one prior session; a durable ban ledger (spanning every session since
   // the ban) is the upgrade path if that's ever needed.
   bannedLastRoundDriverIds?: string[];
+  // M9 — true when correcting an already-published session. Prefills from
+  // published data (initial*Rows below) instead of blank rows, bypasses the
+  // sessionStorage draft entirely, and republishes rather than blocking.
+  correctionMode?: boolean;
+  // M3 — current season standings, used to preview the championship
+  // consequence of publishing on the Review step.
+  driverStandings?: DriverStandingEntry[];
   drivers: SessionDriver[];
   existingPenaltyTotals?: ExistingPenaltyTotal[];
+  initialPenaltyRows?: PenaltyRow[];
+  initialQualifyingRows?: QualifyingRow[];
+  initialResultRows?: RaceResultRow[];
   leagueSlug?: string;
   penaltyThreshold?: number | null;
+  // M9/M3 — this session's previously-published per-driver points, used only
+  // in correction mode to avoid double-counting in the Season projection.
+  previousSessionPoints?: PreviousSessionPoints[];
   session: SessionInfo;
   teams: LeagueTeam[];
 }
 
 export function ResultStepper({
   bannedLastRoundDriverIds = [],
+  correctionMode = false,
+  driverStandings = [],
   drivers,
   existingPenaltyTotals = [],
+  initialPenaltyRows,
+  initialQualifyingRows,
+  initialResultRows,
   leagueSlug = "",
   penaltyThreshold = null,
+  previousSessionPoints = [],
   session,
   teams,
 }: ResultStepperProps) {
@@ -962,12 +1052,16 @@ export function ResultStepper({
 
   const [step, setStep] = useState<Step>("qualifying");
   const [qualifyingRows, setQualifyingRows] = useState<QualifyingRow[]>(() =>
-    qualifyingDrivers.map(defaultQualifyingRow),
+    initialQualifyingRows
+      ? mergeRows(initialQualifyingRows, qualifyingDrivers, defaultQualifyingRow)
+      : qualifyingDrivers.map(defaultQualifyingRow),
   );
   const [resultRows, setResultRows] = useState<RaceResultRow[]>(() =>
-    drivers.map(defaultResultRow),
+    initialResultRows
+      ? mergeRows(initialResultRows, drivers, defaultResultRow)
+      : drivers.map(defaultResultRow),
   );
-  const [penaltyRows, setPenaltyRows] = useState<PenaltyRow[]>([]);
+  const [penaltyRows, setPenaltyRows] = useState<PenaltyRow[]>(() => initialPenaltyRows ?? []);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishSuccess, setPublishSuccess] = useState(false);
@@ -993,6 +1087,9 @@ export function ResultStepper({
   // the initial render (e.g. in a useState initializer) would produce a
   // client/server markup mismatch since this component is server-rendered.
   useEffect(() => {
+    // M9 — published data must win over a stale draft; correction mode never
+    // reads (or writes, below) the sessionStorage draft for this session.
+    if (correctionMode) return;
     if (draftRef.current !== "pending") return;
     draftRef.current = readStoredDraft(draftKey);
 
@@ -1006,13 +1103,14 @@ export function ResultStepper({
     setResultRows(mergeRows(draft.resultRows, drivers, defaultResultRow));
     setPenaltyRows(draft.penaltyRows.filter((p) => drivers.some((d) => d.driver_id === p.driver_id)));
     setDraftRestored(true);
-  }, [draftKey, drivers, pristineJson, qualifyingDrivers]);
+  }, [correctionMode, draftKey, drivers, pristineJson, qualifyingDrivers]);
 
   // Persist on change. Skipping the pristine state means an untouched (or
   // just-discarded) stepper never writes a draft, so the restore notice only
   // ever appears when there is real work to restore. A quota or privacy-mode
   // failure must never interrupt data entry, so setItem is best-effort.
   useEffect(() => {
+    if (correctionMode) return;
     const json = JSON.stringify({ penaltyRows, qualifyingRows, resultRows, step });
     if (json === pristineJson) return;
     try {
@@ -1020,7 +1118,7 @@ export function ResultStepper({
     } catch {
       // Ignore storage errors (quota exceeded, private browsing, etc.).
     }
-  }, [draftKey, penaltyRows, pristineJson, qualifyingRows, resultRows, step]);
+  }, [correctionMode, draftKey, penaltyRows, pristineJson, qualifyingRows, resultRows, step]);
 
   function discardDraft() {
     if (
@@ -1055,6 +1153,14 @@ export function ResultStepper({
 
   async function handlePublish() {
     if (!validation.valid) return;
+    if (
+      correctionMode &&
+      !confirm(
+        "Republish corrected results? This replaces the current public result and recalculates standings.",
+      )
+    ) {
+      return;
+    }
 
     setPublishError(null);
     setPublishing(true);
@@ -1097,6 +1203,7 @@ export function ResultStepper({
           league_id: session.league_id,
           penalties,
           qualifying,
+          republish: correctionMode,
           results,
         }),
         headers: {
@@ -1189,6 +1296,14 @@ export function ResultStepper({
         {`Step ${stepIdx + 1} of ${STEPS.length}: ${STEP_LABELS[step]}`}
       </div>
 
+      {/* M9 — correction-mode warning, shown on every step (not just Review) */}
+      {correctionMode && (
+        <div className="border border-yellow-700 bg-yellow-900/10 px-4 py-3 text-sm text-yellow-400">
+          <span className="font-bold uppercase">Editing published results</span> — publishing
+          again replaces the current public result and recalculates standings.
+        </div>
+      )}
+
       {/* Draft restored notice */}
       {draftRestored && (
         <div className="flex items-center justify-between gap-4 border border-f1-border bg-f1-dark px-4 py-2 text-xs text-f1-muted">
@@ -1234,10 +1349,13 @@ export function ResultStepper({
         )}
         {step === "review" && (
           <ReviewStep
+            correctionMode={correctionMode}
+            driverStandings={driverStandings}
             drivers={drivers}
             existingPenaltyTotals={existingPenaltyTotals}
             penalties={penaltyRows}
             penaltyThreshold={penaltyThreshold}
+            previousSessionPoints={previousSessionPoints}
             qualifyingRows={qualifyingRows}
             results={resultRows}
             session={session}
@@ -1274,7 +1392,11 @@ export function ResultStepper({
             type="button"
             onClick={handlePublish}
           >
-            {publishing ? "Publishing…" : "Publish Results"}
+            {publishing
+              ? "Publishing…"
+              : correctionMode
+              ? "Republish corrected results"
+              : "Publish Results"}
           </button>
         )}
       </div>

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { formatDate } from "@/lib/format-date";
 import { getDriverPenaltyTotals } from "@/lib/penalties/get-driver-penalty-totals";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -182,8 +183,8 @@ export default async function DriverProfilePage({
                     <span className="text-f1-white">{team?.name ?? "—"}</span>
                   </div>
                   <span className="font-mono text-xs text-f1-muted">
-                    {new Date(s.starts_on).toLocaleDateString("en-GB")} –{" "}
-                    {s.ends_on ? new Date(s.ends_on).toLocaleDateString("en-GB") : "present"}
+                    {formatDate(s.starts_on)} –{" "}
+                    {s.ends_on ? formatDate(s.ends_on) : "present"}
                   </span>
                 </li>
               );

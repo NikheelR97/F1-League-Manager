@@ -1,9 +1,19 @@
 import "server-only";
 
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { ResultStepper, type LeagueTeam, type SessionDriver, type SessionInfo } from "@/components/admin/ResultStepper";
+import {
+  ResultStepper,
+  type DriverStandingEntry,
+  type LeagueTeam,
+  type PenaltyRow,
+  type PreviousSessionPoints,
+  type QualifyingRow,
+  type RaceResultRow,
+  type SessionDriver,
+  type SessionInfo,
+} from "@/components/admin/ResultStepper";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { getDriverPenaltyTotals } from "@/lib/penalties/get-driver-penalty-totals";
 import { resolveStintForDate } from "@/lib/results/publish-service";
@@ -59,10 +69,11 @@ export default async function SessionPublishPage({
     return <ErrorState message="Failed to load driver roster." />;
   }
 
-  // Already published — redirect to league admin
-  if (session.status === "completed") {
-    redirect(`/admin/leagues/${leagueId}`);
-  }
+  // M9 — a completed session is no longer a dead end: instead of redirecting
+  // away, the stepper reopens pre-filled with the published data so an admin
+  // can correct a mistyped result. The service's upsert/delete-then-insert
+  // writes are already idempotent, so republishing is safe by design.
+  const correctionMode = session.status === "completed";
 
   const ps = session.points_systems as unknown as {
     fastest_lap_points: number;
@@ -154,18 +165,125 @@ export default async function SessionPublishPage({
     bannedLastRoundDriverIds = (banResults ?? []).map((r) => r.driver_id);
   }
 
+  // M3 — current season standings, used by the Review step to preview each
+  // driver's projected championship total (current -> projected).
+  const { data: standingsRows } = await db
+    .from("driver_standings")
+    .select("driver_id, total_points")
+    .eq("league_id", leagueId)
+    .eq("season_id", session.season_id);
+  const driverStandings: DriverStandingEntry[] = (standingsRows ?? []).map((s) => ({
+    driver_id: s.driver_id,
+    total_points: s.total_points,
+  }));
+
+  // M9 — correction mode: load this session's already-published data so the
+  // stepper reopens pre-filled instead of blank. ResultStepper bypasses the
+  // sessionStorage draft entirely in correction mode, so this published data
+  // always wins over anything stale left in the browser.
+  // ponytail: a driver who has since left the league roster (`entries` above
+  // only includes currently-active drivers) won't appear in the correction
+  // form even if they have a published result here; their old race_results
+  // row is left untouched (upsert, not delete-then-insert) rather than lost.
+  // Upgrade path if this bites: include departed drivers with a result for
+  // this specific session, not just the active roster.
+  let initialQualifyingRows: QualifyingRow[] | undefined;
+  let initialResultRows: RaceResultRow[] | undefined;
+  let initialPenaltyRows: PenaltyRow[] | undefined;
+  let previousSessionPoints: PreviousSessionPoints[] = [];
+
+  if (correctionMode) {
+    const [
+      { data: publishedQualifying },
+      { data: publishedResults },
+      { data: publishedPenalties },
+      { data: reserveAssignments },
+    ] = await Promise.all([
+      db
+        .from("qualifying_results")
+        .select("driver_id, team_id, qualifying_position, is_pole")
+        .eq("race_session_id", sessionId),
+      db
+        .from("race_results")
+        .select(
+          "driver_id, team_id, finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, raw_result, notes",
+        )
+        .eq("race_session_id", sessionId),
+      db
+        .from("penalties")
+        .select("id, driver_id, penalty_points, reason, status, steward_notes, appeal_notes")
+        .eq("race_session_id", sessionId),
+      // B7 — reserve coverage lives in its own table, not on race_results.
+      db
+        .from("race_reserve_assignments")
+        .select("reserve_driver_id, original_driver_id")
+        .eq("race_session_id", sessionId),
+    ]);
+
+    const coveringForByReserve = new Map(
+      (reserveAssignments ?? []).map((r) => [r.reserve_driver_id, r.original_driver_id]),
+    );
+
+    initialQualifyingRows = (publishedQualifying ?? []).map((q) => ({
+      driver_id: q.driver_id,
+      is_pole: q.is_pole,
+      qualifying_position: q.qualifying_position,
+      team_id: q.team_id,
+    }));
+
+    initialResultRows = (publishedResults ?? []).map((r) => ({
+      covering_for_driver_id: coveringForByReserve.get(r.driver_id) ?? null,
+      driver_id: r.driver_id,
+      fastest_lap: r.fastest_lap,
+      finishing_position: r.finishing_position,
+      manual_points_adjustment: r.manual_points_adjustment,
+      notes: r.notes ?? "",
+      raw_result: r.raw_result ?? "",
+      result_status: r.result_status,
+      team_id: r.team_id,
+    }));
+
+    initialPenaltyRows = (publishedPenalties ?? []).map((p) => ({
+      id: p.id,
+      appeal_notes: p.appeal_notes ?? "",
+      driver_id: p.driver_id,
+      penalty_points: p.penalty_points,
+      reason: p.reason,
+      status: p.status,
+      steward_notes: p.steward_notes ?? "",
+    }));
+
+    // M3 — this session's own contribution to each driver's current standings
+    // total; subtracted in the Review step's projection so a republish never
+    // double-counts points this session already contributed.
+    previousSessionPoints = (publishedResults ?? []).map((r) => ({
+      driver_id: r.driver_id,
+      points: r.points_awarded + r.manual_points_adjustment,
+    }));
+  }
+
   return (
     <div className="space-y-8">
       <AdminPageHeader
-        description={`Publish results for this session`}
+        description={
+          correctionMode
+            ? "Correct published results for this session"
+            : "Publish results for this session"
+        }
         title={session.name}
       />
       <ResultStepper
         bannedLastRoundDriverIds={bannedLastRoundDriverIds}
+        correctionMode={correctionMode}
+        driverStandings={driverStandings}
         drivers={drivers}
         existingPenaltyTotals={existingPenaltyTotals}
+        initialPenaltyRows={initialPenaltyRows}
+        initialQualifyingRows={initialQualifyingRows}
+        initialResultRows={initialResultRows}
         leagueSlug={league.slug}
         penaltyThreshold={league.penalty_threshold ?? null}
+        previousSessionPoints={previousSessionPoints}
         session={sessionInfo}
         teams={leagueTeams}
       />

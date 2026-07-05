@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { formatDate } from "@/lib/format-date";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 
 interface SetupCardProps {
@@ -63,11 +64,7 @@ export function SetupCard({
     }
   }
 
-  const updatedDate = new Date(updatedAt).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const updatedDate = formatDate(updatedAt);
 
   return (
     <div className="flex flex-col border border-f1-border bg-f1-dark transition-colors hover:border-f1-red">

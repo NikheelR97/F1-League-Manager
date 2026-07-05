@@ -25,7 +25,7 @@ export default async function LeagueCalendarPage({
 
   const { data: sessions, error: sessionsError } = await db
     .from("race_sessions")
-    .select("id, name, session_code, race_number, scheduled_at, status, circuits(name, country)")
+    .select("id, name, session_code, race_number, scheduled_at, status, circuits(name, country, round_number)")
     .eq("league_id", league.id)
     .in("status", ["scheduled", "completed"])
     .order("scheduled_at", { ascending: true });
@@ -60,12 +60,12 @@ export default async function LeagueCalendarPage({
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {upcoming.map((session) => {
-                const circuit = session.circuits as unknown as { name: string; country: string } | null;
+                const circuit = session.circuits as unknown as { name: string; country: string; round_number: number | null } | null;
                 return (
                   <div key={session.id} className="flex flex-col border border-f1-border bg-f1-dark hover:border-f1-red transition-colors">
                     <div className="border-b border-f1-border p-4 bg-black/20">
                       <p className="text-xs font-bold uppercase text-f1-red-text mb-1">
-                        Race {session.race_number}
+                        {circuit?.round_number ? `Round ${circuit.round_number}` : `Race ${session.race_number}`}
                       </p>
                       <h3 className="text-lg font-bold text-f1-white line-clamp-1">{session.name}</h3>
                       {circuit && (
@@ -119,13 +119,14 @@ export default async function LeagueCalendarPage({
                 </thead>
                 <tbody className="divide-y divide-f1-border">
                   {completed.map((session) => {
-                    const circuit = session.circuits as unknown as { name: string; country: string } | null;
+                    const circuit = session.circuits as unknown as { name: string; country: string; round_number: number | null } | null;
                     return (
                       <tr key={session.id} className="transition-colors hover:bg-black/20">
                         <td className="px-4 py-3 whitespace-nowrap">
                           {formatDate(session.scheduled_at)}
                         </td>
                         <td className="px-4 py-3 font-bold">
+                          {circuit?.round_number ? `Round ${circuit.round_number} · ` : ""}
                           {session.name}
                         </td>
                         <td className="px-4 py-3 text-f1-muted">
@@ -148,12 +149,13 @@ export default async function LeagueCalendarPage({
 
             <ul className="space-y-2 md:hidden">
               {completed.map((session) => {
-                const circuit = session.circuits as unknown as { name: string; country: string } | null;
+                const circuit = session.circuits as unknown as { name: string; country: string; round_number: number | null } | null;
                 return (
                   <li key={session.id} className="border border-f1-border bg-f1-dark p-3">
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="font-bold text-f1-white">
+                          {circuit?.round_number ? `Round ${circuit.round_number} · ` : ""}
                           {session.name}
                         </p>
                         <p className="text-xs text-f1-muted">

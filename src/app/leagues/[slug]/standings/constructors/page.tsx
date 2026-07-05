@@ -10,6 +10,7 @@ import { StandingsSearch } from "@/components/league/StandingsSearch";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
 import { cacheTag } from "@/lib/cache/tags";
+import { formatGap } from "@/lib/format-gap";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { resolveLeagueSeasons, type LeagueSeason } from "@/lib/public/resolve-league-seasons";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -143,7 +144,7 @@ export default async function ConstructorStandingsPage({
             <tbody>
               {standings.map((row) => {
                 const team = row.teams as unknown as TeamRow | null;
-                const gap = row.position === 1 ? "-" : `-${leaderPoints - row.total_points}`;
+                const gap = formatGap(leaderPoints, row.total_points, row.position);
                 return (
                   <tr key={row.position} className="border-b border-f1-border/40 hover:bg-f1-dark" data-driver-name={team?.name.toLowerCase()}>
                     <td className="py-2 pr-4 font-mono font-bold text-f1-white">{row.position}</td>
@@ -182,7 +183,7 @@ export default async function ConstructorStandingsPage({
           <ul className="space-y-2 md:hidden">
             {standings.map((row) => {
               const team = row.teams as unknown as TeamRow | null;
-              const gap = row.position === 1 ? "Leader" : `-${leaderPoints - row.total_points} pts`;
+              const gap = formatGap(leaderPoints, row.total_points, row.position);
               return (
                 <li key={row.position} className="border border-f1-border bg-f1-dark p-3" data-driver-name={team?.name.toLowerCase()}>
                   <div className="flex items-center justify-between">

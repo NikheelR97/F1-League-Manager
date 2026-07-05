@@ -476,6 +476,35 @@ describe("checkPublishPreconditions — duplicate publish returns conflict (test
   });
 });
 
+describe("checkPublishPreconditions — republish (M9 correction path)", () => {
+  it("still returns 409 for a completed session when republish is not set", () => {
+    const result = checkPublishPreconditions({ status: "completed" }, false, mockLeague, mockPs);
+    expect(result).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("returns null for a completed session when republish is true", () => {
+    const result = checkPublishPreconditions(
+      { status: "completed" },
+      false,
+      mockLeague,
+      mockPs,
+      true,
+    );
+    expect(result).toBeNull();
+  });
+
+  it("republish=true has no effect on a non-completed session", () => {
+    const result = checkPublishPreconditions(
+      { status: "scheduled" },
+      false,
+      mockLeague,
+      mockPs,
+      true,
+    );
+    expect(result).toBeNull();
+  });
+});
+
 describe("validatePublishResults — server-side cross-field validation (test 10)", () => {
   const base: RaceResultEntry = {
     driver_id: "d1",

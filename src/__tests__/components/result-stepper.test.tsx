@@ -45,6 +45,7 @@ const session: SessionInfo = {
 const draftKey = `result-stepper-draft:${session.id}`;
 
 const defaultResultRow = {
+  covering_for_driver_id: null as string | null,
   fastest_lap: false,
   finishing_position: null as number | null,
   manual_points_adjustment: 0,
@@ -519,6 +520,175 @@ describe("ResultStepper banned-last-round badge (B2/B3)", () => {
     render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
 
     expect(screen.queryByText("Banned last round")).not.toBeInTheDocument();
+  });
+});
+
+describe("ResultStepper correction mode (M9)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/csrf") {
+          return Promise.resolve(new Response(JSON.stringify({ token: "test-token" })));
+        }
+        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      }),
+    );
+  });
+
+  it("shows the correction warning banner and a Republish button", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(
+      <ResultStepper correctionMode drivers={drivers} session={session} teams={teams} />,
+    );
+
+    expect(screen.getByText(/Editing published results/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    // Banner persists across steps, not just the step it started on.
+    expect(screen.getByText(/Editing published results/i)).toBeInTheDocument();
+  });
+
+  it("prefills from published data and ignores a stale sessionStorage draft", async () => {
+    const user = userEvent.setup();
+    sessionStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        step: "results",
+        qualifyingRows: [{ driver_id: "driver-1", is_pole: false, qualifying_position: 9, team_id: "team-1" }],
+        resultRows: [{ ...defaultResultRow, driver_id: "driver-1", finishing_position: 9 }],
+        penaltyRows: [],
+      }),
+    );
+
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(
+      <ResultStepper
+        correctionMode
+        drivers={drivers}
+        initialResultRows={[{ ...defaultResultRow, driver_id: "driver-1", finishing_position: 3 }]}
+        session={session}
+        teams={teams}
+      />,
+    );
+
+    // Lands on the default first step (qualifying), not the draft's "results" step.
+    expect(screen.getByRole("heading", { name: "Qualifying" })).toBeInTheDocument();
+    expect(screen.queryByText("Draft restored from this browser session.")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    // Published value (3) wins over the stale draft's value (9).
+    expect(screen.getByPlaceholderText("—")).toHaveValue(3);
+  });
+
+  it("gates republish behind a confirm() and sends republish: true", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(
+      <ResultStepper
+        correctionMode
+        drivers={drivers}
+        initialResultRows={[{ ...defaultResultRow, driver_id: "driver-1", finishing_position: 1 }]}
+        session={session}
+        teams={teams}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+    await user.click(screen.getByRole("button", { name: "Republish corrected results" }));
+
+    expect(window.confirm).toHaveBeenCalled();
+    const publishCall = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
+      String(url).includes("/publish"),
+    );
+    const body = JSON.parse(publishCall![1].body);
+    expect(body.republish).toBe(true);
+  });
+
+  it("does not publish when the republish confirm is declined", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(
+      <ResultStepper
+        correctionMode
+        drivers={drivers}
+        initialResultRows={[{ ...defaultResultRow, driver_id: "driver-1", finishing_position: 1 }]}
+        session={session}
+        teams={teams}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+    await user.click(screen.getByRole("button", { name: "Republish corrected results" }));
+
+    expect(
+      (fetch as ReturnType<typeof vi.fn>).mock.calls.some(([url]) => String(url).includes("/publish")),
+    ).toBe(false);
+  });
+});
+
+describe("ResultStepper season projection (M3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
+    );
+  });
+
+  it("previews current -> projected season total for a first publish", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(
+      <ResultStepper
+        driverStandings={[{ driver_id: "driver-1", total_points: 100 }]}
+        drivers={drivers}
+        session={session}
+        teams={teams}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.type(screen.getByPlaceholderText("—"), "1");
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+
+    // 100 current + 25 (P1) previewed = 125 projected.
+    expect(screen.getByText("100")).toBeInTheDocument();
+    expect(screen.getByText("125")).toBeInTheDocument();
+  });
+
+  it("does not double-count already-published points in correction mode", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(
+      <ResultStepper
+        correctionMode
+        driverStandings={[{ driver_id: "driver-1", total_points: 100 }]}
+        drivers={drivers}
+        initialResultRows={[{ ...defaultResultRow, driver_id: "driver-1", finishing_position: 1 }]}
+        previousSessionPoints={[{ driver_id: "driver-1", points: 25 }]}
+        session={session}
+        teams={teams}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+
+    // 100 current already includes this session's 25 pts; re-entering the
+    // same P1 result must project back to 100, not 125.
+    expect(screen.getAllByText("100")).toHaveLength(2);
   });
 });
 
