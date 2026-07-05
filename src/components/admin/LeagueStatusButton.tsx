@@ -23,12 +23,14 @@ export function LeagueStatusButton({ leagueId, currentStatus }: LeagueStatusButt
   const [message, setMessage] = useState("");
 
   const next = NEXT_STATUS[currentStatus];
+  const statusMessage = message ? (
+    <p className="text-xs font-bold uppercase text-f1-muted" role="status">
+      {message}
+    </p>
+  ) : null;
+
   if (!next) {
-    return message ? (
-      <p className="text-xs font-bold uppercase text-f1-muted" role="status">
-        {message}
-      </p>
-    ) : null;
+    return statusMessage;
   }
 
   async function handleClick() {
@@ -77,11 +79,7 @@ export function LeagueStatusButton({ leagueId, currentStatus }: LeagueStatusButt
         {busy ? "Updating…" : next.label}
       </button>
       {error && <p className="text-xs text-f1-red">{error}</p>}
-      {message && (
-        <p className="text-xs font-bold uppercase text-f1-muted" role="status">
-          {message}
-        </p>
-      )}
+      {statusMessage}
     </div>
   );
 }

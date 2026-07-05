@@ -782,9 +782,9 @@ function ReviewStep({
                 );
                 const champTotal = racePts + row.manual_points_adjustment;
                 const isBan = row.result_status === "ban";
+                const penPts = penaltyPtsByDriver.get(row.driver_id) ?? 0;
                 const projectedPenaltyTotal =
-                  (existingPenaltyTotalByDriver.get(row.driver_id) ?? 0) +
-                  (penaltyPtsByDriver.get(row.driver_id) ?? 0);
+                  (existingPenaltyTotalByDriver.get(row.driver_id) ?? 0) + penPts;
                 const isThresholdAlert =
                   !isBan && penaltyThreshold != null && projectedPenaltyTotal >= penaltyThreshold;
 
@@ -830,9 +830,7 @@ function ReviewStep({
                         : "—"}
                     </td>
                     <td className="py-2 pr-3 text-right font-mono text-f1-muted">
-                      {(penaltyPtsByDriver.get(row.driver_id) ?? 0) > 0
-                        ? penaltyPtsByDriver.get(row.driver_id)
-                        : "—"}
+                      {penPts > 0 ? penPts : "—"}
                     </td>
                     <td className="py-2 text-right font-mono font-bold text-f1-white">{champTotal}</td>
                   </tr>

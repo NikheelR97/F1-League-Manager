@@ -290,7 +290,9 @@ export async function publishSession(
 // Standings recalculation (full rebuild from all completed sessions)
 // ---------------------------------------------------------------------------
 
-async function recalculateStandings(
+// Exported so admin routes that mutate penalty status post-publish (e.g. rescinding
+// on appeal) can recompute standings/penalty totals without duplicating this logic.
+export async function recalculateStandings(
   db: ReturnType<typeof createSupabaseServiceRoleClient>,
   leagueId: string,
   seasonId: string,

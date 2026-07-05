@@ -268,6 +268,14 @@ export default async function LeagueDetailPage({
                           Enter Results
                         </Link>
                       )}
+                      {!isPublishable && (
+                        <Link
+                          className="border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                          href={`/admin/leagues/${leagueId}/sessions/${session.id}/penalties`}
+                        >
+                          Penalties
+                        </Link>
+                      )}
                       <Link
                         className="p-1 text-f1-muted transition-colors hover:text-f1-white"
                         href={`/admin/leagues/${leagueId}/sessions/${session.id}/edit`}

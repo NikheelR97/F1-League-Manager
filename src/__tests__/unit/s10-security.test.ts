@@ -33,6 +33,7 @@ const ADMIN_MUTATION_ROUTES = [
   "src/app/api/admin/leagues/[id]/wheel/spin/route.ts",
   "src/app/api/admin/sessions/[id]/route.ts",
   "src/app/api/admin/sessions/[id]/publish/route.ts",
+  "src/app/api/admin/penalties/[id]/route.ts",
   "src/app/api/admin/wheel-spins/[id]/void/route.ts",
   "src/app/api/admin/seasons/[id]/archive/route.ts",
   "src/app/api/admin/seasons/[id]/current/route.ts",
