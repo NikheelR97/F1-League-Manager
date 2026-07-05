@@ -32,7 +32,7 @@ export default async function SessionPublishPage({
       .single(),
     db
       .from("leagues")
-      .select("id, fastest_lap_enabled, pole_position_enabled, penalty_threshold")
+      .select("id, fastest_lap_enabled, pole_position_enabled, penalty_threshold, slug")
       .eq("id", leagueId)
       .single(),
     db
@@ -127,6 +127,7 @@ export default async function SessionPublishPage({
       <ResultStepper
         drivers={drivers}
         existingPenaltyTotals={existingPenaltyTotals}
+        leagueSlug={league.slug}
         penaltyThreshold={league.penalty_threshold ?? null}
         session={sessionInfo}
         teams={leagueTeams}

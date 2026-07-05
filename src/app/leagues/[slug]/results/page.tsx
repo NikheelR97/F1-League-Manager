@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { SeasonSelector } from "@/components/league/SeasonSelector";
+import { formatDate } from "@/lib/format-date";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { resolveLeagueSeasons } from "@/lib/public/resolve-league-seasons";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -97,11 +98,7 @@ export default async function ResultsIndexPage({
                   <div className="text-right">
                     {session.published_at && (
                       <p className="text-xs text-f1-muted">
-                        {new Date(session.published_at).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {formatDate(session.published_at)}
                       </p>
                     )}
                     <p className="text-xs text-f1-red-text">View →</p>

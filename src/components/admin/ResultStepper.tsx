@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FormError } from "@/components/ui/FormError";
@@ -124,6 +124,36 @@ function defaultResultRow(d: SessionDriver): RaceResultRow {
   };
 }
 
+// M1 — grid order for the Qualifying step's starting roster. Drivers without
+// a racing number (shouldn't normally happen) sort after, keeping their
+// existing relative order (Array#sort is a stable sort).
+function sortedByRacingNumber(drivers: SessionDriver[]): SessionDriver[] {
+  return [...drivers].sort((a, b) => {
+    if (a.racing_number === null && b.racing_number === null) return 0;
+    if (a.racing_number === null) return 1;
+    if (b.racing_number === null) return -1;
+    return a.racing_number - b.racing_number;
+  });
+}
+
+// M1 — Results step row order follows the quali grid entered a step earlier
+// instead of roster/join-date order. Drivers with no quali position (DNS,
+// etc.) sort after, in their existing order (stable sort).
+function orderByQualifying<T extends { driver_id: string }>(
+  rows: T[],
+  qualifyingRows: QualifyingRow[],
+): T[] {
+  const posByDriver = new Map(qualifyingRows.map((q) => [q.driver_id, q.qualifying_position]));
+  return [...rows].sort((a, b) => {
+    const pa = posByDriver.get(a.driver_id) ?? null;
+    const pb = posByDriver.get(b.driver_id) ?? null;
+    if (pa === null && pb === null) return 0;
+    if (pa === null) return 1;
+    if (pb === null) return -1;
+    return pa - pb;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Draft persistence (sessionStorage)
 // ---------------------------------------------------------------------------
@@ -179,8 +209,17 @@ function readStoredDraft(key: string): DraftShape | null {
 // Validation
 // ---------------------------------------------------------------------------
 
+// M2 — offending-row info so the Results step can highlight the specific
+// inputs, not just name the position in a Review-step summary.
+interface PositionConflict {
+  driverIds: string[];
+  position: number;
+}
+
 interface ValidationResult {
+  duplicatePositions: PositionConflict[];
   errors: string[];
+  fastestLapDriverIds: string[];
   valid: boolean;
 }
 
@@ -195,18 +234,27 @@ function validateResults(rows: RaceResultRow[]): ValidationResult {
     errors.push("At least one driver must be classified with a finishing position.");
   }
 
-  const positions = classified.map((r) => r.finishing_position!);
-  const dupes = positions.filter((p, i) => positions.indexOf(p) !== i);
-  if (dupes.length > 0) {
-    errors.push(`Duplicate finishing positions: ${[...new Set(dupes)].join(", ")}.`);
+  const byPosition = new Map<number, string[]>();
+  for (const r of classified) {
+    const pos = r.finishing_position!;
+    byPosition.set(pos, [...(byPosition.get(pos) ?? []), r.driver_id]);
+  }
+  const duplicatePositions: PositionConflict[] = [...byPosition.entries()]
+    .filter(([, driverIds]) => driverIds.length > 1)
+    .map(([position, driverIds]) => ({ driverIds, position }));
+  if (duplicatePositions.length > 0) {
+    errors.push(
+      `Duplicate finishing positions: ${duplicatePositions.map((c) => c.position).join(", ")}.`,
+    );
   }
 
-  const fastestLapDrivers = rows.filter((r) => r.fastest_lap);
-  if (fastestLapDrivers.length > 1) {
+  const fastestLapRows = rows.filter((r) => r.fastest_lap);
+  const fastestLapDriverIds = fastestLapRows.length > 1 ? fastestLapRows.map((r) => r.driver_id) : [];
+  if (fastestLapDriverIds.length > 0) {
     errors.push("Only one driver can have the fastest lap.");
   }
 
-  return { errors, valid: errors.length === 0 };
+  return { duplicatePositions, errors, fastestLapDriverIds, valid: errors.length === 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +322,7 @@ function QualifyingStep({
                           qualifying_position: e.target.value ? Number(e.target.value) : null,
                         })
                       }
+                      onWheel={(e) => e.currentTarget.blur()}
                     />
                   </td>
                   <td className="py-2 text-center">
@@ -296,13 +345,17 @@ function QualifyingStep({
 
 function ResultsStep({
   drivers,
+  qualifyingRows,
   rows,
   teams,
+  validation,
   onChange,
 }: {
   drivers: SessionDriver[];
+  qualifyingRows: QualifyingRow[];
   rows: RaceResultRow[];
   teams: LeagueTeam[];
+  validation: ValidationResult;
   onChange: (rows: RaceResultRow[]) => void;
 }) {
   function update(driverId: string, field: Partial<RaceResultRow>) {
@@ -317,7 +370,19 @@ function ResultsStep({
     }
   }
 
+  function driverName(id: string) {
+    return drivers.find((d) => d.driver_id === id)?.display_name ?? id;
+  }
+
   const statuses: ResultStatus[] = ["classified", "dnf", "dns", "dsq", "ban"];
+
+  // M1 — display order follows the quali grid entered a step earlier, not
+  // roster order. Underlying `rows`/`onChange` stay untouched (still keyed
+  // by driver_id) so entered data never jumps.
+  const orderedRows = useMemo(
+    () => orderByQualifying(rows, qualifyingRows),
+    [rows, qualifyingRows],
+  );
 
   return (
     <div className="space-y-3">
@@ -331,18 +396,26 @@ function ResultsStep({
             <tr className="border-b border-f1-border text-left text-xs text-f1-muted">
               <th className="pb-2 pr-3">Driver</th>
               <th className="pb-2 pr-3 w-28">Team</th>
-              <th className="pb-2 pr-3 w-16">Pos</th>
               <th className="pb-2 pr-3 w-28">Status</th>
+              <th className="pb-2 pr-3 w-16">Pos</th>
               <th className="pb-2 pr-3 w-10 text-center">FL</th>
               <th className="pb-2 pr-3 w-20">Adj pts</th>
               <th className="pb-2 w-32">Notes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-f1-border">
-            {rows.map((row) => {
+            {orderedRows.map((row) => {
               const driver = drivers.find((d) => d.driver_id === row.driver_id);
               const currentTeam = teams.find((t) => t.id === row.team_id);
               const isNonClassified = row.result_status !== "classified";
+              // M2 — offending rows, highlighted where the data was entered
+              // instead of only in the Review-step summary.
+              const posConflict = validation.duplicatePositions.find((c) =>
+                c.driverIds.includes(row.driver_id),
+              );
+              const hasFlConflict = validation.fastestLapDriverIds.includes(row.driver_id);
+              const posErrorId = `pos-error-${row.driver_id}`;
+              const flErrorId = `fl-error-${row.driver_id}`;
               return (
                 <tr key={row.driver_id}>
                   <td className="py-2 pr-3">
@@ -373,21 +446,6 @@ function ResultsStep({
                     </select>
                   </td>
                   <td className="py-2 pr-3">
-                    <input
-                      className="w-14 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus:border-f1-red focus:outline-none disabled:opacity-40"
-                      disabled={isNonClassified}
-                      min={1}
-                      placeholder="—"
-                      type="number"
-                      value={row.finishing_position ?? ""}
-                      onChange={(e) =>
-                        update(row.driver_id, {
-                          finishing_position: e.target.value ? Number(e.target.value) : null,
-                        })
-                      }
-                    />
-                  </td>
-                  <td className="py-2 pr-3">
                     <select
                       className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus:border-f1-red focus:outline-none uppercase"
                       value={row.result_status}
@@ -405,14 +463,47 @@ function ResultsStep({
                       ))}
                     </select>
                   </td>
+                  <td className="py-2 pr-3">
+                    <input
+                      aria-describedby={posConflict ? posErrorId : undefined}
+                      aria-invalid={posConflict ? true : undefined}
+                      className={`w-14 border bg-f1-black px-2 py-1 text-sm text-f1-white focus:border-f1-red focus:outline-none disabled:opacity-40 ${
+                        posConflict ? "border-destructive" : "border-f1-border"
+                      }`}
+                      disabled={isNonClassified}
+                      min={1}
+                      placeholder="—"
+                      type="number"
+                      value={row.finishing_position ?? ""}
+                      onChange={(e) =>
+                        update(row.driver_id, {
+                          finishing_position: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      onWheel={(e) => e.currentTarget.blur()}
+                    />
+                    {posConflict && (
+                      <p className="mt-1 w-32 text-xs text-destructive" id={posErrorId}>
+                        P{posConflict.position} assigned to{" "}
+                        {posConflict.driverIds.map((id) => driverName(id)).join(" and ")}
+                      </p>
+                    )}
+                  </td>
                   <td className="py-2 pr-3 text-center">
                     <input
+                      aria-describedby={hasFlConflict ? flErrorId : undefined}
+                      aria-invalid={hasFlConflict ? true : undefined}
                       checked={row.fastest_lap}
-                      className="accent-f1-red"
+                      className={`accent-f1-red ${hasFlConflict ? "outline outline-1 outline-destructive" : ""}`}
                       disabled={isNonClassified}
                       type="checkbox"
                       onChange={(e) => setFastestLap(row.driver_id, e.target.checked)}
                     />
+                    {hasFlConflict && (
+                      <p className="mt-1 w-24 text-xs text-destructive" id={flErrorId}>
+                        Only one fastest lap
+                      </p>
+                    )}
                   </td>
                   <td className="py-2 pr-3">
                     <input
@@ -423,6 +514,7 @@ function ResultsStep({
                       onChange={(e) =>
                         update(row.driver_id, { manual_points_adjustment: Number(e.target.value) || 0 })
                       }
+                      onWheel={(e) => e.currentTarget.blur()}
                     />
                   </td>
                   <td className="py-2">
@@ -776,6 +868,7 @@ function ReviewStep({
 interface ResultStepperProps {
   drivers: SessionDriver[];
   existingPenaltyTotals?: ExistingPenaltyTotal[];
+  leagueSlug?: string;
   penaltyThreshold?: number | null;
   session: SessionInfo;
   teams: LeagueTeam[];
@@ -784,16 +877,19 @@ interface ResultStepperProps {
 export function ResultStepper({
   drivers,
   existingPenaltyTotals = [],
+  leagueSlug = "",
   penaltyThreshold = null,
   session,
   teams,
 }: ResultStepperProps) {
-  const router = useRouter();
   const csrfToken = useCsrfToken();
+
+  // M1 — Qualifying step's starting grid order (see sortedByRacingNumber).
+  const qualifyingDrivers = useMemo(() => sortedByRacingNumber(drivers), [drivers]);
 
   const [step, setStep] = useState<Step>("qualifying");
   const [qualifyingRows, setQualifyingRows] = useState<QualifyingRow[]>(() =>
-    drivers.map(defaultQualifyingRow),
+    qualifyingDrivers.map(defaultQualifyingRow),
   );
   const [resultRows, setResultRows] = useState<RaceResultRow[]>(() =>
     drivers.map(defaultResultRow),
@@ -801,6 +897,7 @@ export function ResultStepper({
   const [penaltyRows, setPenaltyRows] = useState<PenaltyRow[]>([]);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishSuccess, setPublishSuccess] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
 
   const draftKey = `result-stepper-draft:${session.id}`;
@@ -812,11 +909,11 @@ export function ResultStepper({
     () =>
       JSON.stringify({
         penaltyRows: [],
-        qualifyingRows: drivers.map(defaultQualifyingRow),
+        qualifyingRows: qualifyingDrivers.map(defaultQualifyingRow),
         resultRows: drivers.map(defaultResultRow),
         step: "qualifying",
       }),
-    [drivers],
+    [drivers, qualifyingDrivers],
   );
 
   // Restore a saved draft after mount only — reading sessionStorage during
@@ -832,11 +929,11 @@ export function ResultStepper({
     if (JSON.stringify(draft) === pristineJson) return;
 
     setStep(draft.step);
-    setQualifyingRows(mergeRows(draft.qualifyingRows, drivers, defaultQualifyingRow));
+    setQualifyingRows(mergeRows(draft.qualifyingRows, qualifyingDrivers, defaultQualifyingRow));
     setResultRows(mergeRows(draft.resultRows, drivers, defaultResultRow));
     setPenaltyRows(draft.penaltyRows.filter((p) => drivers.some((d) => d.driver_id === p.driver_id)));
     setDraftRestored(true);
-  }, [draftKey, drivers, pristineJson]);
+  }, [draftKey, drivers, pristineJson, qualifyingDrivers]);
 
   // Persist on change. Skipping the pristine state means an untouched (or
   // just-discarded) stepper never writes a draft, so the restore notice only
@@ -853,13 +950,20 @@ export function ResultStepper({
   }, [draftKey, penaltyRows, pristineJson, qualifyingRows, resultRows, step]);
 
   function discardDraft() {
+    if (
+      !confirm(
+        "Discard the entire draft? All entered qualifying, race, and penalty data will be lost.",
+      )
+    ) {
+      return;
+    }
     try {
       sessionStorage.removeItem(draftKey);
     } catch {
       // Ignore storage errors.
     }
     setStep("qualifying");
-    setQualifyingRows(drivers.map(defaultQualifyingRow));
+    setQualifyingRows(qualifyingDrivers.map(defaultQualifyingRow));
     setResultRows(drivers.map(defaultResultRow));
     setPenaltyRows([]);
     setDraftRestored(false);
@@ -928,8 +1032,17 @@ export function ResultStepper({
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setPublishError((body as { error?: string }).error ?? "Failed to publish session.");
+        const body: unknown = await res.json().catch(() => ({}));
+        const rawError = (body as { error?: unknown }).error;
+        // N5(c) — the 422 path can send an object instead of a string; render
+        // never gets a non-string into FormError.
+        setPublishError(
+          typeof rawError === "string"
+            ? rawError
+            : rawError !== undefined
+            ? "Validation failed on the server — check the review step."
+            : "Failed to publish session.",
+        );
         return;
       }
 
@@ -939,11 +1052,40 @@ export function ResultStepper({
         // Ignore storage errors.
       }
 
-      router.push(`/admin/leagues/${session.league_id}`);
-      router.refresh();
+      // P1 — stay put and show a success banner instead of an unannounced
+      // redirect; the banner links out to the public result and back to the
+      // league admin page.
+      setPublishSuccess(true);
     } finally {
       setPublishing(false);
     }
+  }
+
+  if (publishSuccess) {
+    return (
+      <div
+        className="space-y-3 border border-green-700 bg-green-900/10 p-6"
+        role="status"
+      >
+        <p className="text-sm font-bold text-green-400">Results published.</p>
+        <div className="flex gap-4 text-xs font-bold uppercase">
+          {leagueSlug && (
+            <Link
+              className="text-f1-white underline hover:text-f1-red"
+              href={`/leagues/${leagueSlug}/results/${session.id}`}
+            >
+              View public result
+            </Link>
+          )}
+          <Link
+            className="text-f1-white underline hover:text-f1-red"
+            href={`/admin/leagues/${session.league_id}`}
+          >
+            Back to league
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -992,8 +1134,10 @@ export function ResultStepper({
         {step === "results" && (
           <ResultsStep
             drivers={drivers}
+            qualifyingRows={qualifyingRows}
             rows={resultRows}
             teams={teams}
+            validation={validation}
             onChange={setResultRows}
           />
         )}

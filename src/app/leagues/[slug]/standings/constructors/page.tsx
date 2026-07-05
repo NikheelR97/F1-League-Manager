@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { SeasonSelector } from "@/components/league/SeasonSelector";
+import { StandingsSearch } from "@/components/league/StandingsSearch";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
 import { cacheTag } from "@/lib/cache/tags";
@@ -126,6 +127,7 @@ export default async function ConstructorStandingsPage({
         <EmptyState message="Constructor standings will appear once results are published." title="No standings yet" />
       ) : (
         <>
+          <StandingsSearch />
           <table className="hidden w-full text-sm md:table">
             <thead>
               <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
@@ -143,7 +145,7 @@ export default async function ConstructorStandingsPage({
                 const team = row.teams as unknown as TeamRow | null;
                 const gap = row.position === 1 ? "-" : `-${leaderPoints - row.total_points}`;
                 return (
-                  <tr key={row.position} className="border-b border-f1-border/40 hover:bg-f1-dark">
+                  <tr key={row.position} className="border-b border-f1-border/40 hover:bg-f1-dark" data-driver-name={team?.name.toLowerCase()}>
                     <td className="py-2 pr-4 font-mono font-bold text-f1-white">{row.position}</td>
                     <td className="py-2 pr-4">
                       <PositionDelta current={row.position} previous={row.previous_position} />
@@ -182,7 +184,7 @@ export default async function ConstructorStandingsPage({
               const team = row.teams as unknown as TeamRow | null;
               const gap = row.position === 1 ? "Leader" : `-${leaderPoints - row.total_points} pts`;
               return (
-                <li key={row.position} className="border border-f1-border bg-f1-dark p-3">
+                <li key={row.position} className="border border-f1-border bg-f1-dark p-3" data-driver-name={team?.name.toLowerCase()}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="w-6 font-mono text-lg font-bold text-f1-white">{row.position}</span>

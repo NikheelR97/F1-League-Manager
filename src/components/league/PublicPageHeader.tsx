@@ -1,3 +1,5 @@
+import { formatDate } from "@/lib/format-date";
+
 interface PublicPageHeaderProps {
   format: string;
   lastRound: string | null;
@@ -22,7 +24,7 @@ export function PublicPageHeader({
         {lastRound ? ` · ${lastRound}` : ""}
         {" · "}
         <span className="uppercase">{format}</span>
-        {updatedAt ? ` · Updated ${new Date(updatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+        {updatedAt ? ` · Updated ${formatDate(updatedAt)}` : ""}
       </p>
       <h1 className="text-2xl font-black uppercase text-f1-white">{title}</h1>
     </div>

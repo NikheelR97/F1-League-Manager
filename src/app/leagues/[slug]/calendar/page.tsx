@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Calendar, MapPin } from "lucide-react";
 
 import { ErrorState } from "@/components/ui/ErrorState";
+import { formatDate } from "@/lib/format-date";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -78,9 +79,7 @@ export default async function LeagueCalendarPage({
                       <div className="mb-4">
                         <p className="text-xs text-f1-muted uppercase font-bold">Scheduled Date</p>
                         <p className="text-f1-white text-lg">
-                          {new Date(session.scheduled_at).toLocaleDateString(undefined, {
-                            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
-                          })}
+                          {formatDate(session.scheduled_at)}
                         </p>
                         <p className="text-sm text-f1-muted">
                           {new Date(session.scheduled_at).toLocaleTimeString(undefined, {
@@ -124,7 +123,7 @@ export default async function LeagueCalendarPage({
                     return (
                       <tr key={session.id} className="transition-colors hover:bg-black/20">
                         <td className="px-4 py-3 whitespace-nowrap">
-                          {new Date(session.scheduled_at).toLocaleDateString()}
+                          {formatDate(session.scheduled_at)}
                         </td>
                         <td className="px-4 py-3 font-bold">
                           {session.name}
@@ -158,7 +157,7 @@ export default async function LeagueCalendarPage({
                           {session.name}
                         </p>
                         <p className="text-xs text-f1-muted">
-                          {new Date(session.scheduled_at).toLocaleDateString()} · {circuit ? `${circuit.name}, ${circuit.country}` : "—"}
+                          {formatDate(session.scheduled_at)} · {circuit ? `${circuit.name}, ${circuit.country}` : "—"}
                         </p>
                       </div>
                       <div className="text-right">

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Dices } from "lucide-react";
 
 import { ErrorState } from "@/components/ui/ErrorState";
+import { formatDate } from "@/lib/format-date";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -62,7 +63,7 @@ export default async function LeagueWheelHistoryPage({
               <div key={spin.id} className="flex flex-col border border-f1-border bg-f1-dark p-6">
                 <div className="mb-4">
                   <p className="mb-1 text-xs font-bold uppercase text-f1-muted">
-                    {new Date(spin.confirmed_at ?? spin.created_at).toLocaleDateString()}
+                    {formatDate(spin.confirmed_at ?? spin.created_at)}
                   </p>
                   <h3 className="mb-1 text-xl font-bold text-f1-white">
                     {circuit?.name ?? "Unknown Circuit"}
