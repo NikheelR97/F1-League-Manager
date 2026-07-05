@@ -75,11 +75,11 @@ export default async function PenaltiesPage({
           <table className="hidden w-full text-sm md:table">
             <thead>
               <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
-                <th className="pb-2 pr-4">Driver</th>
-                <th className="pb-2 pr-4">Race</th>
-                <th className="pb-2 pr-4">Reason</th>
-                <th className="pb-2 pr-4 text-right">Pts</th>
-                <th className="pb-2 text-right">Status</th>
+                <th className="pb-2 pr-4" scope="col">Driver</th>
+                <th className="pb-2 pr-4" scope="col">Race</th>
+                <th className="pb-2 pr-4" scope="col">Reason</th>
+                <th className="pb-2 pr-4 text-right" scope="col">Pts</th>
+                <th className="pb-2 text-right" scope="col">Status</th>
               </tr>
             </thead>
             <tbody>

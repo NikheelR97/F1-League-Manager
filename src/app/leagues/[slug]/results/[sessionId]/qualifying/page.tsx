@@ -87,10 +87,10 @@ export default async function QualifyingResultsPage({
           >
             <thead>
               <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
-                <th className="w-12 pb-3 pr-4">Pos</th>
-                <th className="pb-3 pr-4">Driver</th>
-                <th className="pb-3 pr-6">Team</th>
-                <th className="pb-3 text-right">No.</th>
+                <th className="w-12 pb-3 pr-4" scope="col">Pos</th>
+                <th className="pb-3 pr-4" scope="col">Driver</th>
+                <th className="pb-3 pr-6" scope="col">Team</th>
+                <th className="pb-3 text-right" scope="col">No.</th>
               </tr>
             </thead>
             <tbody>

@@ -14,11 +14,11 @@ function DiffTable({ items, title }: { items: DiffItem[]; title: string }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-f1-border text-xs font-bold uppercase text-f1-muted">
-              <th className="py-2 pr-4 text-left">Name</th>
-              <th className="py-2 pr-4 text-right">Workbook</th>
-              <th className="py-2 pr-4 text-right">App</th>
-              <th className="py-2 pr-4 text-right">Delta</th>
-              <th className="py-2 text-center">Match</th>
+              <th className="py-2 pr-4 text-left" scope="col">Name</th>
+              <th className="py-2 pr-4 text-right" scope="col">Workbook</th>
+              <th className="py-2 pr-4 text-right" scope="col">App</th>
+              <th className="py-2 pr-4 text-right" scope="col">Delta</th>
+              <th className="py-2 text-center" scope="col">Match</th>
             </tr>
           </thead>
           <tbody>

@@ -312,7 +312,8 @@ function QualifyingStep({
                   </td>
                   <td className="py-2 pr-4">
                     <input
-                      className="w-20 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Qualifying position for ${driver?.display_name ?? row.driver_id}`}
+                      className="w-20 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       min={1}
                       placeholder="—"
                       type="number"
@@ -327,8 +328,9 @@ function QualifyingStep({
                   </td>
                   <td className="py-2 text-center">
                     <input
+                      aria-label={`Pole for ${driver?.display_name ?? row.driver_id}`}
                       checked={row.is_pole}
-                      className="accent-f1-red"
+                      className="accent-f1-red focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       type="checkbox"
                       onChange={() => setPole(row.driver_id)}
                     />
@@ -433,7 +435,8 @@ function ResultsStep({
                   </td>
                   <td className="py-2 pr-3">
                     <select
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Team for ${driverName(row.driver_id)}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       value={row.team_id}
                       onChange={(e) => update(row.driver_id, { team_id: e.target.value })}
                     >
@@ -447,7 +450,8 @@ function ResultsStep({
                   </td>
                   <td className="py-2 pr-3">
                     <select
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus:border-f1-red focus:outline-none uppercase"
+                      aria-label={`Status for ${driverName(row.driver_id)}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none uppercase"
                       value={row.result_status}
                       onChange={(e) => {
                         const status = e.target.value as ResultStatus;
@@ -467,7 +471,8 @@ function ResultsStep({
                     <input
                       aria-describedby={posConflict ? posErrorId : undefined}
                       aria-invalid={posConflict ? true : undefined}
-                      className={`w-14 border bg-f1-black px-2 py-1 text-sm text-f1-white focus:border-f1-red focus:outline-none disabled:opacity-40 ${
+                      aria-label={`Finishing position for ${driverName(row.driver_id)}`}
+                      className={`w-14 border bg-f1-black px-2 py-1 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none disabled:opacity-40 ${
                         posConflict ? "border-destructive" : "border-f1-border"
                       }`}
                       disabled={isNonClassified}
@@ -493,8 +498,9 @@ function ResultsStep({
                     <input
                       aria-describedby={hasFlConflict ? flErrorId : undefined}
                       aria-invalid={hasFlConflict ? true : undefined}
+                      aria-label={`Fastest lap for ${driverName(row.driver_id)}`}
                       checked={row.fastest_lap}
-                      className={`accent-f1-red ${hasFlConflict ? "outline outline-1 outline-destructive" : ""}`}
+                      className={`accent-f1-red focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none ${hasFlConflict ? "outline outline-1 outline-destructive" : ""}`}
                       disabled={isNonClassified}
                       type="checkbox"
                       onChange={(e) => setFastestLap(row.driver_id, e.target.checked)}
@@ -507,7 +513,8 @@ function ResultsStep({
                   </td>
                   <td className="py-2 pr-3">
                     <input
-                      className="w-16 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Points adjustment for ${driverName(row.driver_id)}`}
+                      className="w-16 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       placeholder="0"
                       type="number"
                       value={row.manual_points_adjustment}
@@ -519,7 +526,8 @@ function ResultsStep({
                   </td>
                   <td className="py-2">
                     <input
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Notes for ${driverName(row.driver_id)}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       placeholder="Optional"
                       type="text"
                       value={row.notes}
@@ -579,11 +587,13 @@ function PenaltiesStep({
         <div className="space-y-4">
           {rows.map((row, i) => {
             const driver = drivers.find((d) => d.driver_id === row.driver_id);
+            const entryLabel = driver?.display_name ?? `entry ${i + 1}`;
             return (
               <div className="border border-f1-border bg-f1-dark p-4 space-y-3" key={row.id}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase text-f1-muted">Penalty {i + 1}</span>
                   <button
+                    aria-label={`Remove penalty for ${entryLabel}`}
                     className="text-xs text-f1-muted hover:text-destructive"
                     type="button"
                     onClick={() => remove(i)}
@@ -595,7 +605,8 @@ function PenaltiesStep({
                   <div className="space-y-1">
                     <label className="text-xs text-f1-muted">Driver</label>
                     <select
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Driver for penalty ${entryLabel}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       value={row.driver_id}
                       onChange={(e) => update(i, { driver_id: e.target.value })}
                     >
@@ -610,7 +621,8 @@ function PenaltiesStep({
                   <div className="space-y-1">
                     <label className="text-xs text-f1-muted">Status</label>
                     <select
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Status for penalty ${entryLabel}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       value={row.status}
                       onChange={(e) =>
                         update(i, { status: e.target.value as PenaltyRow["status"] })
@@ -625,7 +637,8 @@ function PenaltiesStep({
                   <div className="space-y-1">
                     <label className="text-xs text-f1-muted">Penalty points</label>
                     <input
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Penalty points for ${entryLabel}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       min={0}
                       type="number"
                       value={row.penalty_points}
@@ -637,7 +650,8 @@ function PenaltiesStep({
                   <div className="space-y-1">
                     <label className="text-xs text-f1-muted">Reason</label>
                     <input
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+                      aria-label={`Reason for penalty ${entryLabel}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       placeholder="Collision at Turn 1"
                       type="text"
                       value={row.reason}
@@ -647,7 +661,8 @@ function PenaltiesStep({
                   <div className="space-y-1 sm:col-span-2">
                     <label className="text-xs text-f1-muted">Steward notes</label>
                     <textarea
-                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none resize-none"
+                      aria-label={`Steward notes for penalty ${entryLabel}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none resize-none"
                       placeholder="Optional steward notes…"
                       rows={2}
                       value={row.steward_notes}
@@ -658,7 +673,8 @@ function PenaltiesStep({
                     <div className="space-y-1 sm:col-span-2">
                       <label className="text-xs text-f1-muted">Appeal notes</label>
                       <textarea
-                        className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus:border-f1-red focus:outline-none resize-none"
+                        aria-label={`Appeal notes for penalty ${entryLabel}`}
+                        className="w-full border border-f1-border bg-f1-black px-2 py-1.5 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none resize-none"
                         placeholder="Optional appeal notes…"
                         rows={2}
                         value={row.appeal_notes}
@@ -1108,6 +1124,12 @@ export function ResultStepper({
         ))}
       </nav>
 
+      {/* M20a — announce step changes to screen readers; the visual nav above
+          gives no other signal that the panel below has changed. */}
+      <div aria-live="polite" className="sr-only">
+        {`Step ${stepIdx + 1} of ${STEPS.length}: ${STEP_LABELS[step]}`}
+      </div>
+
       {/* Draft restored notice */}
       {draftRestored && (
         <div className="flex items-center justify-between gap-4 border border-f1-border bg-f1-dark px-4 py-2 text-xs text-f1-muted">
@@ -1124,6 +1146,7 @@ export function ResultStepper({
 
       {/* Step content */}
       <div className="border border-f1-border bg-f1-dark p-4 sm:p-6">
+        <h2 className="mb-4 text-sm font-bold uppercase text-f1-white">{STEP_LABELS[step]}</h2>
         {step === "qualifying" && (
           <QualifyingStep
             drivers={drivers}

@@ -131,13 +131,13 @@ export default async function ConstructorStandingsPage({
           <table className="hidden w-full text-sm md:table">
             <thead>
               <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
-                <th className="w-10 pb-2 pr-4">Pos</th>
-                <th className="w-6 pb-2 pr-4" aria-label="Change" />
-                <th className="pb-2 pr-4">Constructor</th>
-                <th className="pb-2 pr-4 text-right">Pts</th>
-                <th className="pb-2 pr-4 text-right">Gap</th>
-                <th className="pb-2 pr-4 text-right">W</th>
-                <th className="pb-2 text-right">Pod</th>
+                <th className="w-10 pb-2 pr-4" scope="col">Pos</th>
+                <th className="w-6 pb-2 pr-4" aria-label="Change" scope="col" />
+                <th className="pb-2 pr-4" scope="col">Constructor</th>
+                <th className="pb-2 pr-4 text-right" scope="col">Pts</th>
+                <th className="pb-2 pr-4 text-right" scope="col">Gap</th>
+                <th className="pb-2 pr-4 text-right" scope="col">W</th>
+                <th className="pb-2 text-right" scope="col">Pod</th>
               </tr>
             </thead>
             <tbody>

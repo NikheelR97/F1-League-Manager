@@ -99,9 +99,9 @@ export default async function RaceResultPage({
           <table className="hidden w-full text-sm md:table">
             <thead>
               <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
-                <th className="pb-2 pr-4 w-10">Pos</th>
-                <th className="pb-2 pr-4">Driver</th>
-                <th className="pb-2">Team</th>
+                <th className="pb-2 pr-4 w-10" scope="col">Pos</th>
+                <th className="pb-2 pr-4" scope="col">Driver</th>
+                <th className="pb-2" scope="col">Team</th>
               </tr>
             </thead>
             <tbody>
@@ -153,11 +153,11 @@ export default async function RaceResultPage({
             <table className="hidden w-full text-sm md:table">
               <thead>
                 <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
-                  <th className="pb-2 pr-4 w-10">Pos</th>
-                  <th className="pb-2 pr-4">Driver</th>
-                  <th className="pb-2 pr-4">Team</th>
-                  <th className="pb-2 pr-4 text-right">Pts</th>
-                  <th className="pb-2 text-right">Status</th>
+                  <th className="pb-2 pr-4 w-10" scope="col">Pos</th>
+                  <th className="pb-2 pr-4" scope="col">Driver</th>
+                  <th className="pb-2 pr-4" scope="col">Team</th>
+                  <th className="pb-2 pr-4 text-right" scope="col">Pts</th>
+                  <th className="pb-2 text-right" scope="col">Status</th>
                 </tr>
               </thead>
               <tbody>

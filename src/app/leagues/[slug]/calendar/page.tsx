@@ -111,10 +111,10 @@ export default async function LeagueCalendarPage({
               <table className="w-full text-left text-sm text-f1-white">
                 <thead className="border-b border-f1-border bg-black/20 text-xs uppercase text-f1-muted">
                   <tr>
-                    <th className="px-4 py-3 font-bold">Date</th>
-                    <th className="px-4 py-3 font-bold">Race</th>
-                    <th className="px-4 py-3 font-bold">Circuit</th>
-                    <th className="px-4 py-3 font-bold text-right">Results</th>
+                    <th className="px-4 py-3 font-bold" scope="col">Date</th>
+                    <th className="px-4 py-3 font-bold" scope="col">Race</th>
+                    <th className="px-4 py-3 font-bold" scope="col">Circuit</th>
+                    <th className="px-4 py-3 font-bold text-right" scope="col">Results</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-f1-border">

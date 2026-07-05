@@ -151,6 +151,8 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
       <div className="space-y-1">
         <Label htmlFor="circuit">Circuit</Label>
         <select
+          aria-describedby={errors.circuit_id ? "circuit-error" : undefined}
+          aria-invalid={!!errors.circuit_id}
           className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none disabled:opacity-50"
           aria-disabled={!!wheelSpinId}
           id="circuit"
@@ -164,19 +166,21 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
             </option>
           ))}
         </select>
-        {errors.circuit_id && <p className="text-xs text-destructive">{errors.circuit_id.message}</p>}
+        {errors.circuit_id && <p className="text-xs text-destructive" id="circuit-error">{errors.circuit_id.message}</p>}
       </div>
 
       {/* Name */}
       <div className="space-y-1">
         <Label htmlFor="session-name">Session name</Label>
         <Input
+          aria-describedby={errors.name ? "session-name-error" : undefined}
+          aria-invalid={!!errors.name}
           className="bg-f1-dark text-f1-white placeholder:text-f1-muted"
           id="session-name"
           placeholder="Bahrain Race"
           {...register("name")}
         />
-        {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+        {errors.name && <p className="text-xs text-destructive" id="session-name-error">{errors.name.message}</p>}
       </div>
 
       {/* Session code */}
@@ -184,6 +188,8 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
         <Label htmlFor="session-code">Session code</Label>
         <div className="flex gap-2">
           <Input
+            aria-describedby={errors.session_code ? "session-code-error" : undefined}
+            aria-invalid={!!errors.session_code}
             className="font-mono bg-f1-dark text-f1-white placeholder:text-f1-muted uppercase"
             id="session-code"
             maxLength={6}
@@ -200,13 +206,15 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
             Regenerate
           </button>
         </div>
-        {errors.session_code && <p className="text-xs text-destructive">{errors.session_code.message}</p>}
+        {errors.session_code && <p className="text-xs text-destructive" id="session-code-error">{errors.session_code.message}</p>}
       </div>
 
       {/* Points system */}
       <div className="space-y-1">
         <Label htmlFor="points-system">Points system</Label>
         <select
+          aria-describedby={errors.points_system_id ? "points-system-error" : undefined}
+          aria-invalid={!!errors.points_system_id}
           className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none"
           id="points-system"
           {...register("points_system_id")}
@@ -217,7 +225,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
             </option>
           ))}
         </select>
-        {errors.points_system_id && <p className="text-xs text-destructive">{errors.points_system_id.message}</p>}
+        {errors.points_system_id && <p className="text-xs text-destructive" id="points-system-error">{errors.points_system_id.message}</p>}
       </div>
 
       {/* Race number */}
@@ -227,6 +235,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
           {([1, 2] as const).map((n) => (
             <label className="flex items-center gap-2 text-sm text-f1-white" key={n}>
               <input
+                aria-describedby={errors.race_number ? "race-number-error" : undefined}
                 className="accent-f1-red"
                 type="radio"
                 value={n}
@@ -236,7 +245,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
             </label>
           ))}
         </div>
-        {errors.race_number && <p className="text-xs text-destructive">{errors.race_number.message}</p>}
+        {errors.race_number && <p className="text-xs text-destructive" id="race-number-error">{errors.race_number.message}</p>}
       </div>
 
       {/* Race length */}
@@ -246,6 +255,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
           {([25, 50, 100] as const).map((pct) => (
             <label className="flex items-center gap-2 text-sm text-f1-white" key={pct}>
               <input
+                aria-describedby={errors.race_length_percent ? "race-length-error" : undefined}
                 className="accent-f1-red"
                 type="radio"
                 value={pct}
@@ -255,19 +265,21 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
             </label>
           ))}
         </div>
-        {errors.race_length_percent && <p className="text-xs text-destructive">{errors.race_length_percent.message}</p>}
+        {errors.race_length_percent && <p className="text-xs text-destructive" id="race-length-error">{errors.race_length_percent.message}</p>}
       </div>
 
       {/* Scheduled at */}
       <div className="space-y-1">
         <Label htmlFor="scheduled-at">Scheduled date &amp; time</Label>
         <Input
+          aria-describedby={errors.scheduled_at ? "scheduled-at-error" : undefined}
+          aria-invalid={!!errors.scheduled_at}
           className="bg-f1-dark text-f1-white"
           id="scheduled-at"
           type="datetime-local"
           {...register("scheduled_at")}
         />
-        {errors.scheduled_at && <p className="text-xs text-destructive">{errors.scheduled_at.message}</p>}
+        {errors.scheduled_at && <p className="text-xs text-destructive" id="scheduled-at-error">{errors.scheduled_at.message}</p>}
       </div>
 
       <FormError message={submitError} />
