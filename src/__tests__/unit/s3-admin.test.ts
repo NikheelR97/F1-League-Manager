@@ -42,6 +42,7 @@ const transferSchema = z.object({
   driver_entry_id: z.string().uuid(),
   effective_date: z.string().date(),
   new_team_id: z.string().uuid().nullable(),
+  remove_from_league: z.boolean().optional().default(false),
   transfer_reason: z.string().trim().max(240).nullable().optional(),
 });
 
@@ -242,8 +243,20 @@ describe("transfer schema", () => {
     expect(transferSchema.safeParse(validTransfer).success).toBe(true);
   });
 
-  it("accepts a departure (new_team_id = null)", () => {
+  it("accepts a free-agent transfer (new_team_id = null)", () => {
     expect(transferSchema.safeParse({ ...validTransfer, new_team_id: null }).success).toBe(true);
+  });
+
+  it("defaults remove_from_league to false", () => {
+    const result = transferSchema.safeParse({ ...validTransfer, new_team_id: null });
+    expect(result.success && result.data.remove_from_league).toBe(false);
+  });
+
+  it("accepts an explicit remove_from_league departure", () => {
+    expect(
+      transferSchema.safeParse({ ...validTransfer, new_team_id: null, remove_from_league: true })
+        .success,
+    ).toBe(true);
   });
 
   it("accepts an optional reason", () => {

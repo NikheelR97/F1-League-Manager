@@ -29,6 +29,10 @@ export interface RaceResultEntry {
   manual_points_adjustment: number;
   raw_result: string | null;
   notes: string | null;
+  // B7 — set only for a reserve driver's row; identifies the primary driver
+  // they covered for this session. Null/omitted means no reserve assignment
+  // is recorded (soft-optional, never blocks publish).
+  covering_for_driver_id?: string | null;
 }
 
 export interface PenaltyEntry {
@@ -80,6 +84,56 @@ export function validatePublishResults(
     return { ok: false, status: 422, error: "Only one driver may have the fastest lap" };
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Roster team resolution (exported for unit tests) — M7
+// ---------------------------------------------------------------------------
+
+// A driver's team as of a specific date is the stint whose [starts_on, ends_on)
+// range contains it, falling back to the still-active stint, then to any
+// stint. Used so a historical session's publish form prefills the team the
+// driver actually raced for, not whatever team a later transfer left them on.
+export function resolveStintForDate<T extends { starts_on: string; ends_on: string | null }>(
+  stints: T[],
+  date: string,
+): T | undefined {
+  const atDate = stints.find(
+    (s) => s.starts_on <= date && (s.ends_on === null || date < s.ends_on),
+  );
+  const active = stints.find((s) => s.ends_on === null);
+  return atDate ?? active ?? stints[0];
+}
+
+// ---------------------------------------------------------------------------
+// Reserve assignment rows (exported for unit tests) — B7
+// ---------------------------------------------------------------------------
+
+export interface ReserveAssignmentRow {
+  race_session_id: string;
+  original_driver_id: string;
+  reserve_driver_id: string;
+  team_id: string;
+  assigned_by: string;
+}
+
+// ponytail: only writes a row when the admin named who the reserve covered
+// for (original_driver_id is NOT NULL in the schema); left blank, no
+// assignment is recorded rather than blocking publish over it.
+export function buildReserveAssignmentRows(
+  results: RaceResultEntry[],
+  sessionId: string,
+  actorId: string,
+): ReserveAssignmentRow[] {
+  return results
+    .filter((r) => !!r.covering_for_driver_id)
+    .map((r) => ({
+      race_session_id: sessionId,
+      original_driver_id: r.covering_for_driver_id!,
+      reserve_driver_id: r.driver_id,
+      team_id: r.team_id,
+      assigned_by: actorId,
+    }));
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +282,26 @@ export async function publishSession(
     return { ok: false, status: 500, error: "Failed to save race results" };
   }
 
+  // 4b. Write reserve assignments (delete-then-insert per session — same
+  // idempotency pattern as the upserts above, so a re-publish never
+  // duplicates or strands a stale row) — B7.
+  const { error: reserveDeleteErr } = await db
+    .from("race_reserve_assignments")
+    .delete()
+    .eq("race_session_id", sessionId);
+  if (reserveDeleteErr) {
+    return { ok: false, status: 500, error: "Failed to save reserve assignments" };
+  }
+  const reserveAssignmentRows = buildReserveAssignmentRows(results, sessionId, actorId);
+  if (reserveAssignmentRows.length > 0) {
+    const { error: reserveInsertErr } = await db
+      .from("race_reserve_assignments")
+      .insert(reserveAssignmentRows);
+    if (reserveInsertErr) {
+      return { ok: false, status: 500, error: "Failed to save reserve assignments" };
+    }
+  }
+
   // 5. Write penalties
   if (penalties.length > 0) {
     const { error: penErr } = await db.from("penalties").insert(
@@ -290,7 +364,9 @@ export async function publishSession(
 // Standings recalculation (full rebuild from all completed sessions)
 // ---------------------------------------------------------------------------
 
-async function recalculateStandings(
+// Exported so admin routes that mutate penalty status post-publish (e.g. rescinding
+// on appeal) can recompute standings/penalty totals without duplicating this logic.
+export async function recalculateStandings(
   db: ReturnType<typeof createSupabaseServiceRoleClient>,
   leagueId: string,
   seasonId: string,

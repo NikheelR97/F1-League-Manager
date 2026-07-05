@@ -23,6 +23,8 @@ const raceResultSchema = z.object({
   manual_points_adjustment: z.number().int().default(0),
   raw_result: z.string().nullable().default(null),
   notes: z.string().nullable().default(null),
+  // B7 — set only for a reserve driver's row; who they covered for this session.
+  covering_for_driver_id: z.string().uuid().nullable().default(null),
 });
 
 const penaltySchema = z.object({

@@ -21,6 +21,9 @@ export interface SessionDriver {
   display_name: string;
   driver_id: string;
   is_reserve?: boolean;
+  // M7 — the driver's present-day team, used only to flag when it differs
+  // from `team_id` (which is resolved as of the session's own date).
+  present_team_id?: string;
   racing_number: number | null;
   team_id: string;
   team_name: string;
@@ -59,6 +62,8 @@ interface RaceResultRow {
   raw_result: string;
   result_status: ResultStatus;
   team_id: string;
+  // B7 — set only for a reserve driver's row; who they covered for.
+  covering_for_driver_id: string | null;
 }
 
 // A driver's penalty total prior to this session (from driver_penalty_totals),
@@ -121,6 +126,7 @@ function defaultResultRow(d: SessionDriver): RaceResultRow {
     raw_result: "",
     result_status: "classified",
     team_id: d.team_id,
+    covering_for_driver_id: null,
   };
 }
 
@@ -262,10 +268,12 @@ function validateResults(rows: RaceResultRow[]): ValidationResult {
 // ---------------------------------------------------------------------------
 
 function QualifyingStep({
+  bannedLastRoundDriverIds,
   drivers,
   rows,
   onChange,
 }: {
+  bannedLastRoundDriverIds: string[];
   drivers: SessionDriver[];
   rows: QualifyingRow[];
   onChange: (rows: QualifyingRow[]) => void;
@@ -308,6 +316,14 @@ function QualifyingStep({
                       {driver?.is_reserve && (
                         <span className="text-xs text-f1-muted uppercase">Reserve</span>
                       )}
+                      {bannedLastRoundDriverIds.includes(row.driver_id) && (
+                        <span
+                          className="text-xs text-destructive uppercase"
+                          title="Recorded ban in the previous session — verify eligibility before scoring."
+                        >
+                          Banned last round
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="py-2 pr-4">
@@ -346,6 +362,7 @@ function QualifyingStep({
 }
 
 function ResultsStep({
+  bannedLastRoundDriverIds,
   drivers,
   qualifyingRows,
   rows,
@@ -353,6 +370,7 @@ function ResultsStep({
   validation,
   onChange,
 }: {
+  bannedLastRoundDriverIds: string[];
   drivers: SessionDriver[];
   qualifyingRows: QualifyingRow[];
   rows: RaceResultRow[];
@@ -386,12 +404,19 @@ function ResultsStep({
     [rows, qualifyingRows],
   );
 
+  const nonReserveDrivers = drivers.filter((d) => !d.is_reserve);
+
   return (
     <div className="space-y-3">
       <p className="text-xs text-f1-muted">
-        Enter finishing positions. For reserve drivers, change the team to the one they raced for.
-        Non-classified drivers should have no finishing position.
+        Enter finishing positions. Non-classified drivers should have no finishing position.
       </p>
+      {drivers.some((d) => d.is_reserve) && (
+        <p className="text-xs text-f1-muted">
+          Reserve drivers: set Team to the team they raced for — constructor points go to that
+          team; the driver keeps their personal points.
+        </p>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -431,7 +456,30 @@ function ResultsStep({
                       {driver?.is_reserve && (
                         <span className="text-xs text-f1-muted uppercase">Res</span>
                       )}
+                      {bannedLastRoundDriverIds.includes(row.driver_id) && (
+                        <span
+                          className="text-xs text-destructive uppercase"
+                          title="Recorded ban in the previous session — verify eligibility before scoring."
+                        >
+                          Banned last round
+                        </span>
+                      )}
                     </div>
+                    {driver?.is_reserve && (
+                      <select
+                        aria-label={`Covering for ${driverName(row.driver_id)}`}
+                        className="mt-1 w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-muted focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
+                        value={row.covering_for_driver_id ?? ""}
+                        onChange={(e) =>
+                          update(row.driver_id, { covering_for_driver_id: e.target.value || null })
+                        }
+                      >
+                        <option value="">Covering for…</option>
+                        {nonReserveDrivers.map((d) => (
+                          <option key={d.driver_id} value={d.driver_id}>{d.display_name}</option>
+                        ))}
+                      </select>
+                    )}
                   </td>
                   <td className="py-2 pr-3">
                     <select
@@ -447,6 +495,11 @@ function ResultsStep({
                         <option value={row.team_id}>{driver?.team_name ?? "Unknown"}</option>
                       )}
                     </select>
+                    {/* M7 — flags a historical prefill that differs from the driver's
+                        present-day team, so it doesn't read as a data-entry mistake. */}
+                    {driver?.present_team_id && driver.present_team_id !== row.team_id && (
+                      <p className="mt-1 text-xs text-f1-muted">Team as of race date</p>
+                    )}
                   </td>
                   <td className="py-2 pr-3">
                     <select
@@ -782,9 +835,9 @@ function ReviewStep({
                 );
                 const champTotal = racePts + row.manual_points_adjustment;
                 const isBan = row.result_status === "ban";
+                const penPts = penaltyPtsByDriver.get(row.driver_id) ?? 0;
                 const projectedPenaltyTotal =
-                  (existingPenaltyTotalByDriver.get(row.driver_id) ?? 0) +
-                  (penaltyPtsByDriver.get(row.driver_id) ?? 0);
+                  (existingPenaltyTotalByDriver.get(row.driver_id) ?? 0) + penPts;
                 const isThresholdAlert =
                   !isBan && penaltyThreshold != null && projectedPenaltyTotal >= penaltyThreshold;
 
@@ -830,9 +883,7 @@ function ReviewStep({
                         : "—"}
                     </td>
                     <td className="py-2 pr-3 text-right font-mono text-f1-muted">
-                      {(penaltyPtsByDriver.get(row.driver_id) ?? 0) > 0
-                        ? penaltyPtsByDriver.get(row.driver_id)
-                        : "—"}
+                      {penPts > 0 ? penPts : "—"}
                     </td>
                     <td className="py-2 text-right font-mono font-bold text-f1-white">{champTotal}</td>
                   </tr>
@@ -882,6 +933,11 @@ function ReviewStep({
 // ---------------------------------------------------------------------------
 
 interface ResultStepperProps {
+  // B2 — driver_ids recorded with result_status "ban" in the immediately
+  // previous session for this league+season. ponytail: checks only the
+  // one prior session; a durable ban ledger (spanning every session since
+  // the ban) is the upgrade path if that's ever needed.
+  bannedLastRoundDriverIds?: string[];
   drivers: SessionDriver[];
   existingPenaltyTotals?: ExistingPenaltyTotal[];
   leagueSlug?: string;
@@ -891,6 +947,7 @@ interface ResultStepperProps {
 }
 
 export function ResultStepper({
+  bannedLastRoundDriverIds = [],
   drivers,
   existingPenaltyTotals = [],
   leagueSlug = "",
@@ -1020,6 +1077,8 @@ export function ResultStepper({
         raw_result: r.raw_result || null,
         result_status: r.result_status,
         team_id: r.team_id,
+        // Restored drafts saved before this field existed won't have it.
+        covering_for_driver_id: r.covering_for_driver_id ?? null,
       }));
 
       const penalties = penaltyRows
@@ -1149,6 +1208,7 @@ export function ResultStepper({
         <h2 className="mb-4 text-sm font-bold uppercase text-f1-white">{STEP_LABELS[step]}</h2>
         {step === "qualifying" && (
           <QualifyingStep
+            bannedLastRoundDriverIds={bannedLastRoundDriverIds}
             drivers={drivers}
             rows={qualifyingRows}
             onChange={setQualifyingRows}
@@ -1156,6 +1216,7 @@ export function ResultStepper({
         )}
         {step === "results" && (
           <ResultsStep
+            bannedLastRoundDriverIds={bannedLastRoundDriverIds}
             drivers={drivers}
             qualifyingRows={qualifyingRows}
             rows={resultRows}

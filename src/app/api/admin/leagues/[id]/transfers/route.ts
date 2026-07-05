@@ -8,10 +8,15 @@ import { MAX_PRIMARY_DRIVERS_PER_TEAM } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 const transferSchema = z.object({
-  // new_team_id = null means the driver is leaving the league entirely
   driver_entry_id: z.string().uuid(),
   effective_date: z.string().date(),
+  // new_team_id = null means the driver becomes a free agent (stays on the
+  // league roster). B5 — this used to also remove them from the league;
+  // that's now opt-in via remove_from_league.
   new_team_id: z.string().uuid().nullable(),
+  // Only meaningful when new_team_id is null — closes the league_driver_entries
+  // row (left_on) in addition to closing the team stint.
+  remove_from_league: z.boolean().optional().default(false),
   transfer_reason: z.string().trim().max(240).nullable().optional(),
 });
 
@@ -27,7 +32,8 @@ export async function POST(
       return Response.json({ error: parsed.error.flatten() }, { status: 422 });
     }
 
-    const { driver_entry_id, effective_date, new_team_id, transfer_reason } = parsed.data;
+    const { driver_entry_id, effective_date, new_team_id, remove_from_league, transfer_reason } =
+      parsed.data;
     const db = createSupabaseServiceRoleClient();
 
     // Verify entry belongs to this league and is still active
@@ -47,23 +53,29 @@ export async function POST(
       return Response.json({ error: "Driver entry not found or already inactive" }, { status: 404 });
     }
 
-    // Find the current active team stint
+    // Find the current active team stint. A driver can have none — they may
+    // already be a free agent (B5 rejoin path): still on the roster, just
+    // between teams. In that case there's nothing to close, only a new stint
+    // to open (or, if also leaving the league, nothing left to do to stints).
     const { data: currentStint, error: currentStintError } = await db
       .from("driver_team_stints")
       .select("id, team_id, starts_on")
       .eq("league_driver_entry_id", driver_entry_id)
       .is("ends_on", null)
-      .single();
+      .maybeSingle();
 
-    if (currentStintError && currentStintError.code !== "PGRST116") {
+    if (currentStintError) {
       return Response.json({ error: "Failed to load current team stint" }, { status: 500 });
     }
 
-    if (!currentStint) {
-      return Response.json({ error: "No active team stint found for this driver" }, { status: 404 });
+    if (!currentStint && !new_team_id && !remove_from_league) {
+      return Response.json(
+        { error: "Driver is already a free agent — select a new team or remove them from the league" },
+        { status: 422 },
+      );
     }
 
-    if (effective_date < currentStint.starts_on) {
+    if (currentStint && effective_date < currentStint.starts_on) {
       return Response.json(
         { error: "Transfer date cannot be before current stint start date" },
         { status: 422 },
@@ -124,15 +136,28 @@ export async function POST(
       }
     }
 
-    // Close current stint — old race results retain the team recorded at race time (never touched)
-    const { error: closeError } = await db
-      .from("driver_team_stints")
-      .update({ ends_on: effective_date, transfer_reason: transfer_reason ?? null })
-      .eq("id", currentStint.id);
+    // Close current stint, if one exists — old race results retain the team
+    // recorded at race time (never touched). A free agent rejoining a team
+    // (no currentStint) skips straight to opening the new stint.
+    if (currentStint) {
+      const { error: closeError } = await db
+        .from("driver_team_stints")
+        .update({ ends_on: effective_date, transfer_reason: transfer_reason ?? null })
+        .eq("id", currentStint.id);
 
-    if (closeError) {
-      return Response.json({ error: "Failed to close current team stint" }, { status: 500 });
+      if (closeError) {
+        return Response.json({ error: "Failed to close current team stint" }, { status: 500 });
+      }
     }
+
+    const rollbackStintClose = async () => {
+      if (!currentStint) return null;
+      const { error } = await db
+        .from("driver_team_stints")
+        .update({ ends_on: null, transfer_reason: null })
+        .eq("id", currentStint.id);
+      return error;
+    };
 
     if (new_team_id) {
       // Open new stint on destination team
@@ -146,30 +171,22 @@ export async function POST(
         });
 
       if (stintError) {
-        const { error: rollbackError } = await db
-          .from("driver_team_stints")
-          .update({ ends_on: null, transfer_reason: null })
-          .eq("id", currentStint.id);
-
+        const rollbackError = await rollbackStintClose();
         if (rollbackError) {
           return Response.json({ error: "Transfer failed and rollback failed" }, { status: 500 });
         }
 
         return Response.json({ error: "Failed to open new team stint" }, { status: 500 });
       }
-    } else {
-      // Driver is leaving the league
+    } else if (remove_from_league) {
+      // Driver is leaving the league entirely (opt-in — B5)
       const { error: leaveError } = await db
         .from("league_driver_entries")
         .update({ left_on: effective_date })
         .eq("id", driver_entry_id);
 
       if (leaveError) {
-        const { error: rollbackError } = await db
-          .from("driver_team_stints")
-          .update({ ends_on: null, transfer_reason: null })
-          .eq("id", currentStint.id);
-
+        const rollbackError = await rollbackStintClose();
         if (rollbackError) {
           return Response.json({ error: "Departure failed and rollback failed" }, { status: 500 });
         }
@@ -177,15 +194,23 @@ export async function POST(
         return Response.json({ error: "Failed to mark driver as departed" }, { status: 500 });
       }
     }
+    // else: blank team + no remove_from_league — driver simply becomes a free
+    // agent, stint already closed above, roster entry untouched.
+
+    const action = new_team_id
+      ? "driver.transferred"
+      : remove_from_league
+        ? "driver.left_league"
+        : "driver.departed";
 
     await writeAdminAuditLog({
-      action: new_team_id ? "driver.transferred" : "driver.departed",
+      action,
       actorId: auth.user.id,
       entityId: driver_entry_id,
       entityType: "league_driver_entry",
       metadata: {
         effective_date,
-        from_team_id: currentStint.team_id,
+        from_team_id: currentStint?.team_id ?? null,
         league_id: leagueId,
         to_team_id: new_team_id,
       },

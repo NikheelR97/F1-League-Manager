@@ -72,8 +72,8 @@ export function CarryOverForm({ currentSeasonId, leagueId, seasons }: Props) {
         </select>
       </div>
       <p className="text-xs text-f1-muted">
-        Copies each driver&apos;s end-of-season penalty points and unserved bans
-        into their entry for this season. Safe to re-run — existing entries are
+        Copies each driver&apos;s end-of-season penalty points and ban-threshold flags
+        into their entry for this season. A carried flag means the driver crossed the alert threshold last season — it is not a recorded ban. Safe to re-run — existing entries are
         updated, not duplicated.
       </p>
       <button

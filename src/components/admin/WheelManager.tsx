@@ -54,7 +54,6 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
     }
 
     const prefersReducedMotion =
-      typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     // Total duration ≈ 2 400ms. Intervals: 6×80ms → 6×120ms → 6×200ms → 3×350ms → 1×500ms
