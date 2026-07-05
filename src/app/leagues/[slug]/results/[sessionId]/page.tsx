@@ -30,7 +30,7 @@ export default async function RaceResultPage({
   ] = await Promise.all([
     db
       .from("race_sessions")
-      .select("id, name, race_number, race_length_percent, published_at, circuits(name, country, grand_prix_name)")
+      .select("id, name, race_number, race_length_percent, published_at, circuits(name, country, grand_prix_name, round_number)")
       .eq("id", sessionId)
       .eq("league_id", league.id)
       .eq("status", "completed")
@@ -59,7 +59,7 @@ export default async function RaceResultPage({
 
   if (!session) notFound();
 
-  type Circuit = { name: string; country: string; grand_prix_name: string };
+  type Circuit = { name: string; country: string; grand_prix_name: string; round_number: number | null };
   type Driver = { id: string; display_name: string; racing_number: number | null };
   type Team = { name: string; color_hex: string };
 
@@ -76,7 +76,7 @@ export default async function RaceResultPage({
         lastRound={session.name}
         leagueName={league.name}
         seasonName={league.season.name}
-        title={circuit?.grand_prix_name ?? session.name}
+        title={`${circuit?.round_number ? `Round ${circuit.round_number} · ` : ""}${circuit?.grand_prix_name ?? session.name}`}
         updatedAt={session.published_at}
       />
 

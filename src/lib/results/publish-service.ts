@@ -51,6 +51,10 @@ export interface PublishInput {
   results: RaceResultEntry[];
   penalties: PenaltyEntry[];
   actorId: string;
+  // M9 — explicit opt-in to publish over an already-completed session (the
+  // publish/page.tsx correction flow). Absent/false keeps the normal
+  // first-publish guard that rejects a completed session with 409.
+  republish?: boolean;
 }
 
 export type PublishResult =
@@ -164,11 +168,13 @@ export function checkPublishPreconditions(
   sessionError: boolean,
   league: object | null,
   psRaw: PointsSystem | null,
+  // M9 — republish deliberately relaxes the completed-session guard below.
+  republish = false,
 ): PublishResult | null {
   if (sessionError || !session) {
     return { ok: false, status: 404, error: "Session not found" };
   }
-  if (session.status === "completed") {
+  if (session.status === "completed" && !republish) {
     return { ok: false, status: 409, error: "Session already published" };
   }
   if (!league) {
@@ -188,7 +194,7 @@ export async function publishSession(
   input: PublishInput,
 ): Promise<PublishResult> {
   const db = createSupabaseServiceRoleClient();
-  const { sessionId, leagueId, qualifying, results, penalties, actorId } =
+  const { sessionId, leagueId, qualifying, results, penalties, actorId, republish } =
     input;
 
   // 1. Load session + points system + league settings
@@ -204,7 +210,7 @@ export async function publishSession(
   if (sessionError || !session) {
     return { ok: false, status: 404, error: "Session not found" };
   }
-  if (session.status === "completed") {
+  if (session.status === "completed" && !republish) {
     return { ok: false, status: 409, error: "Session already published" };
   }
 
@@ -217,7 +223,7 @@ export async function publishSession(
     .single();
 
   const psRaw = session.points_systems as unknown as PointsSystem | null;
-  const precheck = checkPublishPreconditions(session, false, league ?? null, psRaw);
+  const precheck = checkPublishPreconditions(session, false, league ?? null, psRaw, republish);
   if (precheck) return precheck;
   // checkPublishPreconditions guarantees league and psRaw are non-null beyond this point
   const leagueData = league!;
@@ -348,13 +354,14 @@ export async function publishSession(
     return { ok: false, status: 500, error: "Failed to mark session as completed" };
   }
 
-  // 8. Audit log
+  // 8. Audit log — M9: a republish is recorded on the same action, distinct
+  // only via metadata.republish, rather than inventing a parallel audit verb.
   await writeAdminAuditLog({
     action: "session.published",
     actorId,
     entityId: sessionId,
     entityType: "race_session",
-    metadata: { league_id: leagueId, result_count: results.length },
+    metadata: { league_id: leagueId, republish: republish === true, result_count: results.length },
   });
 
   return { ok: true, sessionId };

@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { LEAGUE_ASSETS_BUCKET } from "@/lib/constants";
+import { formatGap } from "@/lib/format-gap";
 import type { PublicLeague } from "@/lib/public/resolve-league";
 
 interface NextRace {
@@ -211,7 +212,7 @@ export function LeagueHub({
               {topDrivers.map((row) => {
                 const driver = castDriver(row.drivers);
                 const team = castTeam(row.teams);
-                const gap = row.position === 1 ? "Leader" : `-${leaderPoints - row.total_points}`;
+                const gap = formatGap(leaderPoints, row.total_points, row.position);
                 return (
                   <li key={row.position} className="flex items-center gap-3 border border-f1-border bg-f1-dark px-4 py-2">
                     <span className="w-6 font-mono text-sm font-bold text-f1-white">{row.position}</span>
@@ -260,7 +261,7 @@ export function LeagueHub({
               <ul className="space-y-1">
                 {topConstructors.map((row) => {
                   const team = castTeam(row.teams);
-                  const gap = row.position === 1 ? "Leader" : `-${constructorLeaderPoints - row.total_points}`;
+                  const gap = formatGap(constructorLeaderPoints, row.total_points, row.position);
                   return (
                     <li key={row.position} className="flex items-center gap-3 border border-f1-border bg-f1-dark px-4 py-2">
                       <span className="w-6 font-mono text-sm font-bold text-f1-white">{row.position}</span>

@@ -41,6 +41,9 @@ const publishBodySchema = z.object({
   qualifying: z.array(qualifyingSchema),
   results: z.array(raceResultSchema).min(1),
   penalties: z.array(penaltySchema),
+  // M9 — explicit opt-in from the correction flow to publish over an
+  // already-completed session; see checkPublishPreconditions.
+  republish: z.boolean().optional().default(false),
 });
 
 export async function POST(
@@ -67,6 +70,7 @@ export async function POST(
       results: body.results,
       penalties: body.penalties,
       actorId: auth.user.id,
+      republish: body.republish,
     });
 
     if (!result.ok) {

@@ -276,6 +276,16 @@ export default async function LeagueDetailPage({
                           Penalties
                         </Link>
                       )}
+                      {/* M9 — published results are no longer uncorrectable; the
+                          publish page reopens pre-filled for a republish. */}
+                      {!isPublishable && (
+                        <Link
+                          className="border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                          href={`/admin/leagues/${leagueId}/sessions/${session.id}/publish`}
+                        >
+                          Correct results
+                        </Link>
+                      )}
                       <Link
                         className="p-1 text-f1-muted transition-colors hover:text-f1-white"
                         href={`/admin/leagues/${leagueId}/sessions/${session.id}/edit`}
@@ -371,6 +381,12 @@ export default async function LeagueDetailPage({
               href={`/admin/leagues/${leagueId}/transfers/new`}
             >
               Record Transfer
+            </Link>
+            <Link
+              className="flex items-center gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              href={`/admin/leagues/${leagueId}/adjustments`}
+            >
+              Adjustments
             </Link>
             <Link
               className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"

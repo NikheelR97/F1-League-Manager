@@ -88,6 +88,25 @@ describe("standings gap to leader", () => {
   });
 });
 
+// ─── formatGap helper ───────────────────────────────────────────────────────
+
+import { formatGap } from "@/lib/format-gap";
+
+describe("formatGap helper", () => {
+  it("returns 'Leader' for position 1", () => {
+    expect(formatGap(200, 200, 1)).toBe("Leader");
+  });
+
+  it("returns '-N pts' for trailing positions", () => {
+    expect(formatGap(200, 175, 2)).toBe("-25 pts");
+    expect(formatGap(200, 100, 5)).toBe("-100 pts");
+  });
+
+  it("handles zero gap for tied points outside position 1", () => {
+    expect(formatGap(200, 200, 2)).toBe("-0 pts");
+  });
+});
+
 // ─── Penalty field safety ─────────────────────────────────────────────────────
 // Verifies the select strings in penalty-related files do not expose internal
 // steward/appeal notes (HANDOVER §8.4 and §13).

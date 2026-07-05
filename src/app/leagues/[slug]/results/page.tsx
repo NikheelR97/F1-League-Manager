@@ -38,7 +38,7 @@ export default async function ResultsIndexPage({
     db
       .from("race_sessions")
       .select(
-        "id, name, race_number, race_length_percent, scheduled_at, published_at, circuits(name, country, grand_prix_name)",
+        "id, name, race_number, race_length_percent, scheduled_at, published_at, circuits(name, country, grand_prix_name, round_number)",
       )
       .eq("league_id", league.id)
       .eq("season_id", seasonId)
@@ -53,7 +53,7 @@ export default async function ResultsIndexPage({
   const displaySeason =
     seasons.find((s) => s.id === seasonId)?.name ?? league.season.name;
 
-  type Circuit = { name: string; country: string; grand_prix_name: string };
+  type Circuit = { name: string; country: string; grand_prix_name: string; round_number: number | null };
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -86,6 +86,7 @@ export default async function ResultsIndexPage({
                 >
                   <div>
                     <p className="font-bold text-f1-white">
+                      {circuit?.round_number ? `Round ${circuit.round_number} · ` : ""}
                       {circuit?.grand_prix_name ?? session.name}
                     </p>
                     <p className="text-xs text-f1-muted">
