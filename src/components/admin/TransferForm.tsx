@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { formatDate } from "@/lib/format-date";
 import { MAX_PRIMARY_DRIVERS_PER_TEAM } from "@/lib/constants";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
+import { useFocusOnMount } from "@/lib/hooks/use-focus-on-mount";
 
 // Sentinel for "no completed race boundary yet" — B6 fallback option.
 const IMMEDIATE_VALUE = "__immediate__";
@@ -63,6 +64,14 @@ type Stage = "form" | "review" | "success";
 export function TransferForm({ drivers, leagueId, sessions, teams }: TransferFormProps) {
   const csrfToken = useCsrfToken();
   const [stage, setStage] = useState<Stage>("form");
+  // K1 — each stage swap replaces the visible content; without moving focus
+  // along, it's stuck wherever the previous stage's control (e.g. "Back")
+  // used to be, or on <body> once that control unmounts.
+  // skipInitial on the form stage so the initial page load doesn't steal
+  // focus — only a later return to it (via Back) should.
+  const formRef = useFocusOnMount<HTMLDivElement>(stage === "form", true);
+  const reviewRef = useFocusOnMount<HTMLDivElement>(stage === "review");
+  const successRef = useFocusOnMount<HTMLDivElement>(stage === "success");
 
   const {
     control,
@@ -128,7 +137,12 @@ export function TransferForm({ drivers, leagueId, sessions, teams }: TransferFor
 
   if (stage === "success") {
     return (
-      <div className="space-y-3 border border-green-700 bg-green-900/10 p-6" role="status">
+      <div
+        className="space-y-3 border border-green-700 bg-green-900/10 p-6"
+        ref={successRef}
+        role="status"
+        tabIndex={-1}
+      >
         <p className="text-sm font-bold text-green-400">Transfer recorded: {summary}</p>
         <Link
           className="text-xs font-bold uppercase text-f1-white underline hover:text-f1-red"
@@ -143,7 +157,7 @@ export function TransferForm({ drivers, leagueId, sessions, teams }: TransferFor
   return (
     <form className="space-y-6" onSubmit={handleSubmit(onValid)}>
       {stage === "form" && (
-        <>
+        <div className="space-y-6" ref={formRef} tabIndex={-1}>
           <div className="space-y-2">
             <Label htmlFor="driver_entry_id">Driver</Label>
             <select
@@ -237,11 +251,15 @@ export function TransferForm({ drivers, leagueId, sessions, teams }: TransferFor
               <p className="text-xs text-f1-red" id="transfer_reason-error">{errors.transfer_reason.message}</p>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {stage === "review" && (
-        <div className="space-y-2 border border-f1-border bg-f1-dark p-4">
+        <div
+          className="space-y-2 border border-f1-border bg-f1-dark p-4"
+          ref={reviewRef}
+          tabIndex={-1}
+        >
           <p className="text-xs font-bold uppercase text-f1-muted">Review Transfer</p>
           <p className="text-sm text-f1-white">{summary}</p>
         </div>

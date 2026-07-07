@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Trash2 } from "lucide-react";
 
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
+import { useFocusOnMount } from "@/lib/hooks/use-focus-on-mount";
 
 interface AdjustmentDeleteButtonProps {
   adjustmentId: string;
@@ -16,11 +17,14 @@ export function AdjustmentDeleteButton({ adjustmentId, targetName }: AdjustmentD
   const csrfToken = useCsrfToken();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
+  // K2 — the button self-replaces with a status message; without this,
+  // focus falls back to <body> before the delayed router.refresh() below.
+  const statusRef = useFocusOnMount<HTMLParagraphElement>(isDeleted);
 
   async function handleDelete() {
     if (
       !confirm(
-        `Remove this adjustment for ${targetName}? Standings will be recalculated immediately.`,
+        `Delete this adjustment for ${targetName}? Standings will be recalculated immediately.`,
       )
     ) {
       return;
@@ -53,8 +57,13 @@ export function AdjustmentDeleteButton({ adjustmentId, targetName }: AdjustmentD
 
   if (isDeleted) {
     return (
-      <p className="text-xs font-bold uppercase text-f1-muted" role="status">
-        Adjustment removed.
+      <p
+        className="text-xs font-bold uppercase text-f1-muted"
+        ref={statusRef}
+        role="status"
+        tabIndex={-1}
+      >
+        Adjustment deleted — standings recalculated.
       </p>
     );
   }

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { FormError } from "@/components/ui/FormError";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
+import { PENALTY_STATUS_LABELS } from "@/lib/penalties/status-labels";
 
 const STATUS_OPTIONS = ["open", "served", "appealed", "rescinded"] as const;
 export type PenaltyStatus = (typeof STATUS_OPTIONS)[number];
@@ -72,7 +73,7 @@ export function PenaltyStatusEditor({ driverName, initialStatus, penaltyId }: Pr
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>
-              {s}
+              {PENALTY_STATUS_LABELS[s]}
             </option>
           ))}
         </select>
@@ -82,7 +83,7 @@ export function PenaltyStatusEditor({ driverName, initialStatus, penaltyId }: Pr
           onClick={handleSave}
           type="button"
         >
-          {saveState === "loading" ? "Saving…" : "Save"}
+          {saveState === "loading" ? "Updating…" : "Save"}
         </button>
       </div>
       {saveState === "success" && !dirty && (

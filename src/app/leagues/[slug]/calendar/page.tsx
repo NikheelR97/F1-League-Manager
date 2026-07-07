@@ -136,7 +136,7 @@ export default async function LeagueCalendarPage({
                         <td className="px-4 py-3 text-right">
                           <Link
                             href={`/leagues/${slug}/results?session=${session.id}`}
-                            className="text-xs font-bold uppercase text-f1-red-text hover:text-white transition-colors"
+                            className="inline-flex items-center min-h-11 text-xs font-bold uppercase text-f1-red-text hover:text-white transition-colors"
                           >
                             View
                           </Link>

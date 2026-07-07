@@ -6,16 +6,9 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
+import { PENALTY_STATUS_LABELS } from "@/lib/penalties/status-labels";
 
 export const dynamic = "force-dynamic";
-
-// Status display labels for public consumption
-const STATUS_LABEL: Record<string, string> = {
-  open: "Open",
-  served: "Served",
-  appealed: "Under Appeal",
-  rescinded: "Rescinded",
-};
 
 export default async function PenaltiesPage({
   params,
@@ -93,7 +86,7 @@ export default async function PenaltiesPage({
                     <td className="py-2 pr-4 text-f1-muted">{p.reason}</td>
                     <td className="py-2 pr-4 text-right font-mono font-bold text-f1-red-text">{p.penalty_points}</td>
                     <td className="py-2 text-right font-mono text-xs text-f1-muted">
-                      {STATUS_LABEL[p.status] ?? p.status}
+                      {PENALTY_STATUS_LABELS[p.status] ?? p.status}
                     </td>
                   </tr>
                 );
@@ -116,7 +109,7 @@ export default async function PenaltiesPage({
                     </div>
                     <div className="text-right">
                       <p className="font-mono font-bold text-f1-red-text">{p.penalty_points} pts</p>
-                      <p className="font-mono text-xs text-f1-muted">{STATUS_LABEL[p.status] ?? p.status}</p>
+                      <p className="font-mono text-xs text-f1-muted">{PENALTY_STATUS_LABELS[p.status] ?? p.status}</p>
                     </div>
                   </div>
                 </li>

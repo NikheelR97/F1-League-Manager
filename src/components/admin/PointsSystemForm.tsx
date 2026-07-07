@@ -104,7 +104,7 @@ export function PointsSystemForm({ leagueId }: PointsSystemFormProps) {
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       setError("root", {
-        message: (body as { error?: string }).error ?? "Failed to create points system.",
+        message: (body as { error?: string }).error ?? "Failed to create points system",
       });
       return;
     }
@@ -223,7 +223,7 @@ export function PointsSystemForm({ leagueId }: PointsSystemFormProps) {
       <FormError message={errors.root?.message} />
 
       <button
-        className="w-full border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
+        className="w-full min-h-11 border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
         disabled={isSubmitting}
         type="submit"
       >

@@ -134,14 +134,14 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setSubmitError((body as { error?: string }).error ?? `Failed to ${session ? "update" : "create"} session.`);
+        setSubmitError((body as { error?: string }).error ?? `Failed to ${session ? "update" : "create"} session`);
         return;
       }
 
       router.push(`/admin/leagues/${leagueId}`);
       router.refresh();
     } catch {
-      setSubmitError(`Failed to ${session ? "update" : "create"} session.`);
+      setSubmitError(`Failed to ${session ? "update" : "create"} session`);
     }
   }
 
@@ -285,7 +285,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
       <FormError message={submitError} />
 
       <button
-        className="w-full border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
+        className="w-full min-h-11 border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
         disabled={isSubmitting}
         type="submit"
       >

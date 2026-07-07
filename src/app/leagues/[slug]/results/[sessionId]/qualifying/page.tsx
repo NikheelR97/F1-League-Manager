@@ -65,7 +65,7 @@ export default async function QualifyingResultsPage({
       <div className="flex flex-wrap items-center gap-4 text-xs text-f1-muted">
         {circuit?.country && <span>{circuit.country}</span>}
         <Link
-          className="ml-auto text-f1-muted underline underline-offset-2 hover:text-f1-white"
+          className="inline-flex items-center min-h-11 ml-auto text-f1-muted underline underline-offset-2 hover:text-f1-white"
           href={backHref}
         >
           ← Full result

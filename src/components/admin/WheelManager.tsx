@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
+import { useFocusOnMount } from "@/lib/hooks/use-focus-on-mount";
 
 interface Circuit {
   country: string;
@@ -38,6 +39,12 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
   const [spinState, setSpinState] = useState<SpinState>(pendingSpin ? "pending" : "idle");
   const [localPendingSpin, setLocalPendingSpin] = useState<WheelSpin | null>(pendingSpin ?? null);
   const [announcement, setAnnouncement] = useState("");
+
+  // K4 — reveal mounts the Void/Confirm controls; without this, focus stays
+  // wherever it was (e.g. the Spin button, now gone) instead of following.
+  // skipInitial: a spin left pending from a previous visit shouldn't steal
+  // focus on page load — only a reveal completing during this visit should.
+  const pendingRegionRef = useFocusOnMount<HTMLDivElement>(spinState === "pending", true);
 
   // Slot-machine cycling display during spin
   const [cyclingName, setCyclingName] = useState<string>("");
@@ -275,7 +282,11 @@ export function WheelManager({ allCircuits, initialPoolIds, leagueId, pendingSpi
         )}
 
         {(spinState === "pending") && localPendingSpin && (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div
+            className="flex flex-col items-center justify-center py-8 text-center"
+            ref={pendingRegionRef}
+            tabIndex={-1}
+          >
             <p className="mb-2 text-xs font-bold uppercase tracking-widest text-f1-muted">
               The wheel landed on
             </p>

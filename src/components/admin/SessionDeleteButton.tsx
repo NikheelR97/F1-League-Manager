@@ -42,7 +42,7 @@ export function SessionDeleteButton({ sessionId }: { sessionId: string }) {
   if (isDeleted) {
     return (
       <p className="text-xs font-bold uppercase text-f1-muted" role="status">
-        Session deleted.
+        Session deleted
       </p>
     );
   }

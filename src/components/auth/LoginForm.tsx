@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getDefaultPathForRole } from "@/lib/auth/redirects";
+import { useFocusOnMount } from "@/lib/hooks/use-focus-on-mount";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface LoginFormProps {
@@ -27,6 +28,9 @@ export function LoginForm({ nextPath }: LoginFormProps) {
   const [errors, setErrors] = useState<LoginErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // K4 — on bad credentials, focus should land on the alert, not stay on
+  // the submit button (which is where it was left after the click).
+  const submitErrorRef = useFocusOnMount<HTMLParagraphElement>(submitError);
 
   function validate() {
     const nextErrors: LoginErrors = {};
@@ -82,7 +86,12 @@ export function LoginForm({ nextPath }: LoginFormProps) {
   return (
     <form className="space-y-5" noValidate onSubmit={handleSubmit}>
       {submitError ? (
-        <p className="border border-f1-red bg-f1-dark p-3 text-sm text-f1-silver" role="alert">
+        <p
+          className="border border-f1-red bg-f1-dark p-3 text-sm text-f1-silver"
+          ref={submitErrorRef}
+          role="alert"
+          tabIndex={-1}
+        >
           {submitError}
         </p>
       ) : null}

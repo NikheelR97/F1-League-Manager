@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FormError } from "@/components/ui/FormError";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
+import { useFocusOnMount } from "@/lib/hooks/use-focus-on-mount";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -665,6 +666,24 @@ function PenaltiesStep({
   rows: PenaltyRow[];
   onChange: (rows: PenaltyRow[]) => void;
 }) {
+  // K2 — after removing a row, focus lands on <body> unless we move it
+  // somewhere sensible: the row that slid into this slot, else the previous
+  // row, else the Add Penalty button (list now empty).
+  const removeButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingFocusRef = useRef<string | "add" | null>(null);
+
+  useEffect(() => {
+    const target = pendingFocusRef.current;
+    if (!target) return;
+    pendingFocusRef.current = null;
+    if (target === "add") {
+      addButtonRef.current?.focus();
+    } else {
+      removeButtonRefs.current.get(target)?.focus();
+    }
+  }, [rows.length]);
+
   function add() {
     onChange([
       ...rows,
@@ -681,7 +700,9 @@ function PenaltiesStep({
   }
 
   function remove(i: number) {
-    onChange(rows.filter((_, idx) => idx !== i));
+    const next = rows.filter((_, idx) => idx !== i);
+    pendingFocusRef.current = next[i]?.id ?? next[i - 1]?.id ?? "add";
+    onChange(next);
   }
 
   function update(i: number, field: Partial<PenaltyRow>) {
@@ -707,6 +728,10 @@ function PenaltiesStep({
                   <button
                     aria-label={`Remove penalty for ${entryLabel}`}
                     className="text-xs text-f1-muted hover:text-destructive"
+                    ref={(el) => {
+                      if (el) removeButtonRefs.current.set(row.id, el);
+                      else removeButtonRefs.current.delete(row.id);
+                    }}
                     type="button"
                     onClick={() => remove(i)}
                   >
@@ -802,6 +827,7 @@ function PenaltiesStep({
       )}
       <button
         className="border border-f1-border px-4 py-2 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+        ref={addButtonRef}
         type="button"
         onClick={add}
       >
@@ -1134,6 +1160,9 @@ export function ResultStepper({
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishSuccess, setPublishSuccess] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  // K1 — the success banner replaces the whole stepper subtree; without this
+  // focus would fall back to <body> instead of landing on the banner.
+  const publishSuccessRef = useFocusOnMount<HTMLDivElement>(publishSuccess);
 
   const draftKey = `result-stepper-draft:${session.id}`;
   const draftRef = useRef<DraftShape | "pending" | null>("pending");
@@ -1317,7 +1346,9 @@ export function ResultStepper({
     return (
       <div
         className="space-y-3 border border-green-700 bg-green-900/10 p-6"
+        ref={publishSuccessRef}
         role="status"
+        tabIndex={-1}
       >
         <p className="text-sm font-bold text-green-400">Results published.</p>
         <div className="flex gap-4 text-xs font-bold uppercase">

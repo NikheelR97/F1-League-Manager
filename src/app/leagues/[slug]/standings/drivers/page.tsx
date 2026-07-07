@@ -156,7 +156,7 @@ export default async function DriverStandingsPage({
                     <td className="py-2 pr-4">
                       {driver ? (
                         <Link
-                          className="font-bold text-f1-white hover:text-f1-red"
+                          className="inline-flex items-center min-h-11 font-bold text-f1-white hover:text-f1-red"
                           href={`/leagues/${league.slug}/drivers/${driver.id}`}
                         >
                           {driver.display_name}
@@ -177,7 +177,7 @@ export default async function DriverStandingsPage({
                         />
                         {team ? (
                           <Link
-                            className="text-f1-muted hover:text-f1-white"
+                            className="inline-flex items-center min-h-11 text-f1-muted hover:text-f1-white"
                             href={`/leagues/${league.slug}/teams/${team.id}`}
                           >
                             {team.name}
@@ -212,7 +212,7 @@ export default async function DriverStandingsPage({
                       <div className="min-w-0">
                         <p className="truncate font-bold text-f1-white">
                           {driver ? (
-                            <Link href={`/leagues/${league.slug}/drivers/${driver.id}`}>
+                            <Link className="inline-flex items-center min-h-11" href={`/leagues/${league.slug}/drivers/${driver.id}`}>
                               {driver.display_name}
                             </Link>
                           ) : (
@@ -229,7 +229,7 @@ export default async function DriverStandingsPage({
                             style={{ backgroundColor: team?.color_hex ?? "#444" }}
                           />
                           {team ? (
-                            <Link href={`/leagues/${league.slug}/teams/${team.id}`}>{team.name}</Link>
+                            <Link className="inline-flex items-center min-h-11" href={`/leagues/${league.slug}/teams/${team.id}`}>{team.name}</Link>
                           ) : (
                             "TBD"
                           )}

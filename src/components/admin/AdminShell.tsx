@@ -85,7 +85,7 @@ export function AdminShell({ children, role }: AdminShellProps) {
             <SignOutButton className="mt-0" />
           </div>
         </header>
-        <main className="flex-1 p-6" id="main-content">{children}</main>
+        <main className="flex-1 p-6" id="main-content" tabIndex={-1}>{children}</main>
       </div>
     </div>
   );

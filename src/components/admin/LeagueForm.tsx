@@ -168,7 +168,7 @@ export function LeagueForm({ seasons }: LeagueFormProps) {
         </legend>
         <label className="flex items-center gap-3 text-sm text-f1-white">
           <input
-            className="accent-f1-red"
+            className="accent-f1-red size-5"
             type="checkbox"
             {...register("fastest_lap_enabled")}
           />
@@ -176,7 +176,7 @@ export function LeagueForm({ seasons }: LeagueFormProps) {
         </label>
         <label className="flex items-center gap-3 text-sm text-f1-white">
           <input
-            className="accent-f1-red"
+            className="accent-f1-red size-5"
             type="checkbox"
             {...register("pole_position_enabled")}
           />
@@ -184,7 +184,7 @@ export function LeagueForm({ seasons }: LeagueFormProps) {
         </label>
         <label className="flex items-center gap-3 text-sm text-f1-white">
           <input
-            className="accent-f1-red"
+            className="accent-f1-red size-5"
             type="checkbox"
             {...register("constructor_championship_enabled")}
           />
@@ -214,7 +214,7 @@ export function LeagueForm({ seasons }: LeagueFormProps) {
       <FormError message={errors.root?.message} />
 
       <button
-        className="w-full border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
+        className="w-full min-h-11 border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
         disabled={isSubmitting || seasons.length === 0}
         type="submit"
       >

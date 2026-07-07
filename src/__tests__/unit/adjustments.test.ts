@@ -81,7 +81,7 @@ describe("adjustment delete button", () => {
     const fetchIdx = componentSrc.indexOf("await fetch(");
     expect(confirmIdx).toBeGreaterThan(-1);
     expect(confirmIdx).toBeLessThan(fetchIdx);
-    expect(componentSrc).toContain("Remove this adjustment for ${targetName}");
+    expect(componentSrc).toContain("Delete this adjustment for ${targetName}");
   });
 
   it("names the target in the button's aria-label", () => {
