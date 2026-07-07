@@ -308,7 +308,16 @@ export async function publishSession(
     }
   }
 
-  // 5. Write penalties
+  // 5. Write penalties (delete-then-insert per session — same idempotency
+  // pattern as the reserve assignments above, so a republish never
+  // double-counts penalty points into ban thresholds/standings) — X1.
+  const { error: penaltyDeleteErr } = await db
+    .from("penalties")
+    .delete()
+    .eq("race_session_id", sessionId);
+  if (penaltyDeleteErr) {
+    return { ok: false, status: 500, error: "Failed to save penalties" };
+  }
   if (penalties.length > 0) {
     const { error: penErr } = await db.from("penalties").insert(
       penalties.map((p) => ({

@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { SeasonSelector } from "@/components/league/SeasonSelector";
 import { formatDate } from "@/lib/format-date";
+import { roundPrefix } from "@/lib/public/round-prefix";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { resolveLeagueSeasons } from "@/lib/public/resolve-league-seasons";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -78,6 +79,7 @@ export default async function ResultsIndexPage({
         <ul className="space-y-2">
           {results.map((session) => {
             const circuit = session.circuits as unknown as Circuit | null;
+            const displayName = circuit?.grand_prix_name ?? session.name;
             return (
               <li key={session.id}>
                 <Link
@@ -86,8 +88,8 @@ export default async function ResultsIndexPage({
                 >
                   <div>
                     <p className="font-bold text-f1-white">
-                      {circuit?.round_number ? `Round ${circuit.round_number} · ` : ""}
-                      {circuit?.grand_prix_name ?? session.name}
+                      {roundPrefix(circuit?.round_number, displayName)}
+                      {displayName}
                     </p>
                     <p className="text-xs text-f1-muted">
                       {circuit?.country ?? ""}

@@ -202,6 +202,28 @@ interface DraftShape {
   step: Step;
 }
 
+// Pulls the first human-readable message out of a Zod .flatten() object
+// (`{ formErrors: string[]; fieldErrors: Record<string, string[]> }`), so the
+// publish 422 path can show the real reason instead of a generic guess.
+function firstZodMessage(err: unknown): string | null {
+  if (typeof err !== "object" || err === null) return null;
+  const { formErrors, fieldErrors } = err as {
+    formErrors?: unknown;
+    fieldErrors?: unknown;
+  };
+  if (Array.isArray(formErrors) && typeof formErrors[0] === "string") {
+    return formErrors[0];
+  }
+  if (typeof fieldErrors === "object" && fieldErrors !== null) {
+    for (const messages of Object.values(fieldErrors)) {
+      if (Array.isArray(messages) && typeof messages[0] === "string") {
+        return messages[0];
+      }
+    }
+  }
+  return null;
+}
+
 function hasDriverId(row: unknown): row is { driver_id: string } {
   return typeof row === "object" && row !== null && typeof (row as { driver_id?: unknown }).driver_id === "string";
 }
@@ -1262,14 +1284,16 @@ export function ResultStepper({
       if (!res.ok) {
         const body: unknown = await res.json().catch(() => ({}));
         const rawError = (body as { error?: unknown }).error;
-        // N5(c) — the 422 path can send an object instead of a string; render
-        // never gets a non-string into FormError.
+        // N5(c) — the 422 path can send a Zod flatten() object instead of a
+        // string; pull out the actual field-level reason so FormError never
+        // renders a non-string (and never a made-up "review step" guess).
         setPublishError(
           typeof rawError === "string"
             ? rawError
             : rawError !== undefined
-            ? "Validation failed on the server — check the review step."
-            : "Failed to publish session.",
+              ? (firstZodMessage(rawError) ??
+                "Couldn't publish — please review your entries.")
+              : "Failed to publish session.",
         );
         return;
       }

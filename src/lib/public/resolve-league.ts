@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export interface PublicLeague {
@@ -17,7 +19,9 @@ export interface PublicLeague {
   season: { id: string; name: string };
 }
 
-export async function resolvePublicLeague(slug: string): Promise<PublicLeague | null> {
+// cache() dedupes same-request calls by slug — the layout and each page under
+// it both resolve the league, so this collapses that to one query per request.
+export const resolvePublicLeague = cache(async (slug: string): Promise<PublicLeague | null> => {
   const db = createSupabaseServiceRoleClient();
   const { data } = await db
     .from("leagues")
@@ -47,4 +51,4 @@ export async function resolvePublicLeague(slug: string): Promise<PublicLeague | 
     hero_image_path: data.hero_image_path,
     season,
   };
-}
+});
