@@ -1,15 +1,39 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { formatDate } from "@/lib/format-date";
 import { getDriverPenaltyTotals } from "@/lib/penalties/get-driver-penalty-totals";
+import { pageTitle } from "@/lib/public/page-title";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
+
+// ponytail: this refetches the driver's display_name (not cache()-wrapped) —
+// a single indexed .single() lookup by primary key, cheap enough not to
+// bother wiring a shared cache for a tab title.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string; driverId: string }>;
+}): Promise<Metadata> {
+  const { slug, driverId } = await params;
+  const league = await resolvePublicLeague(slug);
+  if (!league) return { title: pageTitle("Driver") };
+
+  const db = createSupabaseServiceRoleClient();
+  const { data: driver } = await db
+    .from("drivers")
+    .select("display_name")
+    .eq("id", driverId)
+    .single();
+
+  return { title: pageTitle(`${driver?.display_name ?? "Driver"} — ${league.name}`) };
+}
 
 export default async function DriverProfilePage({
   params,

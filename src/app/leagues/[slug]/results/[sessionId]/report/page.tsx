@@ -1,15 +1,41 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { pageTitle } from "@/lib/public/page-title";
 import { comparePublicRaceResults } from "@/lib/public/result-sort";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
+
+// ponytail: see the sibling results/[sessionId] page.tsx for why this small
+// extra session lookup (uncached) is fine for a tab title.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string; sessionId: string }>;
+}): Promise<Metadata> {
+  const { slug, sessionId } = await params;
+  const league = await resolvePublicLeague(slug);
+  if (!league) return { title: pageTitle("Report") };
+
+  const db = createSupabaseServiceRoleClient();
+  const { data: session } = await db
+    .from("race_sessions")
+    .select("name, circuits(grand_prix_name)")
+    .eq("id", sessionId)
+    .eq("league_id", league.id)
+    .single();
+
+  const circuit = session?.circuits as unknown as { grand_prix_name: string } | null;
+  const displayName = circuit?.grand_prix_name ?? session?.name ?? "Report";
+  return { title: pageTitle(`Report — ${displayName}`) };
+}
 
 export default async function RaceReportPage({
   params,

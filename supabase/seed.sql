@@ -204,14 +204,14 @@ values
 insert into public.driver_standings
   (league_id, season_id, driver_id, team_id, position, previous_position, total_points, wins, podiums, fastest_laps)
 values
-  -- 1st: Alessandro Ferrari (Red Racing, 25 pts + FL)
+  -- 1st: Alessandro Ferrari (Red Racing, 25 pts + FL) — up from 2nd last round
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-   1, null, 26, 1, 1, 1),
-  -- 2nd: Carlos Martinez (Blue Speed, 18 pts)
+   1, 2, 26, 1, 1, 1),
+  -- 2nd: Carlos Martinez (Blue Speed, 18 pts) — down from 1st last round
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
-   2, null, 18, 0, 1, 0),
+   2, 1, 18, 0, 1, 0),
   -- 3rd: Hans Mueller (Green Force, 15 pts)
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13',
@@ -220,14 +220,14 @@ values
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a17', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14',
    4, null, 12, 0, 0, 0),
-  -- 5th: Kenji Tanaka (Silver Arrow, 10 pts)
+  -- 5th: Kenji Tanaka (Silver Arrow, 10 pts) — up from 6th last round
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a19', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15',
-   5, null, 10, 0, 0, 0),
-  -- 6th: Marco Rossi (Red Racing, 8 pts)
+   5, 6, 10, 0, 0, 0),
+  -- 6th: Marco Rossi (Red Racing, 8 pts) — down from 5th last round
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-   6, null, 8, 0, 0, 0),
+   6, 5, 8, 0, 0, 0),
   -- 7th: Pierre Dupont (Blue Speed, 6 pts)
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
@@ -249,26 +249,26 @@ values
 insert into public.driver_standings
   (league_id, season_id, driver_id, team_id, position, previous_position, total_points, wins, podiums, fastest_laps)
 values
-  -- 1st: Viktor Petrov (Alpine Ace, 25 pts + FL)
+  -- 1st: Viktor Petrov (Alpine Ace, 25 pts + FL) — up from 2nd last round
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21',
-   1, null, 26, 1, 1, 1),
-  -- 2nd: Lucas Santos (Grid Warrior, 18 pts)
+   1, 2, 26, 1, 1, 1),
+  -- 2nd: Lucas Santos (Grid Warrior, 18 pts) — down from 1st last round
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
-   2, null, 18, 0, 1, 0),
+   2, 1, 18, 0, 1, 0),
   -- 3rd: Nadia Laurent (Apex Chasers, 15 pts)
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a25', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23',
    3, null, 15, 0, 1, 0),
-  -- 4th: Oliver Schmidt (Pit Stop Kings, 12 pts)
+  -- 4th: Oliver Schmidt (Pit Stop Kings, 12 pts) — up from 5th last round
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a27', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a24',
-   4, null, 12, 0, 0, 0),
-  -- 5th: Ryan McAllister (Tarmac Beasts, 10 pts)
+   4, 5, 12, 0, 0, 0),
+  -- 5th: Ryan McAllister (Tarmac Beasts, 10 pts) — down from 4th last round
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a29', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a25',
-   5, null, 10, 0, 0, 0),
+   5, 4, 10, 0, 0, 0),
   -- 6th: Amir Hassan (Alpine Ace, 8 pts)
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21',
@@ -298,9 +298,9 @@ insert into public.team_standings
   (league_id, season_id, team_id, position, previous_position, total_points, wins, podiums)
 values
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-   'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 1, null, 34, 1, 1),  -- Alpine Ace (26 + 8)
+   'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 1, 2, 34, 1, 1),  -- Alpine Ace (26 + 8) — up from 2nd last round
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-   'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 2, null, 24, 0, 1),  -- Grid Warrior (18 + 6)
+   'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 2, 1, 24, 0, 1),  -- Grid Warrior (18 + 6) — down from 1st last round
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23', 3, null, 19, 0, 1),  -- Apex Chasers (15 + 4)
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',

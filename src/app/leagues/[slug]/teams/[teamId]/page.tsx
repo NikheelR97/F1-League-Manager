@@ -1,14 +1,39 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { pageTitle } from "@/lib/public/page-title";
 import { comparePublicRaceResults } from "@/lib/public/result-sort";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
+
+// ponytail: this refetches the team name (not cache()-wrapped) — a single
+// indexed .single() lookup by primary key, cheap enough not to bother
+// wiring a shared cache for a tab title.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string; teamId: string }>;
+}): Promise<Metadata> {
+  const { slug, teamId } = await params;
+  const league = await resolvePublicLeague(slug);
+  if (!league) return { title: pageTitle("Team") };
+
+  const db = createSupabaseServiceRoleClient();
+  const { data: team } = await db
+    .from("teams")
+    .select("name")
+    .eq("id", teamId)
+    .eq("league_id", league.id)
+    .single();
+
+  return { title: pageTitle(`${team?.name ?? "Team"} — ${league.name}`) };
+}
 
 // HANDOVER sort order: finished → lap down → dnf → dsq → ban → dnp
 export default async function TeamProfilePage({

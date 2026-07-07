@@ -1,16 +1,44 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { pageTitle } from "@/lib/public/page-title";
 import { comparePublicRaceResults } from "@/lib/public/result-sort";
 import { roundPrefix } from "@/lib/public/round-prefix";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
+
+// ponytail: this refetches session/circuit name (not cache()-wrapped like
+// resolvePublicLeague) so it runs once more than the page body — a single
+// indexed .single() lookup on race_sessions.id, cheap enough not to bother
+// wiring a shared cache for a tab title.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string; sessionId: string }>;
+}): Promise<Metadata> {
+  const { slug, sessionId } = await params;
+  const league = await resolvePublicLeague(slug);
+  if (!league) return { title: pageTitle("Race Result") };
+
+  const db = createSupabaseServiceRoleClient();
+  const { data: session } = await db
+    .from("race_sessions")
+    .select("name, circuits(grand_prix_name, round_number)")
+    .eq("id", sessionId)
+    .eq("league_id", league.id)
+    .single();
+
+  const circuit = session?.circuits as unknown as { grand_prix_name: string; round_number: number | null } | null;
+  const displayName = circuit?.grand_prix_name ?? session?.name ?? "Race Result";
+  return { title: pageTitle(`${roundPrefix(circuit?.round_number, displayName)}${displayName}`) };
+}
 
 // HANDOVER sort order: finished → lap down → dnf → dsq → ban → dnp
 export default async function RaceResultPage({

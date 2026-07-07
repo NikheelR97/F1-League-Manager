@@ -128,7 +128,7 @@ export function AddLeagueDriverForm({ drivers, leagueId, teams }: AddLeagueDrive
             type="checkbox"
             {...register("is_reserve")}
           />
-          Reserve driver (uncheck for primary)
+          Reserve driver
         </label>
       </div>
 
@@ -162,7 +162,7 @@ export function AddLeagueDriverForm({ drivers, leagueId, teams }: AddLeagueDrive
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="entry-bans">Unserved bans</Label>
+          <Label htmlFor="entry-bans">Bans owed</Label>
           <Input
             id="entry-bans"
             min={0}
