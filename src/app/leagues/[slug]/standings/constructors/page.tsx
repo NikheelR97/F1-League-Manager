@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,11 +12,24 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
 import { cacheTag } from "@/lib/cache/tags";
 import { formatGap } from "@/lib/format-gap";
+import { pageTitle } from "@/lib/public/page-title";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { resolveLeagueSeasons, type LeagueSeason } from "@/lib/public/resolve-league-seasons";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const league = await resolvePublicLeague(slug);
+  return {
+    title: pageTitle(league ? `Constructor Standings — ${league.name}` : "Constructor Standings"),
+  };
+}
 
 // Fallback revalidation window: self-heals standings even if a mutation
 // route misses the tag.

@@ -1,10 +1,12 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
 
 import { LeagueHub } from "@/components/league/LeagueHub";
 import { cacheTag } from "@/lib/cache/tags";
+import { pageTitle } from "@/lib/public/page-title";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -17,6 +19,12 @@ const HUB_REVALIDATE_SECONDS = 300;
 
 interface LeaguePageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: LeaguePageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const league = await resolvePublicLeague(slug);
+  return { title: league ? pageTitle(league.name) : pageTitle("League") };
 }
 
 // Data-fetching only — no cookies/headers/auth touched here, so this is safe
@@ -110,9 +118,10 @@ export default async function LeaguePage({ params }: LeaguePageProps) {
   const { slug } = await params;
   // ponytail: resolvePublicLeague itself stays uncached, by choice not by
   // blocker. Checked: `leagues.slug` is `unique` (20260507161000_s1_core_schema.sql),
-  // so this is a single indexed lookup, and it runs exactly once per request
-  // (no shared layout under leagues/[slug], no generateMetadata reusing it) —
-  // there's nothing to dedupe and nothing measurably slow to cache. Slugs are
+  // so this is a single indexed lookup. It now runs up to 3x per request
+  // (layout, generateMetadata, this page) but resolvePublicLeague is
+  // React cache()-wrapped, so those calls dedupe to one query — still
+  // nothing to gain from a second caching layer here. Slugs are
   // also immutable post-creation (no rename route exists) and leagues are
   // never deleted, so a coarse slug->id cache would even be *safe* to add —
   // it just isn't worth wiring revalidation into the create/status routes to

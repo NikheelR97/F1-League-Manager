@@ -1,14 +1,27 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Dices } from "lucide-react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate } from "@/lib/format-date";
+import { pageTitle } from "@/lib/public/page-title";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const revalidate = 60;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const league = await resolvePublicLeague(slug);
+  return { title: pageTitle(league ? `Wheel History — ${league.name}` : "Wheel History") };
+}
 
 export default async function LeagueWheelHistoryPage({
   params,
@@ -52,7 +65,10 @@ export default async function LeagueWheelHistoryPage({
       </header>
 
       {!spins?.length ? (
-        <p className="text-sm text-f1-muted">No wheel spins have been confirmed yet for this league.</p>
+        <EmptyState
+          message="The wheel randomly draws the next circuit from this league's remaining pool; confirmed spins appear here."
+          title="No wheel spins yet"
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {spins.map((spin) => {

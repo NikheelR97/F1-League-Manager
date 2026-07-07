@@ -17,11 +17,13 @@ export function GarageShell({ children, displayName }: GarageShellProps) {
   return (
     <div className="theme-driver-garage flex min-h-screen bg-f1-dark text-f1-white">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-f1-border bg-f1-black md:flex">
-        <div className="flex min-h-16 items-center gap-2 border-b border-f1-border px-4">
-          <Gauge aria-hidden="true" className="text-f1-red" size={20} />
-          <span className="text-sm font-black uppercase tracking-wide">
-            Driver Garage
-          </span>
+        <div className="flex min-h-16 items-center border-b border-f1-border px-4">
+          <Link className="inline-flex min-h-11 items-center gap-2 text-f1-white" href="/">
+            <Gauge aria-hidden="true" className="text-f1-red" size={20} />
+            <span className="text-sm font-black uppercase tracking-wide">
+              Driver Garage
+            </span>
+          </Link>
         </div>
         <nav aria-label="Garage navigation" className="flex flex-col gap-1 p-2">
           {navItems.map(({ href, icon: Icon, label }) => (
@@ -42,8 +44,10 @@ export function GarageShell({ children, displayName }: GarageShellProps) {
       </aside>
       <div className="flex flex-1 flex-col">
         <header className="flex min-h-16 items-center border-b border-f1-border bg-f1-black px-6 md:hidden">
-          <Gauge aria-hidden="true" className="text-f1-red" size={20} />
-          <span className="ml-2 text-sm font-black uppercase">Driver Garage</span>
+          <Link className="inline-flex min-h-11 items-center text-f1-white" href="/">
+            <Gauge aria-hidden="true" className="text-f1-red" size={20} />
+            <span className="ml-2 text-sm font-black uppercase">Driver Garage</span>
+          </Link>
           <div className="ml-auto w-32">
             <SignOutButton className="mt-0" />
           </div>

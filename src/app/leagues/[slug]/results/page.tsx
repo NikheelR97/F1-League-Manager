@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -7,12 +8,23 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { SeasonSelector } from "@/components/league/SeasonSelector";
 import { formatDate } from "@/lib/format-date";
+import { pageTitle } from "@/lib/public/page-title";
 import { roundPrefix } from "@/lib/public/round-prefix";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { resolveLeagueSeasons } from "@/lib/public/resolve-league-seasons";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const league = await resolvePublicLeague(slug);
+  return { title: pageTitle(league ? `Results — ${league.name}` : "Results") };
+}
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

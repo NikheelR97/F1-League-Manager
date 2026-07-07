@@ -1,16 +1,28 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar, MapPin } from "lucide-react";
 
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate } from "@/lib/format-date";
+import { pageTitle } from "@/lib/public/page-title";
 import { roundPrefix } from "@/lib/public/round-prefix";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const revalidate = 60; // Revalidate every minute
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const league = await resolvePublicLeague(slug);
+  return { title: pageTitle(league ? `Calendar — ${league.name}` : "Calendar") };
+}
 
 export default async function LeagueCalendarPage({
   params,

@@ -1,15 +1,27 @@
 import "server-only";
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { getDriverPenaltyTotals } from "@/lib/penalties/get-driver-penalty-totals";
+import { pageTitle } from "@/lib/public/page-title";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { computeBiggestClimbers } from "@/lib/public/stats";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const league = await resolvePublicLeague(slug);
+  return { title: pageTitle(league ? `Statistics — ${league.name}` : "Statistics") };
+}
 
 export default async function LeagueStatsPage({
   params,

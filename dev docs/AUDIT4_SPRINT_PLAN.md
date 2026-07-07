@@ -158,15 +158,27 @@ The suite **is** the deliverable — 3.1 + 3.2 add ~23 tests across the specs ab
 
 ---
 
-## 7. Explicitly Deferred / Declined (with reason)
+## 7. Final Polish — Closed (was deferred)
+
+Wave "final polish" (PR after #32) closed every remaining Minor/Polish item:
+
+| Item | Finding | Outcome |
+|------|---------|---------|
+| Per-page tab titles | R8 | `generateMetadata` on all 13 public league pages via shared `pageTitle()` helper. |
+| Wheel explainer | R5 | `EmptyState` on the public wheel page explains the mechanic. |
+| Garage ↔ league cross-links | R7 | Garage wordmark links home; `PublicHeader` gains a Garage link (garage redirects unauthed). |
+| Admin microcopy | M5 | "Unserved bans" → "Bans owed"; reserve checkbox parenthetical dropped. |
+| Position-delta "since last week" | R6 | **Investigated: production recompute is correct** (`recalculateStandings` snapshots the prior `position` into `previous_position`; already unit-tested). It was a seed artifact only — seed updated so the up/down arrows are demonstrated. No calculation bug. |
+
+## 7a. Declined (with reason)
 
 | Item | Finding | Reason |
 |------|---------|--------|
 | Public-page performance work | P1/P2/P3 | Public pages pass every field vital under harsher-than-real throttling; the 556KB baseline is framework floor (446KB real), not app-splittable. No engineering time warranted. |
-| Position-delta "since last week" wiring | R6 | Needs real `previous_position` data, not code; revisit once R1 gives result pages real content. |
-| Wheel explainer, garage cross-links, per-page titles | R5, R7, R8 | Minor/Polish; batch opportunistically, not worth a dedicated wave. |
 | Workbook-import + empty-homepage E2E | E2E skips | High fixture cost, already unit-covered / low marginal risk. |
 | The 4 "not a violation" microcopy clusters | V9/V10/V11/V14 | Real semantic distinctions (driver/racer, session/race, championship/standings, tone), not drift. |
+
+**Audit-4 status: fully closed.** All Blockers, Majors, Minors, and the two bugs the E2E surfaced (F6, F2) are shipped across PRs #29–#32 + final polish; only the three declined items above remain, each a deliberate no-op.
 
 ---
 

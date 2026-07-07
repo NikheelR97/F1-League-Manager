@@ -18,6 +18,10 @@ describe("PublicHeader", () => {
       "href",
       "/leagues/standard",
     );
+    expect(screen.getAllByRole("link", { name: "Garage" })[0]).toHaveAttribute(
+      "href",
+      "/garage",
+    );
     expect(screen.getByLabelText("Open navigation")).toBeInTheDocument();
   });
 });
