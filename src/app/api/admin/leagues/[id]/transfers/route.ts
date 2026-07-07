@@ -171,6 +171,20 @@ export async function POST(
         });
 
       if (stintError) {
+        // F2: unique violation on driver_team_stints_one_open_per_entry means
+        // a concurrent identical request already closed this same stint and
+        // opened its own new one — we lost the race. Do NOT roll back the
+        // close: that close is correct and already stands for the winner.
+        // Reopening it here would leave TWO open stints (the reopened old
+        // one + the winner's new one) — exactly the bug this index exists to
+        // prevent. Report the conflict and stop; no audit log for the loser.
+        if (stintError.code === "23505") {
+          return Response.json(
+            { error: "This driver was just transferred — refresh to see the current team" },
+            { status: 409 },
+          );
+        }
+
         const rollbackError = await rollbackStintClose();
         if (rollbackError) {
           return Response.json({ error: "Transfer failed and rollback failed" }, { status: 500 });
