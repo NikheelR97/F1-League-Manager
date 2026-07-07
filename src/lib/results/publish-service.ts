@@ -260,30 +260,44 @@ export async function publishSession(
     notes: r.notes,
   }));
 
-  // 3. Write qualifying results (upsert — idempotent by session+driver)
+  // 3. Write qualifying results (delete-then-insert per session). An upsert on
+  //    (race_session_id, driver_id) cannot survive a position-swap republish:
+  //    the table also has unique(race_session_id, qualifying_position), and the
+  //    row-by-row upsert transiently collides two drivers on the same position
+  //    mid-statement. Clearing the session first removes the collision. F6.
+  const { error: qualDeleteErr } = await db
+    .from("qualifying_results")
+    .delete()
+    .eq("race_session_id", sessionId);
+  if (qualDeleteErr) {
+    return { ok: false, status: 500, error: "Failed to save qualifying results" };
+  }
   if (qualifying.length > 0) {
-    const { error: qualErr } = await db
-      .from("qualifying_results")
-      .upsert(
-        qualifying.map((q) => ({
-          race_session_id: sessionId,
-          driver_id: q.driver_id,
-          team_id: q.team_id,
-          qualifying_position: q.qualifying_position,
-          is_pole: q.is_pole,
-        })),
-        { onConflict: "race_session_id,driver_id" },
-      );
+    const { error: qualErr } = await db.from("qualifying_results").insert(
+      qualifying.map((q) => ({
+        race_session_id: sessionId,
+        driver_id: q.driver_id,
+        team_id: q.team_id,
+        qualifying_position: q.qualifying_position,
+        is_pole: q.is_pole,
+      })),
+    );
     if (qualErr) {
       return { ok: false, status: 500, error: "Failed to save qualifying results" };
     }
   }
 
-  // 4. Write race results (upsert — idempotent by session+driver)
-  const { error: resultsErr } = await db
+  // 4. Write race results (delete-then-insert per session — same reason as
+  //    qualifying: unique(race_session_id, finishing_position) makes a
+  //    position-swap republish 500 under a row-by-row upsert. F6.
+  const { error: resultsDeleteErr } = await db
     .from("race_results")
-    .upsert(resultRows, { onConflict: "race_session_id,driver_id" });
-
+    .delete()
+    .eq("race_session_id", sessionId);
+  if (resultsDeleteErr) {
+    return { ok: false, status: 500, error: "Failed to save race results" };
+  }
+  const { error: resultsErr } = await db.from("race_results").insert(resultRows);
   if (resultsErr) {
     return { ok: false, status: 500, error: "Failed to save race results" };
   }

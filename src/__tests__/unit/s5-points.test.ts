@@ -660,6 +660,40 @@ describe("publishSession — penalty writes are delete-then-insert per session (
   });
 });
 
+// ---------------------------------------------------------------------------
+// 9b. Position-write idempotency on republish (F6 — qualifying_results and
+//     race_results both carry a unique(session, position); a plain positions-
+//     in-place upsert 500s when a correction swaps two drivers' positions,
+//     because a row transiently collides with another row's old position.
+//     Delete-then-insert per session removes the pre-existing rows to collide
+//     with. Guards the fix at unit speed; e2e T2 proves it end-to-end.)
+// ---------------------------------------------------------------------------
+
+const qualifyingDeleteChain =
+  /\.from\("qualifying_results"\)\s*\.delete\(\)\s*\.eq\("race_session_id",\s*sessionId\)/;
+const raceResultsDeleteChain =
+  /\.from\("race_results"\)\s*\.delete\(\)\s*\.eq\("race_session_id",\s*sessionId\)/;
+
+describe("publishSession — position writes are delete-then-insert per session (F6)", () => {
+  it("deletes qualifying_results before inserting, and never upserts them in place", () => {
+    const deleteMatch = publishServiceSource.match(qualifyingDeleteChain);
+    const insertIdx = publishServiceSource.indexOf('.from("qualifying_results").insert(');
+    expect(deleteMatch).not.toBeNull();
+    expect(insertIdx).toBeGreaterThan(-1);
+    expect(deleteMatch!.index!).toBeLessThan(insertIdx);
+    expect(publishServiceSource).not.toMatch(/\.from\("qualifying_results"\)\s*\.upsert/);
+  });
+
+  it("deletes race_results before inserting, and never upserts them in place", () => {
+    const deleteMatch = publishServiceSource.match(raceResultsDeleteChain);
+    const insertIdx = publishServiceSource.indexOf('.from("race_results").insert(');
+    expect(deleteMatch).not.toBeNull();
+    expect(insertIdx).toBeGreaterThan(-1);
+    expect(deleteMatch!.index!).toBeLessThan(insertIdx);
+    expect(publishServiceSource).not.toMatch(/\.from\("race_results"\)\s*\.upsert/);
+  });
+});
+
 describe("RaceResultEntry — client-supplied points are rejected (test 11)", () => {
   it("RaceResultEntry type has no points_awarded field — server recalculates it", () => {
     const entry: RaceResultEntry = {
