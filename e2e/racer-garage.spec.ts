@@ -118,3 +118,36 @@ test.describe("Racer garage - unauthenticated", () => {
     await context.close();
   });
 });
+
+test.describe("Racer garage - form validation and duplication (T22, T23)", () => {
+  test.use({ storageState: RACER_STORAGE_STATE });
+
+  test("T22: empty setup name shows a validation error and creates nothing", async ({ page }) => {
+    await page.goto("/garage/new");
+    await page.getByLabel("Driver").selectOption({ label: "E2E Racer" });
+    await page.getByLabel("Circuit").selectOption({ index: 1 });
+    // Setup Name left blank — client-side zod validation should block submit.
+    await page.getByRole("button", { name: "Create Setup" }).click();
+
+    await expect(page.getByText("Name is required")).toBeVisible();
+    await expect(page).toHaveURL(/\/garage\/new/);
+  });
+
+  test("T23: duplicating a setup produces a copy alongside the original", async ({ page }) => {
+    const sourceSetupName = `E2E Duplicate Source ${Date.now()}`;
+
+    await page.goto("/garage/new");
+    await page.getByLabel("Driver").selectOption({ label: "E2E Racer" });
+    await page.getByLabel("Setup Name").fill(sourceSetupName);
+    await page.getByLabel("Circuit").selectOption({ index: 1 });
+    await page.getByRole("button", { name: "Create Setup" }).click();
+    await expect(page).toHaveURL(/\/garage/);
+    await expect(page.getByText(sourceSetupName, { exact: true })).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole("button", { name: "Duplicate setup" }).first().click();
+
+    // buildDuplicateName appends " (copy)" (src/lib/constants.ts DUPLICATE_SETUP_SUFFIX).
+    await expect(page.getByText(`${sourceSetupName} (copy)`)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(sourceSetupName, { exact: true })).toBeVisible();
+  });
+});

@@ -16,8 +16,6 @@ export const serverEnvSchema = publicEnvSchema.extend({
   CSRF_SECRET: z.string().trim().length(64),
   UPSTASH_REDIS_REST_URL: optionalUrlSchema,
   UPSTASH_REDIS_REST_TOKEN: z.string().trim().optional(),
-  SENTRY_DSN: optionalUrlSchema,
-  SENTRY_AUTH_TOKEN: z.string().trim().optional(),
   DISCORD_WEBHOOK_URL: optionalUrlSchema,
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 });
