@@ -198,7 +198,7 @@ export function ImportForm({ leagues, seasons }: ImportFormProps) {
         </div>
 
         <button
-          className="border border-f1-red bg-f1-red px-4 py-2 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:cursor-not-allowed disabled:opacity-50"
+          className="min-h-11 border border-f1-red bg-f1-red px-4 py-2 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:cursor-not-allowed disabled:opacity-50"
           disabled={disableUpload}
           type="submit"
         >
@@ -227,7 +227,7 @@ export function ImportForm({ leagues, seasons }: ImportFormProps) {
                 Diff is clean — all standings match. Confirm to lock this season against re-import.
               </p>
               <button
-                className="border border-team-sauber px-4 py-2 text-xs font-bold uppercase text-team-sauber transition-colors hover:bg-team-sauber hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-h-11 border border-team-sauber px-4 py-2 text-xs font-bold uppercase text-team-sauber transition-colors hover:bg-team-sauber hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={!csrfToken || busy}
                 type="button"
                 onClick={handleConfirm}

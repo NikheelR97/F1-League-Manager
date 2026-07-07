@@ -77,7 +77,7 @@ export function CarryOverForm({ currentSeasonId, leagueId, seasons }: Props) {
         updated, not duplicated.
       </p>
       <button
-        className="border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
+        className="min-h-11 border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
         disabled={!sourceId || status === "loading"}
         type="submit"
       >

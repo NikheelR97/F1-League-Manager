@@ -47,7 +47,7 @@ export function UserRoleForm({ currentRole, displayName, userId }: Props) {
     setBusy(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError((body as { error?: string }).error ?? "Failed to update role.");
+      setError((body as { error?: string }).error ?? "Failed to update role");
       return;
     }
     router.refresh();
@@ -74,7 +74,7 @@ export function UserRoleForm({ currentRole, displayName, userId }: Props) {
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
       <button
-        className="border border-f1-red px-4 py-2 text-sm font-bold uppercase text-f1-red transition-colors hover:bg-f1-red hover:text-white disabled:opacity-50"
+        className="min-h-11 border border-f1-red px-4 py-2 text-sm font-bold uppercase text-f1-red transition-colors hover:bg-f1-red hover:text-white disabled:opacity-50"
         disabled={!dirty || busy}
         type="submit"
       >

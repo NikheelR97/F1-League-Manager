@@ -40,7 +40,7 @@ export function SeasonForm() {
     });
 
     if (!res.ok) {
-      setError("root", { message: "Failed to create season. Try again." });
+      setError("root", { message: "Failed to create season" });
       return;
     }
 
@@ -94,7 +94,7 @@ export function SeasonForm() {
       <FormError message={errors.root?.message} />
 
       <button
-        className="w-full border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
+        className="w-full min-h-11 border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
         disabled={isSubmitting}
         type="submit"
       >

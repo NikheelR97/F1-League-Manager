@@ -22,14 +22,14 @@ export function PublicHeader() {
       </a>
       <header className="border-b border-f1-border bg-f1-black/95">
         <div className="mx-auto flex min-h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link className="flex items-center gap-3 text-f1-white" href="/">
+          <Link className="inline-flex items-center gap-3 min-h-11 text-f1-white" href="/">
             <Trophy aria-hidden="true" className="text-f1-red" size={24} />
             <span className="text-lg font-black uppercase">F1 League Manager</span>
           </Link>
           <nav aria-label="Primary navigation" className="hidden gap-6 md:flex">
             {boundedLinks.map((link) => (
               <Link
-                className="text-sm font-bold uppercase text-f1-silver hover:text-f1-white"
+                className="inline-flex items-center min-h-11 text-sm font-bold uppercase text-f1-silver hover:text-f1-white"
                 href={link.href}
                 key={link.href}
               >

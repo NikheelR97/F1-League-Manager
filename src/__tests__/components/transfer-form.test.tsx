@@ -81,6 +81,9 @@ describe("TransferForm", () => {
     expect(
       screen.getByText("Max Verstappen: Red Bull (until 1 Jun 2025) → Alpine"),
     ).toBeInTheDocument();
+    // K1 — the review stage replaces the form's fields; focus should follow
+    // onto the new region instead of staying wherever "Review Transfer" was.
+    expect(screen.getByText("Review Transfer").parentElement).toHaveFocus();
 
     await user.click(screen.getByRole("button", { name: "Confirm Transfer" }));
 
@@ -134,6 +137,9 @@ describe("TransferForm", () => {
     await user.click(screen.getByRole("button", { name: "Back" }));
 
     expect(screen.getByLabelText("Driver")).toBeInTheDocument();
+    // K1 — the review stage (and its "Back" button) unmounts on Back; focus
+    // must land on the form again instead of falling back to <body>.
+    expect(screen.getByLabelText("Driver").closest('[tabindex="-1"]')).toHaveFocus();
     expect(
       fetchMock.mock.calls.some(([url]) => url === "/api/admin/leagues/league-1/transfers"),
     ).toBe(false);

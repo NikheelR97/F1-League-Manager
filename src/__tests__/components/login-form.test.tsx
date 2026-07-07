@@ -69,9 +69,11 @@ describe("LoginForm", () => {
     await user.type(screen.getByLabelText("Password"), "wrong-password");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Email or password is incorrect.",
-    );
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Email or password is incorrect.");
+    // K4 — focus should land on the alert instead of staying on the submit
+    // button that was just clicked.
+    expect(alert).toHaveFocus();
     expect(router.push).not.toHaveBeenCalled();
   });
 

@@ -155,7 +155,7 @@ export function LeagueHub({
           <span>{league.season.name}</span>
           {latestSession && (
             <Link
-              className="text-f1-white underline-offset-2 hover:text-f1-red hover:underline"
+              className="inline-flex items-center min-h-11 text-f1-white underline-offset-2 hover:text-f1-red hover:underline"
               href={`/leagues/${league.slug}/results/${latestSession.id}`}
             >
               Last result: {latestCircuit?.name ?? latestSession.name}
@@ -187,7 +187,7 @@ export function LeagueHub({
                 Wheel
               </h2>
               <Link
-                className="text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
+                className="inline-flex items-center min-h-11 text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
                 href={`/leagues/${league.slug}/wheel`}
               >
                 Wheel history -&gt;
@@ -218,7 +218,7 @@ export function LeagueHub({
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase text-f1-muted">Drivers</h2>
             <Link
-              className="text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
+              className="inline-flex items-center min-h-11 text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
               href={`/leagues/${league.slug}/standings/drivers`}
             >
               Full standings -&gt;
@@ -243,7 +243,7 @@ export function LeagueHub({
                     />
                     {driver ? (
                       <Link
-                        className="flex-1 text-sm text-f1-white hover:text-f1-red"
+                        className="inline-flex items-center min-h-11 flex-1 text-sm text-f1-white hover:text-f1-red"
                         href={`/leagues/${league.slug}/drivers/${driver.id}`}
                       >
                         {driver.display_name}
@@ -268,7 +268,7 @@ export function LeagueHub({
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-bold uppercase text-f1-muted">Constructors</h2>
               <Link
-                className="text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
+                className="inline-flex items-center min-h-11 text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
                 href={`/leagues/${league.slug}/standings/constructors`}
               >
                 Full standings -&gt;
@@ -292,7 +292,7 @@ export function LeagueHub({
                       />
                       {team ? (
                         <Link
-                          className="flex-1 text-sm text-f1-white hover:text-f1-red"
+                          className="inline-flex items-center min-h-11 flex-1 text-sm text-f1-white hover:text-f1-red"
                           href={`/leagues/${league.slug}/teams/${team.id}`}
                         >
                           {team.name}
@@ -315,7 +315,7 @@ export function LeagueHub({
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-bold uppercase text-f1-muted">Penalty Watch</h2>
               <Link
-                className="text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
+                className="inline-flex items-center min-h-11 text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
                 href={`/leagues/${league.slug}/penalties`}
               >
                 View all -&gt;

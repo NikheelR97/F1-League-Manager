@@ -13,6 +13,12 @@ import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 
 const KIND_OPTIONS = ["bonus", "penalty", "correction"] as const;
 
+const KIND_LABELS: Record<string, string> = {
+  bonus: "Bonus",
+  penalty: "Penalty",
+  correction: "Correction",
+};
+
 // ponytail: one select with "driver:<id>" / "team:<id>" values instead of two
 // mutually-exclusive fields — enforces the DB's one-target check for free,
 // no extra state to keep in sync.
@@ -82,7 +88,7 @@ export function AdjustmentForm({ leagueId, seasonId, targets }: AdjustmentFormPr
 
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      setError("root", { message: data.error ?? "Failed to create adjustment." });
+      setError("root", { message: data.error ?? "Failed to create adjustment" });
       return;
     }
 
@@ -125,7 +131,7 @@ export function AdjustmentForm({ leagueId, seasonId, targets }: AdjustmentFormPr
         >
           {KIND_OPTIONS.map((k) => (
             <option key={k} value={k}>
-              {k}
+              {KIND_LABELS[k]}
             </option>
           ))}
         </select>
@@ -180,11 +186,11 @@ export function AdjustmentForm({ leagueId, seasonId, targets }: AdjustmentFormPr
       )}
 
       <button
-        className="w-full border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full min-h-11 border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:cursor-not-allowed disabled:opacity-50"
         disabled={isSubmitting || !csrfToken}
         type="submit"
       >
-        {isSubmitting ? "Saving…" : "Create Adjustment"}
+        {isSubmitting ? "Creating…" : "Create Adjustment"}
       </button>
     </form>
   );

@@ -182,7 +182,7 @@ export default async function LeagueDetailPage({
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase text-f1-muted">Points Systems</h2>
           <Link
-            className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+            className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
             href={`/admin/leagues/${leagueId}/points-systems/new`}
           >
             <Plus aria-hidden="true" size={12} />
@@ -217,13 +217,13 @@ export default async function LeagueDetailPage({
           </h2>
           <div className="flex gap-2">
             <Link
-              className="flex items-center gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
               href={`/admin/leagues/${leagueId}/wheel`}
             >
               Digital Wheel
             </Link>
             <Link
-              className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
               href={`/admin/leagues/${leagueId}/sessions/new`}
             >
               <Plus aria-hidden="true" size={12} />
@@ -262,7 +262,7 @@ export default async function LeagueDetailPage({
                       </span>
                       {isPublishable && (
                         <Link
-                          className="border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                          className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
                           href={`/admin/leagues/${leagueId}/sessions/${session.id}/publish`}
                         >
                           Enter Results
@@ -270,7 +270,7 @@ export default async function LeagueDetailPage({
                       )}
                       {!isPublishable && (
                         <Link
-                          className="border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                          className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
                           href={`/admin/leagues/${leagueId}/sessions/${session.id}/penalties`}
                         >
                           Penalties
@@ -280,7 +280,7 @@ export default async function LeagueDetailPage({
                           publish page reopens pre-filled for a republish. */}
                       {!isPublishable && (
                         <Link
-                          className="border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                          className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
                           href={`/admin/leagues/${leagueId}/sessions/${session.id}/publish`}
                         >
                           Correct results
@@ -310,7 +310,7 @@ export default async function LeagueDetailPage({
             Teams ({teams?.length ?? 0}/{MAX_TEAMS_PER_LEAGUE})
           </h2>
           <Link
-            className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+            className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
             href={`/admin/leagues/${leagueId}/teams/new`}
           >
             <Plus aria-hidden="true" size={12} />
@@ -377,19 +377,19 @@ export default async function LeagueDetailPage({
           </h2>
           <div className="flex items-center gap-2">
             <Link
-              className="flex items-center gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
               href={`/admin/leagues/${leagueId}/transfers/new`}
             >
               Record Transfer
             </Link>
             <Link
-              className="flex items-center gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
               href={`/admin/leagues/${leagueId}/adjustments`}
             >
               Adjustments
             </Link>
             <Link
-              className="flex items-center gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
               href={`/admin/leagues/${leagueId}/drivers/new`}
             >
               <Plus aria-hidden="true" size={12} />

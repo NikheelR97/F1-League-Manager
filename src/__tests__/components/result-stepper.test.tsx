@@ -132,6 +132,9 @@ describe("ResultStepper full publish flow", () => {
       "href",
       "/admin/leagues/league-1",
     );
+    // K1 — keyboard focus follows the announcement onto the banner instead
+    // of staying on the now-unmounted Publish button.
+    expect(screen.getByRole("status")).toHaveFocus();
   });
 
   it("blocks publish while validation errors exist", async () => {
@@ -876,5 +879,47 @@ describe("ResultStepper reserve assignment (B7)", () => {
     expect(body.results).toContainEqual(
       expect.objectContaining({ driver_id: "driver-1", covering_for_driver_id: null }),
     );
+  });
+});
+
+describe("ResultStepper penalty row removal focus (K2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
+    );
+  });
+
+  it("moves focus to the remaining row's remove button after removing one of two", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One"), makeDriver("driver-2", "Driver Two")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+
+    await user.click(screen.getByRole("button", { name: /Add Penalty/i }));
+    await user.click(screen.getByRole("button", { name: /Add Penalty/i }));
+    await user.selectOptions(screen.getAllByRole("combobox", { name: /^Driver for penalty/i })[1], "driver-2");
+
+    await user.click(screen.getByRole("button", { name: "Remove penalty for Driver One" }));
+
+    expect(screen.getByRole("button", { name: "Remove penalty for Driver Two" })).toHaveFocus();
+  });
+
+  it("moves focus to the Add Penalty button after removing the last row", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+
+    await user.click(screen.getByRole("button", { name: /Add Penalty/i }));
+    await user.click(screen.getByRole("button", { name: /Remove penalty for/i }));
+
+    expect(screen.getByRole("button", { name: "+ Add Penalty" })).toHaveFocus();
   });
 });
