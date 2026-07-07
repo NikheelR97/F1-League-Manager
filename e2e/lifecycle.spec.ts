@@ -187,18 +187,21 @@ test.describe.serial("Lifecycle — fresh isolated league (T11, T12, T14, T15, T
     await expect(page.getByText("Alessandro Ferrari")).not.toBeVisible();
   });
 
-  // FINDING F2 (design doc §2), confirmed live: transfers/route.ts has no
+  // FINDING F2 (design doc §2), fixed: transfers/route.ts previously had no
   // lock/unique constraint on "one open stint per entry" — two concurrent
   // identical POSTs both read the same current stint, both close it
-  // (idempotent update), and both insert a new stint on the destination team.
-  // Ran this assertion against the real app first (not assumed from the
-  // design doc): openStints.length came back 2, not 1. This is a genuine
-  // product bug, not a flaky test — test.fixme so the suite stays green
-  // while the defect is tracked. Fix direction: a partial unique index on
-  // driver_team_stints (league_driver_entry_id) where ends_on is null, or an
-  // advisory lock keyed on the entry id around the read-close-insert sequence.
-  test.fixme(
-    "T15: transfer double-submit invariant (F2 — two concurrent transfers leave two open stints, not one)",
+  // (idempotent update), and both inserted a new stint on the destination
+  // team. Ran this assertion against the real app first (not assumed from
+  // the design doc): openStints.length came back 2, not 1 — a genuine
+  // product bug. Fixed with a partial unique index,
+  // driver_team_stints_one_open_per_entry on (league_driver_entry_id) where
+  // ends_on is null (migration 20260704000000), plus route handling: the
+  // losing request's stint-insert now hits a 23505 unique violation, which
+  // the route reports as a clean 409 without rolling back the winner's
+  // close. Exactly one request should 200 and the other 409, leaving exactly
+  // one open stint.
+  test(
+    "T15: transfer double-submit invariant (F2 — two concurrent transfers leave exactly one open stint)",
     async ({ request }) => {
       const headers = await csrfHeaders(request);
       const body = {
@@ -207,10 +210,13 @@ test.describe.serial("Lifecycle — fresh isolated league (T11, T12, T14, T15, T
         new_team_id: teamAId,
       };
 
-      await Promise.all([
+      const [resA, resB] = await Promise.all([
         request.post(`/api/admin/leagues/${leagueId}/transfers`, { headers, data: body }),
         request.post(`/api/admin/leagues/${leagueId}/transfers`, { headers, data: body }),
       ]);
+
+      const statuses = [resA.status(), resB.status()].sort();
+      expect(statuses).toEqual([200, 409]);
 
       const driversRes = await request.get(`/api/admin/leagues/${leagueId}/drivers`);
       const { drivers } = (await driversRes.json()) as {

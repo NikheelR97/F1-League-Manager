@@ -152,8 +152,8 @@ The suite **is** the deliverable — 3.1 + 3.2 add ~23 tests across the specs ab
 | WP3.2 mutation + public E2E (E4–E6) | Done | `adjustments.spec.ts`, `lifecycle.spec.ts`, `public-pages.spec.ts`, extended `racer-garage.spec.ts`; confirmed F2 | None |
 | WP3.3 Sentry dependency decision (P4) | Done | Removed `@sentry/nextjs` (unwired) + orphaned env fields; build clean | None |
 | **F6 — position-swap republish 500 (new Blocker, found by T2)** | Fixed | `publish-service.ts` qualifying_results + race_results now delete-then-insert per session (unique(session,position) collided under row-by-row upsert); T2 un-fixme'd, unit guards added | None |
-| F2 transfer double-submit follow-up filed | Filed | `lifecycle.spec.ts` T15 `test.fixme` documents it; fix needs a partial unique index on `driver_team_stints(league_driver_entry_id) WHERE ends_on IS NULL` (migration → senior review) | Open follow-up: migration + un-fixme T15 |
-| CI runs only `smoke.spec.ts` for E2E | Noted | New specs validated locally on a clean DB (`supabase db reset` + `seed:e2e`); CI does not run them | Follow-up: wire authenticated E2E into CI (needs `E2E_SECRET` as a CI secret — owner/senior decision) |
+| F2 transfer double-submit | Fixed | Migration `20260704000000_driver_team_stints_one_open_per_entry.sql` (partial unique index); transfers route catches 23505 → clean 409 without rolling back the winner's close; `lifecycle.spec.ts` T15 un-fixme'd and passing (statuses `[200, 409]`, exactly one open stint) | None |
+| CI runs the full authenticated E2E suite | Fixed | `ci.yml` now seeds (`scripts/seed-e2e.mjs`) + runs `test:e2e:run` (was smoke-only); `E2E_SECRET`/`CSRF_SECRET`/`NEXT_PUBLIC_SITE_URL` defined inline (test-only, no stored secret) | None |
 | Wave 3 PR merged to `dev` | Not started | | |
 
 ---
