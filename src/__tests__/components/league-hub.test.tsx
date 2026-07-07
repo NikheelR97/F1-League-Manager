@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 
 import { LeagueHub } from "@/components/league/LeagueHub";
 import { RaceCountdown } from "@/components/league/RaceCountdown";
+import { formatDate } from "@/lib/format-date";
 import type { PublicLeague } from "@/lib/public/resolve-league";
 
 const mockLeague: PublicLeague = {
@@ -137,6 +138,57 @@ describe("LeagueHub", () => {
       />,
     );
     expect(screen.getByText(/Last result: Monaco/i)).toBeInTheDocument();
+  });
+
+  it("links the last result to its public result page", () => {
+    render(
+      <LeagueHub
+        {...baseProps}
+        latestSession={{
+          id: "session-5",
+          name: "Round 5 — Monaco",
+          race_number: 1,
+          published_at: "2026-05-07T18:00:00.000Z",
+          circuits: { name: "Monaco", country: "Monaco" },
+        }}
+      />,
+    );
+    expect(screen.getByRole("link", { name: /Last result: Monaco/i })).toHaveAttribute(
+      "href",
+      "/leagues/standard/results/session-5",
+    );
+  });
+
+  it("shows the formatted next race date on the next race card", () => {
+    const scheduledAt = new Date(Date.now() + 30 * 86400000).toISOString();
+    render(
+      <LeagueHub
+        {...baseProps}
+        nextRace={{
+          id: "session-1",
+          name: "Round 1 — Bahrain",
+          scheduled_at: scheduledAt,
+          circuits: { name: "Bahrain", country: "Bahrain" },
+        }}
+      />,
+    );
+    expect(screen.getAllByText(formatDate(scheduledAt)).length).toBeGreaterThan(0);
+  });
+
+  it("does not show 'Race ready' for a past-dated next race", () => {
+    render(
+      <LeagueHub
+        {...baseProps}
+        nextRace={{
+          id: "session-1",
+          name: "Round 1 — Bahrain",
+          scheduled_at: "2020-01-01T00:00:00.000Z",
+          circuits: { name: "Bahrain", country: "Bahrain" },
+        }}
+      />,
+    );
+    expect(screen.queryByText("Race ready")).not.toBeInTheDocument();
+    expect(screen.getAllByText("1 Jan 2020").length).toBeGreaterThan(0);
   });
 
   it("uses uploaded league hero images when configured", () => {

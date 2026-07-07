@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { LEAGUE_ASSETS_BUCKET } from "@/lib/constants";
+import { formatDate } from "@/lib/format-date";
 import { formatGap } from "@/lib/format-gap";
 import type { PublicLeague } from "@/lib/public/resolve-league";
 
@@ -55,6 +56,8 @@ interface LatestWheelSpin {
 }
 
 interface LeagueHubProps {
+  /** Resolved once on the server (see RaceCountdown) so render stays pure. */
+  now?: Date;
   league: PublicLeague;
   nextRace: NextRace | null;
   latestSession: LatestSession | null;
@@ -94,6 +97,7 @@ function getStoragePublicUrl(bucket: string, path: string | null): string | null
 }
 
 export function LeagueHub({
+  now = new Date(),
   league,
   nextRace,
   latestSession,
@@ -115,6 +119,11 @@ export function LeagueHub({
   const leaderPoints = topDrivers[0]?.total_points ?? 0;
   const constructorLeaderPoints = topConstructors[0]?.total_points ?? 0;
 
+  // ponytail: guarded here (not in RaceCountdownClient, owned by another
+  // agent this wave) — a past-dated "next race" is a data problem (seeded/stale
+  // scheduled_at), not an imminent one, so it shouldn't read "Race ready".
+  const nextRaceIsPast = nextRace ? new Date(nextRace.scheduled_at).getTime() < now.getTime() : false;
+
   return (
     <section>
       <div className="hero-band">
@@ -132,7 +141,11 @@ export function LeagueHub({
           </StatusPill>
           <h1>{league.name}</h1>
           <p className="text-sm text-f1-muted">{league.season.name}</p>
-          <RaceCountdown targetIso={nextRace?.scheduled_at ?? null} />
+          {nextRace && nextRaceIsPast ? (
+            <p className="font-mono text-sm text-f1-muted">{formatDate(nextRace.scheduled_at)}</p>
+          ) : (
+            <RaceCountdown now={now} targetIso={nextRace?.scheduled_at ?? null} />
+          )}
         </div>
       </div>
 
@@ -141,7 +154,12 @@ export function LeagueHub({
           <span className="font-bold uppercase text-f1-white">{league.name}</span>
           <span>{league.season.name}</span>
           {latestSession && (
-            <span>Last result: {latestCircuit?.name ?? latestSession.name}</span>
+            <Link
+              className="text-f1-white underline-offset-2 hover:text-f1-red hover:underline"
+              href={`/leagues/${league.slug}/results/${latestSession.id}`}
+            >
+              Last result: {latestCircuit?.name ?? latestSession.name}
+            </Link>
           )}
           <span className="uppercase">{league.format} format</span>
         </div>
@@ -156,6 +174,7 @@ export function LeagueHub({
               {nextRaceCircuit?.country && (
                 <p className="text-xs text-f1-muted">{nextRaceCircuit.country}</p>
               )}
+              <p className="mt-1 text-xs text-f1-muted">{formatDate(nextRace.scheduled_at)}</p>
             </div>
           </section>
         )}

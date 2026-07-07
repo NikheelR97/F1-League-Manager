@@ -74,10 +74,18 @@ export default async function QualifyingResultsPage({
 
       {/* Qualifying classification */}
       {!qualifying || qualifying.length === 0 ? (
-        <EmptyState
-          message="Qualifying results have not been published for this session."
-          title="No qualifying data"
-        />
+        <div className="space-y-3">
+          <EmptyState
+            message="Grid order wasn't recorded for this session. Championship points from this round are reflected in the standings."
+            title="Qualifying not recorded"
+          />
+          <Link
+            className="inline-block text-xs font-bold uppercase text-f1-red-text underline underline-offset-2 hover:text-f1-white"
+            href={`/leagues/${slug}/standings/drivers`}
+          >
+            View standings →
+          </Link>
+        </div>
       ) : (
         <>
           {/* Desktop table */}

@@ -6,6 +6,7 @@ import { Calendar, MapPin } from "lucide-react";
 
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate } from "@/lib/format-date";
+import { roundPrefix } from "@/lib/public/round-prefix";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -126,7 +127,7 @@ export default async function LeagueCalendarPage({
                           {formatDate(session.scheduled_at)}
                         </td>
                         <td className="px-4 py-3 font-bold">
-                          {circuit?.round_number ? `Round ${circuit.round_number} · ` : ""}
+                          {roundPrefix(circuit?.round_number, session.name)}
                           {session.name}
                         </td>
                         <td className="px-4 py-3 text-f1-muted">
@@ -155,7 +156,7 @@ export default async function LeagueCalendarPage({
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="font-bold text-f1-white">
-                          {circuit?.round_number ? `Round ${circuit.round_number} · ` : ""}
+                          {roundPrefix(circuit?.round_number, session.name)}
                           {session.name}
                         </p>
                         <p className="text-xs text-f1-muted">

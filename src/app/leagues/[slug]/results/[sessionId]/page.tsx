@@ -1,10 +1,12 @@
 import "server-only";
 
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { comparePublicRaceResults } from "@/lib/public/result-sort";
+import { roundPrefix } from "@/lib/public/round-prefix";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -64,6 +66,7 @@ export default async function RaceResultPage({
   type Team = { name: string; color_hex: string };
 
   const circuit = session.circuits as unknown as Circuit | null;
+  const displayName = circuit?.grand_prix_name ?? session.name;
 
   const sortedResults = [...(raceResults ?? [])].sort(comparePublicRaceResults);
 
@@ -76,7 +79,7 @@ export default async function RaceResultPage({
         lastRound={session.name}
         leagueName={league.name}
         seasonName={league.season.name}
-        title={`${circuit?.round_number ? `Round ${circuit.round_number} · ` : ""}${circuit?.grand_prix_name ?? session.name}`}
+        title={`${roundPrefix(circuit?.round_number, displayName)}${displayName}`}
         updatedAt={session.published_at}
       />
 
@@ -147,7 +150,18 @@ export default async function RaceResultPage({
       <section className="space-y-2">
         <h2 className="text-xs font-bold uppercase text-f1-muted">Race Result</h2>
         {sortedResults.length === 0 ? (
-          <EmptyState message="Race result not yet available." title="No result" />
+          <div className="space-y-3">
+            <EmptyState
+              message="Full finishing order wasn't recorded for this race. Championship points from this round are reflected in the standings."
+              title="Result not recorded"
+            />
+            <Link
+              className="inline-block text-xs font-bold uppercase text-f1-red-text underline underline-offset-2 hover:text-f1-white"
+              href={`/leagues/${slug}/standings/drivers`}
+            >
+              View standings →
+            </Link>
+          </div>
         ) : (
           <>
             <table className="hidden w-full text-sm md:table">

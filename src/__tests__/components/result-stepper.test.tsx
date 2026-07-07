@@ -182,9 +182,9 @@ describe("ResultStepper full publish flow", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("falls back to a fixed message when the server error is not a string", async () => {
-    // N5(c) — a 422 body can carry an object `error` (e.g. a field-error map).
-    // FormError only ever renders a string, so a non-string must be coerced.
+  it("surfaces the first field-level reason from a Zod flatten() 422 body", async () => {
+    // X3/M1 — the 422 path sends z.ZodError#flatten(), which carries the real
+    // reason the request failed. Show that instead of a generic guess.
     const user = userEvent.setup();
     vi.stubGlobal(
       "fetch",
@@ -193,7 +193,39 @@ describe("ResultStepper full publish flow", () => {
           return Promise.resolve(new Response(JSON.stringify({ token: "test-token" })));
         }
         return Promise.resolve(
-          new Response(JSON.stringify({ error: { finishing_position: "required" } }), {
+          new Response(
+            JSON.stringify({
+              error: { formErrors: [], fieldErrors: { results: ["Duplicate finishing position"] } },
+            }),
+            { status: 422 },
+          ),
+        );
+      }),
+    );
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.type(screen.getByPlaceholderText("—"), "1");
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+    await user.click(screen.getByRole("button", { name: "Publish Results" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Duplicate finishing position");
+  });
+
+  it("falls back to a plain message when no field reason can be extracted", async () => {
+    // N5(c) — FormError only ever renders a string, so a non-string error
+    // with no usable formErrors/fieldErrors must fall back, not crash.
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/csrf") {
+          return Promise.resolve(new Response(JSON.stringify({ token: "test-token" })));
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: { formErrors: [], fieldErrors: {} } }), {
             status: 422,
           }),
         );
@@ -209,7 +241,7 @@ describe("ResultStepper full publish flow", () => {
     await user.click(screen.getByRole("button", { name: "Publish Results" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Validation failed on the server — check the review step.",
+      "Couldn't publish — please review your entries.",
     );
   });
 });

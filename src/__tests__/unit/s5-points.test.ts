@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { parseWorkbookGap } from "@/lib/results/parse-gap";
@@ -629,6 +631,32 @@ describe("buildReserveAssignmentRows", () => {
       "actor-1",
     );
     expect(rows).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9. Penalty write idempotency on republish (X1 — a plain insert with no
+//    preceding delete double-counts penalty points into ban thresholds and
+//    standings on every republish of a session that carries penalties).
+// ---------------------------------------------------------------------------
+
+const publishServiceSource = readFileSync("src/lib/results/publish-service.ts", "utf8");
+const penaltyDeleteChain = /\.from\("penalties"\)\s*\.delete\(\)\s*\.eq\("race_session_id",\s*sessionId\)/;
+const reserveDeleteChain =
+  /\.from\("race_reserve_assignments"\)\s*\.delete\(\)\s*\.eq\("race_session_id",\s*sessionId\)/;
+
+describe("publishSession — penalty writes are delete-then-insert per session (X1)", () => {
+  it("deletes existing penalties for the session before inserting new ones", () => {
+    const deleteMatch = publishServiceSource.match(penaltyDeleteChain);
+    const insertIdx = publishServiceSource.lastIndexOf('db.from("penalties").insert(');
+    expect(deleteMatch).not.toBeNull();
+    expect(insertIdx).toBeGreaterThan(-1);
+    expect(deleteMatch!.index!).toBeLessThan(insertIdx);
+  });
+
+  it("mirrors the same idempotency pattern already used for reserve assignments", () => {
+    expect(publishServiceSource).toMatch(reserveDeleteChain);
+    expect(publishServiceSource).toMatch(penaltyDeleteChain);
   });
 });
 
