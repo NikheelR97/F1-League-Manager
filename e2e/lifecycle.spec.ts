@@ -113,8 +113,11 @@ test.describe.serial("Lifecycle — fresh isolated league (T11, T12, T14, T15, T
     driverEntryId = ((await driverRes.json()) as { entry_id: string }).entry_id;
 
     // Sanity: league is visible (not draft) before we start mutating it.
+    // Scoped to the card heading, not getByText(leagueName) — PublicHeader's
+    // nav now also links this league by name, so a bare text match resolves
+    // to 3 elements (nav desktop, nav mobile, homepage card heading).
     await page.goto("/");
-    await expect(page.getByText(leagueName)).toBeVisible();
+    await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
   });
 
   test("T11: session create via admin UI form appears on public calendar", async ({
@@ -247,7 +250,7 @@ test.describe.serial("Lifecycle — fresh isolated league (T11, T12, T14, T15, T
     // doc's "archive hides from homepage" assumption does not hold against
     // the real code; the actual contract is "still listed, marked Archived".
     await page.goto("/");
-    await expect(page.getByText(leagueName)).toBeVisible();
+    await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
 
     const reactivateRes = await request.patch(`/api/admin/leagues/${leagueId}/status`, {
       headers,

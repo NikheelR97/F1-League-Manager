@@ -3,19 +3,27 @@ import Link from "next/link";
 
 import { MAX_NAV_LINKS } from "@/lib/constants";
 
-const navLinks = [
-  { href: "/", label: "Leagues" },
-  { href: "/leagues/informal", label: "Informal" },
-  { href: "/leagues/standard", label: "Standard" },
-  // ponytail: PublicHeader is a plain server component with no session
-  // lookup wired in — rather than plumb auth state through every public
-  // page just for this link, always show it and let /garage's own
-  // redirect-to-login handle signed-out visitors. Revisit if a session
-  // check becomes cheap/available here for real (e.g. via a shared layout).
-  { href: "/garage", label: "Garage" },
-] as const;
+interface NavLink {
+  href: string;
+  label: string;
+}
 
-export function PublicHeader() {
+interface PublicHeaderProps {
+  leagueLinks?: NavLink[];
+}
+
+export function PublicHeader({ leagueLinks = [] }: PublicHeaderProps) {
+  const navLinks: NavLink[] = [
+    { href: "/", label: "Leagues" },
+    ...leagueLinks,
+    // ponytail: PublicHeader is a plain server component with no session
+    // lookup wired in — rather than plumb auth state through every public
+    // page just for this link, always show it and let /garage's own
+    // redirect-to-login handle signed-out visitors. Revisit if a session
+    // check becomes cheap/available here for real (e.g. via a shared layout).
+    { href: "/garage", label: "Garage" },
+  ];
+
   const boundedLinks = navLinks.slice(0, MAX_NAV_LINKS);
 
   return (
