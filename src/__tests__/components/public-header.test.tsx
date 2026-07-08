@@ -3,25 +3,31 @@ import { render, screen } from "@testing-library/react";
 import { PublicHeader } from "@/components/layout/PublicHeader";
 
 describe("PublicHeader", () => {
-  it("renders primary league links", () => {
-    render(<PublicHeader />);
+  it("renders league links from props", () => {
+    const leagueLinks = [
+      { href: "/leagues/standard", label: "Standard League" },
+      { href: "/leagues/informal", label: "Informal League" },
+    ];
 
-    expect(screen.getByRole("link", { name: /F1 League Manager/i })).toHaveAttribute(
-      "href",
-      "/",
-    );
-    expect(screen.getAllByRole("link", { name: "Informal" })[0]).toHaveAttribute(
-      "href",
-      "/leagues/informal",
-    );
-    expect(screen.getAllByRole("link", { name: "Standard" })[0]).toHaveAttribute(
-      "href",
-      "/leagues/standard",
-    );
-    expect(screen.getAllByRole("link", { name: "Garage" })[0]).toHaveAttribute(
-      "href",
-      "/garage",
-    );
-    expect(screen.getByLabelText("Open navigation")).toBeInTheDocument();
+    render(<PublicHeader leagueLinks={leagueLinks} />);
+
+    const standardLink = screen.getAllByText("Standard League")[0] as HTMLAnchorElement;
+    const informalLink = screen.getAllByText("Informal League")[0] as HTMLAnchorElement;
+    const garageLink = screen.getAllByText("Garage")[0] as HTMLAnchorElement;
+
+    expect(standardLink.href).toContain("/leagues/standard");
+    expect(informalLink.href).toContain("/leagues/informal");
+    expect(garageLink.href).toContain("/garage");
+    expect(screen.getByLabelText("Open navigation")).toBeTruthy();
+  });
+
+  it("renders gracefully with zero public leagues", () => {
+    render(<PublicHeader leagueLinks={[]} />);
+
+    // Should render header with home and garage links, but no league links
+    expect(screen.getByText("F1 League Manager")).toBeTruthy();
+    expect(screen.getAllByText("Garage")[0]).toBeTruthy();
+    expect(screen.queryByText("Standard League")).toBeNull();
+    expect(screen.getByLabelText("Open navigation")).toBeTruthy();
   });
 });

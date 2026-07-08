@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 
 import { PublicHeader } from "@/components/layout/PublicHeader";
 import { LeagueSubNav } from "@/components/league/LeagueSubNav";
+import { getNavLeagueLinks } from "@/lib/public/nav-league-links";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export default async function LeagueLayout({
   children,
@@ -18,10 +20,11 @@ export default async function LeagueLayout({
   if (!league) notFound();
 
   const isWheelLeague = league.format === "standard";
+  const navLeagueLinks = await getNavLeagueLinks(createSupabaseServiceRoleClient());
 
   return (
     <>
-      <PublicHeader />
+      <PublicHeader leagueLinks={navLeagueLinks} />
       <LeagueSubNav slug={slug} isWheelLeague={isWheelLeague} />
       <main id="main-content">{children}</main>
     </>
