@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+// Filename is prefixed 00- so this runs before any spec that creates test
+// leagues via the admin API — the homepage shows only the newest
+// MAX_PUBLIC_LEAGUE_CARDS leagues by created_at, and with workers:1 a
+// later-alphabetical smoke test could get the seeded leagues bumped off the
+// list by test-created ones (no admin delete-league endpoint exists to clean
+// those up afterward, only archive — and archived leagues stay listed too).
 const S2_MOBILE_VIEWPORT = { height: 800, width: 375 };
 const S2_DESKTOP_SCREENSHOT = "test-results/s2-home-desktop.png";
 const S2_MOBILE_SCREENSHOT = "test-results/s2-home-mobile.png";
