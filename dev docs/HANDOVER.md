@@ -422,6 +422,37 @@ All S4 validation passed before PR #8 was merged. Unit/component tests were at 1
 
 ---
 
+## Manual GUI UAT Harness (scripts/uat-harness.mjs)
+
+A Playwright-driven manual GUI/UAT tool for testing the rendered DOM in a real browser without CI/E2E framework overhead. Used for acceptance testing and debugging GUI-only issues, not part of the CI pipeline.
+
+Prerequisites:
+
+- Local Supabase running (`docker compose up` in the supabase directory).
+- `npm run seed:e2e` has been run to create test users (admin: `e2e-admin@test.local`, racer: `e2e-racer@test.local`).
+- Dev server running on http://localhost:3000. **Important:** Always use `localhost`, never `127.0.0.1` — the app pins Origin/CSRF to `NEXT_PUBLIC_SITE_URL=http://localhost:3000`, so 127.0.0.1 returns "Forbidden".
+
+Run from repo root via PowerShell (not Git Bash, which mangles `/paths`):
+
+```powershell
+node scripts/uat-harness.mjs observe <url-path> [admin|racer|anon]
+```
+Dumps the rendered page (headings, form fields with names/labels/options, buttons, links, paragraphs, tables, alerts) and saves a screenshot to `.uat-artifacts/`.
+
+```powershell
+node scripts/uat-harness.mjs login <role>
+```
+Caches a browser session for the role (creates `state-{role}.json` in `.uat-artifacts/`).
+
+```powershell
+node scripts/uat-harness.mjs flow <abs-path-to-steps.json> [role]
+```
+Runs an ordered list of flow steps in one browser context, logging all non-GET requests and dumping the final page. Supports steps: `goto`, `fill`, `typeLabel`, `selectName`, `selectLabel`, `check`, `checkLabel`, `click`, `clickLink`, `clickSel`, `waitUrl`, `expect`, `evalJs`, `wait`, `dump`.
+
+Outputs (screenshots, session state) go to gitignored `.uat-artifacts/`. Credentials can be overridden via env vars: `UAT_ADMIN_EMAIL`, `UAT_ADMIN_PASSWORD`, `UAT_RACER_EMAIL`, `UAT_RACER_PASSWORD`.
+
+---
+
 ## 1. What We Are Building
 
 We are building a web app for managing F1 esports leagues.
