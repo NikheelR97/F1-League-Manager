@@ -146,6 +146,40 @@ export function buildTeamStandings(
   }));
 }
 
+// F1 — a team page's per-driver points breakdown must reconcile with the
+// header's constructor total (buildTeamStandings above), which sums
+// points_awarded only. This intentionally ignores manual_points_adjustment
+// even though the input rows carry it, so a caller can pass full race-result
+// rows without a separate DTO — and can't silently reintroduce the
+// adjustment by tweaking this function's inputs.
+export interface DriverPointsBreakdownRow {
+  driver_id: string;
+  driver_name: string;
+  points_awarded: number;
+  manual_points_adjustment: number;
+}
+
+export interface DriverPointsBreakdownResult {
+  driver_id: string;
+  name: string;
+  points: number;
+}
+
+export function buildDriverPointsBreakdown(
+  rows: DriverPointsBreakdownRow[],
+): DriverPointsBreakdownResult[] {
+  const byDriver = new Map<string, DriverPointsBreakdownResult>();
+  for (const r of rows) {
+    const existing = byDriver.get(r.driver_id);
+    byDriver.set(r.driver_id, {
+      driver_id: r.driver_id,
+      name: r.driver_name,
+      points: (existing?.points ?? 0) + r.points_awarded,
+    });
+  }
+  return [...byDriver.values()].sort((a, b) => b.points - a.points);
+}
+
 export function buildPenaltyTotals(
   penaltyRows: Array<{ driver_id: string; penalty_points: number }>,
   carryOverByDriver: Map<string, number>,

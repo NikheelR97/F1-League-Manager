@@ -21,6 +21,7 @@ blob-report/
 .nyc_output/
 junit.xml
 e2e/.auth/
+.uat-artifacts/
 
 # Logs
 logs/

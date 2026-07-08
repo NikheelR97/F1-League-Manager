@@ -3,6 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
+import { formatDateTime } from "@/lib/format-date";
+
 interface AuditLog {
   action: string;
   actor_id: string | null;
@@ -58,7 +60,7 @@ export function AuditLogTable({ limit, logs, offset }: Props) {
                 key={log.id}
               >
                 <td className="py-2 pr-4 font-mono text-xs text-f1-muted">
-                  {new Date(log.created_at).toLocaleString()}
+                  {formatDateTime(log.created_at)}
                 </td>
                 <td className="py-2 pr-4 text-f1-white">
                   {(Array.isArray(log.profiles)
