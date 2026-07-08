@@ -558,7 +558,7 @@ Build the public pages viewers and drivers use after results are published.
 | S4 component tests (LeagueHub full-data scenarios, PublicPageHeader, PositionDelta) | Done | 13 new tests across `league-hub.test.tsx`, `public-page-header.test.tsx`, `position-delta.test.tsx` | None |
 | `writeAdminAuditLog` coverage (success and failure paths) | Done | Added to `api-guard.test.ts` | None |
 | Per-league sub-navigation (Hub / Standings / Results / Penalties / Stats) | Done | `src/components/league/LeagueSubNav.tsx`, `src/app/leagues/[slug]/layout.tsx` — active tab highlighted via `usePathname` | None |
-| Mobile E2E smoke updated to use home page (no DB dependency) | Done | `e2e/smoke.spec.ts` — 2 tests pass | None |
+| Mobile E2E smoke updated to use home page (no DB dependency) | Done | `e2e/00-smoke.spec.ts` — 2 tests pass (renamed 2026-07-07 to sort first, so it runs before league-creating specs and isn't affected by them bumping seeded leagues off the homepage's top-6) | None |
 | 105 tests passing, lint clean, type-check clean | Done | `npm run test` passes: 105/105 tests; `npm run test:coverage`, `npm run lint`, `npm run type-check`, `npm run build`, and `npm run test:e2e` pass | None |
 | Precomputed standings snapshots used (no recalculation on page load) | Done | All standings pages read from `driver_standings`/`team_standings` tables only | None |
 | S4 qualifying results page | Outstanding | None | Qualifying data shown on race result detail page; standalone qualifying page deferred to S5 |
