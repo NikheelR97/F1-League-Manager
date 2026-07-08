@@ -1,8 +1,424 @@
 # F1 Esports League Manager - Simple Developer Handover
 
-**Status:** Planning only. Do not write app code until the owner approves these docs.
+**Status:** S12 staging prep is in progress on `feature/s12-staging-prep`; `/login` auth and proxy convention cleanup are merged to `dev`.
 **Audience:** Interns, juniors, and any developer joining the project.
 **Goal:** Build a fast, secure, modern F1 esports league app that replaces the current spreadsheet workflow.
+
+---
+
+## Current Handover Notes
+
+Last updated: May 15, 2026.
+
+Current branch state:
+
+| Item | Current state |
+|------|---------------|
+| Active development branch | `feature/s12-staging-prep` — staging smoke readiness and release prep evidence. |
+| Latest merged PR | PR #20, `fix(s12): migrate auth middleware to proxy` on `dev` |
+| Merge commit | `c9b9d7e` |
+| Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
+| Latest migration applied locally | `20260513000000_s9_workbook_import.sql` (no new migration in S10 or S11) |
+
+S10 is the regression and security audit sprint. Key findings and audit results:
+
+```text
+- All 24 public tables have RLS enabled (verified via pg_tables query).
+- All admin routes use withAdminGuard; racer routes use withRacerGuard + resolveOwnedSetup.
+- No NEXT_PUBLIC_ prefix on server-only secrets.
+- Service role key absent from .next/static client chunks.
+- Dependency audit: zero high/critical findings. Two moderate postcss findings via Next.js — no safe fix without a breaking downgrade; accepted.
+- 24 new S10 security tests in src/__tests__/unit/s10-security.test.ts covering all 10 SPRINT_PLAN requirements.
+```
+
+S10 security rules to maintain:
+
+```text
+- withAdminGuard covers the full §7 pipeline: size → content-type → origin → session → role-from-DB → rate-limit → CSRF → Zod → service → audit log → sanitized response.
+- withRacerGuard covers: size → origin → session → CSRF. Owner check is in resolveOwnedSetup (returns 404, not 403).
+- points_awarded must never appear in any API request schema — server-calculates only.
+- Wheel circuit must be validated against DB-stored spin via validateWheelConfirmation + confirm_wheel_spin_session RPC.
+- Every state-changing admin route must call writeAdminAuditLog (or delegate to a service that does).
+- RLS enabled: audit_logs append-only (no update/delete policy), vehicle_setups owner-scoped.
+```
+
+---
+
+S9 adds workbook import — a two-phase import pipeline for the Season 2 `.xlsx` workbook:
+
+1. Admin uploads a workbook at `/admin/import`. The upload route parses the file, imports all data, calculates standings server-side, and returns a diff comparing app standings to workbook-stated standings. Raw workbook rows are never sent to the browser.
+2. Admin reviews the diff report. Confirmation is blocked unless `diff.clean === true`.
+3. On confirmation, the migration record is locked (`status = 'confirmed'`). Re-upload for the same season is rejected with 409.
+4. Sessions are upserted by a deterministic `session_code` (`IMP001`–`IMP024`) — safe to re-upload before confirmation.
+5. Transfer-aware team resolution: each race result resolves the correct team using `transferAfterRace` from the League Management sheet.
+6. All routes use `withAdminGuard`; the upload route passes `maxBodyBytes: MAX_WORKBOOK_BYTES` to allow 10 MB workbooks through the guard's default 50 KB body limit.
+
+Important S9 rules:
+
+```text
+- Only .xlsx files are accepted; extension is checked on the server.
+- MAX_WORKBOOK_BYTES = 10 MB; MAX_WORKBOOK_DRIVERS = 60; MAX_WORKBOOK_RACES = 30.
+- XLSX is read with type:"buffer" to read cached cell values, not formulas.
+- Points are calculated server-side (calculateRacePoints); workbook formula results are ignored for standings.
+- One confirmed migration per (league_id, season_id) — upload returns 409 if a confirmed migration exists.
+- Confirm route validates migration_id as UUID and rejects already-confirmed migrations with 409.
+- Both routes write audit logs: import.uploaded and import.confirmed.
+- workbook_migrations stores only metadata + diff; raw parsed rows are discarded after import.
+```
+
+S9 migration:
+
+```text
+supabase/migrations/20260513000000_s9_workbook_import.sql
+```
+
+This migration adds a unique constraint on `race_sessions(league_id, season_id, session_code)` for idempotent upserts, and an index on `workbook_migrations(league_id, season_id, status)` for fast lock checks.
+
+S9 validation evidence:
+
+```powershell
+npm run type-check
+npm run lint
+npm run test          # 313 tests (18 test files)
+npm run build
+npm run sprint-verify # all gates pass including E2E
+```
+
+Post-review fixes applied (commit `99c9098`, PR #15):
+
+| Bug | Fix |
+|-----|-----|
+| `penalties.insert()` error silently discarded — import returned `ok: true` with broken penalty data | Added error check; now returns `{ ok: false, error: ... }` on failure |
+| `allResults` query in `recalculate()` had no limit — violated HANDOVER §6 "Bound every list" | Added `.limit(MAX_WORKBOOK_RACES * MAX_WORKBOOK_DRIVERS)` |
+| `void ps` dead code — `ps` parameter unused in `recalculate()` | Removed parameter from `recalculate()` signature and call site |
+| `void teamForEntry` dead code — reserve stint creation was never implemented | Removed unused variable and stale comment |
+
+Known cross-sprint deferred items (carried into S12):
+
+| Item | Originally deferred in | Now planned for |
+|------|------------------------|-----------------|
+| `/login` page (email/password) | Never built — all sprints redirected to `/login` | Done in PR #18 |
+| Real workbook end-to-end smoke | S9 | S12 pre-deploy |
+| `driver_penalty_totals` rebuild after import | S9 | S12 pre-deploy (manual: run carry-over API after import confirmation) |
+
+S12 login/auth status:
+
+```text
+- /login now supports Supabase email/password auth.
+- Protected /admin and /garage routes preserve safe next redirects limited to those path families.
+- Admin and racer shells include sign-out controls.
+- Browser CSP allows only the configured Supabase origin for auth requests.
+- PR #18 CI passed before merge; local sprint gate passed with 346 tests and 19 Playwright tests.
+- S12 docs/deploy-gate pass: npm run deploy:check passed locally with 347 tests, coverage, build, 19 Playwright tests, high audit, and secret scan.
+- PR #20 moved the auth redirect entrypoint from `src/middleware.ts` to `src/proxy.ts`; CI passed and local build no longer reports the deprecated middleware file convention warning.
+- May 15 staging-prep baseline: `npm run deploy:check` passed locally after starting Docker/Supabase and running `npm run seed:e2e`; 347 tests, coverage, build, 19 Playwright tests, high audit, and secret scan.
+```
+
+Resolved S12 deploy-gate warning:
+
+```text
+Next.js middleware file convention warning was resolved in PR #20 by using the current proxy convention.
+```
+
+S12 staging prep status:
+
+```text
+- Vercel project `f1-league-manager` exists under `nikheel-rajmans-projects` and is connected to the GitHub repo.
+- `vercel env ls` currently reports no environment variables for the project.
+- Do not deploy staging until Vercel has non-production Supabase values, `NEXT_PUBLIC_SITE_URL`, `CSRF_SECRET`, and the configured optional service values.
+- Supabase CLI is not logged in locally, so non-production project migration state has not been inspected from this machine yet.
+```
+
+---
+
+### S11 Notes (archived)
+
+S11 delivers all deferred features from S3–S9 plus performance, accessibility, and UX polish:
+
+1. Playwright auth storage state helpers for admin and racer E2E tests via a test-only `/api/e2e/session` endpoint (NODE_ENV + `E2E_SECRET` guard; returns 404 in production).
+2. E2E seed script (`npm run seed:e2e`) — idempotent, uses email as the stable lookup key. Local GoTrue ignores the `user_id` parameter in `createUser`, so the seed uses dynamic UUIDs assigned by Supabase and upserts on unique columns (`profile_id` for drivers, `(league_id, driver_id, season_id)` for league driver entries).
+3. Admin browser E2E tests: dashboard redirect, league create, team add, driver add, seed data navigation.
+4. Authenticated wheel E2E tests: page navigation, unauthenticated redirect.
+5. Racer garage E2E tests: setup CRUD, cross-racer isolation (admin gets 404 on racer's setup).
+6. Standalone qualifying results page at `/leagues/[slug]/results/[sessionId]/qualifying` — pole position row highlighted.
+7. Public race report page at `/leagues/[slug]/results/[sessionId]/report` — winner/pole/fastest highlights, race classification, qualifying order, penalties (steward_notes and appeal_notes excluded per HANDOVER §7).
+8. Season selector on public standings and results pages (UUID-validated `?season=<id>` searchParam; selector hidden when only one season exists).
+9. Tag-based cache revalidation using `src/lib/cache/tags.ts` factory: `standings`, `results`, `session`, `penalties`, `wheel`, `league` tags.  `revalidateTag(tag, "default")` called in publish, transfer, wheel spin, and asset upload routes.
+10. `unstable_cache` wrapping on standings and results data-fetch functions for per-request cache even with `force-dynamic` pages.
+11. `DiffReport` ✓/✗ spans now carry `aria-label="match"` / `aria-label="mismatch"`.
+12. Digital wheel rewritten as a state machine (`idle → spinning → revealing → pending`) with slot-machine animation, `aria-live`, `role="alert"` on errors, `fieldset`/`legend` for circuit pool, and `focus:ring-2` on all interactive elements.
+
+S11 important rules:
+
+```text
+- /api/e2e/session must never run in production (NODE_ENV === "production" returns 404 first).
+- E2E_SECRET header is required even in development; missing secret → 404.
+- revalidateTag second argument must be "default" (Next.js 16 breaking change — required profile argument).
+- unstable_cache tags must match what revalidateTag fires — use cacheTag.* factory for both.
+- steward_notes and appeal_notes must never appear in public penalty queries (report page included).
+- Playwright auth files (e2e/.auth/*.json) are gitignored — regenerate with npm run seed:e2e then npm run test:e2e.
+- E2E_SECRET must be set in .env.local before running tests (it is NOT in .env.example with a real value — add it manually). Example: E2E_SECRET=dev-e2e-secret-for-local-testing-only
+- Do not use fixed auth user UUIDs anywhere — local GoTrue silently ignores user_id in createUser. Always look up users by email after creation.
+```
+
+S11 validation evidence:
+
+```powershell
+npm run type-check  # 0 errors
+npm run lint        # 0 warnings
+npm run test        # 337 tests, 19 files, all passed
+npm run seed:e2e    # seed confirmed working after fixing dynamic UUID approach
+npm run test:e2e    # full Playwright suite passed locally before PR #17 merge
+GitHub CI verify    # passed on PR #17 before merge
+```
+
+Known S11 accepted limitations:
+
+| Item | Reason |
+|------|--------|
+| Lighthouse scores not captured | Requires live staging environment with real data. Deferred to S12 pre-deploy. |
+| Wheel E2E spin flow | Full spin+confirm E2E deferred — requires seeded circuit pool on local Supabase; covered by unit tests in `wheel-service.test.ts`. |
+
+---
+
+Known deferred S9 items:
+
+| Item | Reason |
+|------|--------|
+| `driver_penalty_totals` not rebuilt on import | Import flow has no threshold configuration data. Carry-over penalties from the League Management sheet populate `carry_over_penalty_points` on `league_driver_entries` but do not populate `driver_penalty_totals`. Run carry-over via the S8 carry-over API after import. |
+| Real workbook end-to-end smoke | Requires local Supabase with a seeded league + season; the import logic is unit-tested structurally. |
+| `xlsx@0.18.5` security audit | Last public npm version before SheetJS went proprietary; has known prototype-pollution paths. Flag for `npm audit --audit-level=moderate` in S10 security audit. |
+| `DiffReport` tick/cross accessibility | `✓`/`✗` symbols in `<span>` lack `aria-label`. Flag for S11 accessibility pass. |
+
+---
+
+### S8 Notes (archived)
+
+S8 adds admin operations — seasons management, carry-over of penalties and bans, super-admin user role management, and the audit log viewer:
+
+1. Seasons can be marked as current (clears the flag from all others) or archived (togglable). The current season cannot be archived.
+2. An archived season cannot be made current.
+3. Carry-over: copies each driver's end-of-season `penalty_points` and `ban_threshold_reached` flag from `driver_penalty_totals` into `carry_over_penalty_points` and `carry_over_ban_count` on new `league_driver_entries`. Safe to re-run (upsert).
+4. Super-admin user management: super_admins can promote or demote other users' roles. Normal admins cannot access this page or API. A super_admin cannot change their own role.
+5. Audit log viewer: server-rendered table at `/admin/audit` with filters for actor, action, entity type, entity ID (pass a league or season UUID to scope by league/season), and date range. Append-only — no update or delete policies exist on `audit_logs`. All search params are validated with Zod before reaching the DB.
+6. Admin nav gains "Audit Log" for all admins and "User Roles" for super_admins only.
+7. Season selector on the league admin detail page (`/admin/leagues/[id]`): a `?season_id=` URL param (Zod-validated UUID) switches the season context; `race_sessions` and `league_driver_entries` are filtered by the chosen season. Defaults to the current season, then the league's own initial season. The selector is hidden when only one season exists.
+
+Important S8 rules:
+
+```text
+- Only super_admin may call GET /api/admin/users or PATCH /api/admin/users/[id]/role.
+- A super_admin cannot change their own role (prevents accidental self-lockout).
+- Cannot mark an archived season as current.
+- Cannot archive the current season.
+- Carry-over upserts on (league_id, season_id, driver_id) — safe to re-run.
+- audit_logs has no update or delete RLS policies — append-only by design.
+- The Discord webhook env var (DISCORD_WEBHOOK_URL) is present in env.ts and .env.example but no webhook sending is implemented yet.
+```
+
+S8 migration: `supabase/migrations/20260512000000_s8_admin_operations.sql`
+
+Known S8 accepted risks:
+
+| Risk | Detail |
+|------|--------|
+| `season.set_current` atomicity | Two sequential writes: set target → clear others. If the clear step fails the desired season is already current (better than zero current seasons), but stale `is_current = true` rows may remain until the next successful call. Wrap in a DB function/RPC if this becomes a concern. |
+
+---
+
+### S7 Notes (archived)
+
+S7 adds the racer garage - private vehicle setup management for authenticated racers:
+
+1. Racers can create, edit, delete, and duplicate vehicle setups per circuit.
+2. Setup list never exposes setup_data (compact DTOs only).
+3. All racer routes follow the HANDOVER section 7 security pipeline: size -> origin -> session -> CSRF.
+4. Ownership is verified server-side (profile_id check via service role client); RLS enforces it at DB level too.
+5. Setups are private by default; duplicates always start private.
+6. Filters: circuit, weather, and league (league_id added to vehicle_setups via S7 migration).
+
+Important S7 racer garage rules:
+
+```text
+- Never load setup_data in the list query - it can be large JSON; load it only on edit.
+- Verify driver ownership with a service role SELECT before any mutation (not just RLS).
+- Return 404 (not 403) when a setup is not found or not owned - avoids leaking existence.
+- Duplicate always sets is_public = false regardless of source setup visibility.
+- The racer guard checks session (any authenticated user) - no admin role required.
+```
+
+S7 migrations:
+
+```text
+supabase/migrations/20260509120000_s7_vehicle_setups_league.sql
+supabase/migrations/20260509130000_fix_driver_standings_team_id.sql
+```
+
+The first migration adds `league_id uuid` (nullable) to `vehicle_setups` for filtering setups by league, plus an index on `(driver_id, league_id)`. The second migration adds `team_id` to `driver_standings` so public standings can show current team context after seeded data or recalculation.
+
+S7 validation evidence:
+
+```powershell
+npm.cmd run type-check
+npm.cmd run lint
+npm.cmd run test          # 227 tests
+npm.cmd run build
+npm.cmd run sprint-verify # all gates pass including E2E
+npm.cmd run deploy:check  # passed after Next 16.2.6 security patch
+```
+
+PR #11 CI verification passed after the Next.js security update to `next@16.2.6` and `eslint-config-next@16.2.6`.
+
+Known deferred S8 items:
+
+None — all build steps completed.
+
+Known S8 accepted risks:
+
+| Risk | Detail |
+|------|--------|
+| `season.set_current` atomicity | Two sequential writes: set target → clear others. If the clear step fails the desired season is already current (better than zero current seasons), but stale `is_current = true` rows may remain on other seasons until the next successful call. Wrap in a DB function/RPC if this becomes a concern. |
+
+---
+
+### S7 Notes (archived)
+
+Known deferred S7 items:
+
+| Item | Status | Note |
+|------|--------|------|
+| "Copy from circuit" create-form shortcut | Deferred | Racers can duplicate manually; a dedicated copy-from selector can be added later. |
+| Game version autocomplete | Deferred | Free text input works; autocomplete from existing values can be added later. |
+| Public setup discovery | Deferred | `is_public` flag exists; a public setup gallery page is not yet built. |
+| Racer E2E auth tests | Deferred | Browser E2E for authenticated racer flow deferred with other auth E2E expansion. |
+
+---
+
+### S6 Notes (archived)
+
+S6 added the calendar and digital wheel workflow:
+
+1. Admins can create, edit, and manage race sessions on the calendar.
+2. Public users can view scheduled and completed sessions through league-safe public routes.
+3. Admins can spin a digital circuit wheel for scheduled sessions.
+4. Wheel confirmation is server-side and atomic, so the selected circuit is persisted consistently.
+5. Public wheel history avoids leaking admin profile details.
+
+Important S6 calendar and wheel rules:
+
+```text
+- The wheel animation is visual only; the server-confirmed result is the source of truth.
+- Wheel confirmation must use public.confirm_wheel_spin_session(...) rather than client-only updates.
+- Public calendar reads should stay limited to scheduled/completed sessions.
+- Session create/update must validate the selected points system belongs to the same league.
+- The S6 migration must be applied to whichever database target is used for validation.
+```
+
+S6 migration:
+
+```text
+supabase/migrations/20260509101500_s6_confirm_wheel_spin_session.sql
+```
+
+This migration creates the `public.confirm_wheel_spin_session(...)` RPC used to atomically confirm wheel selections.
+
+S6 validation evidence:
+
+```powershell
+npm.cmd run type-check
+npm.cmd run lint
+npm.cmd run test          # 181 tests
+npm.cmd run build
+git diff --check
+```
+
+All passed before PR #10 was merged. PR #10 CI verification also passed.
+
+Shared environment reminder:
+
+Apply the S6 migration to any shared dev preview, staging, or production database before validating calendar and wheel behavior there. It has already been applied to the local Supabase Docker target.
+
+Known deferred S6 items:
+
+| Item | Status | Note |
+|------|--------|------|
+| Rich wheel animation polish | Deferred | Current wheel flow is functional; deeper animation polish can happen later. |
+| Public race reports page | Deferred | Still depends on a dedicated reports experience. |
+| Historical season selector | Deferred | MVP still assumes the active league season for primary public flows. |
+| Full browser E2E for authenticated wheel flow | Deferred | Unit/integration coverage exists; browser coverage can be added when auth E2E helpers are expanded. |
+
+---
+
+### S5 Notes (archived)
+
+S5 added the admin result publishing workflow:
+
+1. Session management API (`GET + POST /api/admin/leagues/[id]/sessions`).
+2. Session creation UI (`SessionForm.tsx` + `/admin/leagues/[id]/sessions/new`).
+3. Publish API (`POST /api/admin/sessions/[id]/publish`) — Zod-validated; `points_awarded` absent from schema, server-calculated only.
+4. Server-authoritative points engine (`src/lib/results/points.ts`) — FL bonus, pole bonus, non-classified → 0.
+5. Workbook gap parser (`src/lib/results/parse-gap.ts`) — all HANDOVER §11 formats.
+6. Standings builders (`src/lib/results/standings.ts`) — driver/team/penalty, tie-break order, carry-over.
+7. Publish service (`src/lib/results/publish-service.ts`) — full publish pipeline with standings rebuild.
+8. 4-step result entry stepper (`ResultStepper.tsx`) — qualifying → results → penalties → review → publish.
+9. 167 unit/component tests passing (167 from 5 prior — 5 new `validatePublishResults` tests added in post-review fix commit).
+
+Important S5 publish pipeline rules:
+
+```text
+- points_awarded is calculated server-side only. The API schema has no points_awarded field.
+- penalty_points (discipline) do NOT affect standings. manual_points_adjustment DOES.
+- Constructor standings use points_awarded only, not manual_points_adjustment.
+- Standings are recalculated by full delete + re-insert to avoid unique position constraint violations.
+- Standings recalculation runs BEFORE marking the session completed so a DB failure is safely retryable.
+- Rescinded penalties are excluded from ban-total calculations (.neq("status", "rescinded")).
+- Server validates cross-field rules: ≥1 classified finisher, no duplicate positions, ≤1 fastest-lap driver.
+```
+
+Post-review fixes applied (in commit `4e67fbd`, merged in PR #9):
+
+| Bug | Fix |
+|-----|-----|
+| Session marked completed before standings recalc — failure left broken unretryable state | Moved standings recalc before `status = completed`; passes `additionalSessionId` so current session results are included |
+| Rescinded penalties counted toward `ban_threshold_reached` | Added `.neq("status", "rescinded")` to penalties query in `recalculateStandings` |
+| `penaltyMap` kept only last penalty per driver — multi-penalty ban alert wrong | Replaced with point aggregation loop across all non-rescinded penalties per driver |
+| No server-side cross-field validation — duplicate positions/multiple FL could reach DB | Added `validatePublishResults()` pure function called before any DB write; exported + 5 unit tests |
+| Index keys on removable penalty list items — stale React DOM on removal | Added stable `id: crypto.randomUUID()` to `PenaltyRow`; penalty items key on `row.id` |
+
+No new migrations in S5. The existing schema (including `race_results`, `qualifying_results`, `penalties`, `driver_standings`, `team_standings`, `driver_penalty_totals`) was defined in the S1 migration.
+
+S5 validation evidence:
+
+```bash
+npm.cmd run type-check
+npm.cmd run lint
+npm.cmd run test          # 167 tests
+npm.cmd run test:coverage # branches 82.9%, all thresholds met
+npm.cmd run build
+npm.cmd run test:e2e
+```
+
+All passed before PR #9 was merged. CI green on both the initial S5 commit and the post-review fix commit.
+
+Known deferred S5 items:
+
+| Item | Status | Next action |
+|------|--------|-------------|
+| Standalone qualifying results page | Deferred | Qualifying shown on race detail; standalone page still deferred after S6. |
+| Race reports page | Deferred | Needs a dedicated public reports experience; still deferred after S6. |
+| Season selector on public pages | Deferred | MVP assumes one active season per league; revisit with historical seasons. |
+| Cache/revalidation after publish | Deferred | Public pages use `force-dynamic`; tag-based revalidation still deferred after S6. |
+| Standings atomicity (delete+insert gap) | Accepted risk | PostgREST has no transactions; gap is milliseconds during a rare admin action. Wrap in a DB function/RPC if standings become high-traffic. |
+
+---
+
+### S4 Notes (archived)
+
+S4 added public league pages: league hub, driver standings, constructor standings, results list, race result detail, penalties, driver profiles, team profiles, and statistics.
+
+The S4 hardening migration (`20260508123000_s4_public_security_boundaries.sql`) scopes public RLS policies to non-draft leagues, restricts result reads to completed sessions, and removes `steward_notes`/`appeal_notes` from the anon column grant on the penalties table.
+
+All S4 validation passed before PR #8 was merged. Unit/component tests were at 105 passing after S4 review fixes.
 
 ---
 
@@ -56,6 +472,97 @@ These decisions are confirmed and should not be changed without updating this do
 | Appeals/stewards | Handled manually outside the app. App stores notes/status for audit. |
 | Discord | Stretch goal, not MVP. |
 | Brand assets | Uploaded per league/team. No official F1 logos unless licensed. |
+
+---
+
+## Branch And Environment Model
+
+This project uses three long-lived GitHub branches and two cloud Supabase projects.
+
+Daily local development should use local Supabase when possible. Shared integration and staging testing use the non-production Supabase project. Production uses its own isolated Supabase project.
+
+| GitHub branch | Supabase target | Vercel target | Purpose |
+|---------------|-----------------|---------------|---------|
+| `dev` | Local Supabase by default. Dev previews may use `f1-league-manager-nonprod`. | Development/preview | Daily development and disposable integration testing. |
+| `staging` | `f1-league-manager-nonprod` | Staging/preview | Release candidate testing before production. |
+| `prod` | `f1-league-manager-prod` | Production | Real league data and public release. |
+
+Standing rules:
+
+1. Normal local work happens on `dev` using local Supabase.
+2. Shared dev previews and release testing use `f1-league-manager-nonprod`.
+3. Production deploys happen from `prod` using `f1-league-manager-prod`.
+4. Never put production Supabase keys in dev or staging environments.
+5. Never point local development at production unless a senior approves a controlled smoke test.
+6. Before running migrations, confirm the current Git branch and Supabase target match.
+7. Before deployment, confirm Vercel environment variables match the branch target.
+8. Non-production data may be reset; production data must never be reset.
+
+Every developer and AI assistant must keep this mapping in mind when making code, docs, migration, or deployment changes.
+
+---
+
+## Pull Request And Review Model
+
+All project work must happen through branches and pull requests. Do not commit directly to `dev`, `staging`, or `prod`.
+
+Branch flow:
+
+| Work type | Work branch | Pull request target | Required review |
+|-----------|-------------|---------------------|-----------------|
+| Normal feature or bug fix | `feature/short-description` or `fix/short-description` from `dev` | `dev` | Code review expected, but GitHub does not currently enforce approval on `dev`. |
+| Release candidate | `release/yyyy-mm-dd` from `dev` | `staging` | Code review plus QA checklist. |
+| Production release | `promote/yyyy-mm-dd` from `staging` | `prod` | Senior review, security check, deploy checklist. |
+| Hotfix | `hotfix/short-description` from `prod` | `prod`, then back-merge to `staging` and `dev` | Senior review. |
+
+Pull request rules:
+
+1. Every code change must have a PR.
+2. Every PR must describe what changed, why it changed, and how it was tested.
+3. Every PR must pass CI before merge.
+4. Every PR touching auth, RLS, migrations, secrets, deploy config, or production data needs senior review.
+5. PRs into `prod` must be small, already tested on `staging`, and linked to release notes.
+6. `dev` PRs may be owner-merged after CI and documented Codex review when no second reviewer is available.
+7. Squash merge is preferred for feature branches unless a senior chooses otherwise.
+8. After hotfixes, back-merge into `staging` and `dev` so branches do not drift.
+
+AI assistant rule:
+
+```text
+When working on code, Codex must ask or confirm the intended branch and PR target before making changes that are meant to be merged.
+```
+
+---
+
+## Sprint Tracking Model
+
+As sprints are worked, the docs must show what is done, what is still outstanding, and why.
+
+Use this status model:
+
+| Status | Meaning |
+|--------|---------|
+| `Not started` | Work has not begun. |
+| `In progress` | Work has started but is not complete. |
+| `Done` | Work is complete, tested, reviewed, and accepted. |
+| `Outstanding` | Work is not complete and must include a reason. |
+| `Blocked` | Work cannot continue until something external changes. |
+
+Tracking rules:
+
+1. Every sprint task must have a status.
+2. Every `Done` task must include evidence, such as PR number, test command, screenshot, or migration name.
+3. Every `Outstanding` task must include a reason.
+4. Every `Blocked` task must include the blocker owner or next action.
+5. Sprint reviews must update the sprint plan before moving to the next sprint.
+6. Do not mark a feature `Done` just because code exists. It must pass tests and review.
+
+Use this simple format when updating sprint progress:
+
+| Task | Status | Evidence | Outstanding reason / next action |
+|------|--------|----------|----------------------------------|
+| Example task | Done | PR #12, `npm run test` | None |
+| Example task | Outstanding | None | Waiting for Supabase keys |
 
 ---
 
@@ -210,7 +717,8 @@ Required security controls:
 | Admin authorization | Check `profiles.role` on every admin request. |
 | Racer authorization | Owner checks in RLS and server service. |
 | CSRF | Required for all state-changing routes. |
-| Rate limiting | Required for auth and admin APIs. |
+| Rate limiting (admin) | Required for admin APIs; enforced via `createAdminRateLimiter` (`src/lib/admin/api-guard.ts`, Upstash-backed, fails closed in production). |
+| Rate limiting (auth) | Sign-in goes browser → Supabase directly (`LoginForm.tsx` calls `supabase.auth.signInWithPassword()`); there is no app-side auth API route to rate limit. Accepted control: Supabase Auth's built-in per-IP rate limits — verify they are enabled/appropriate in the Supabase dashboard for staging and production as a deploy step. `createAuthRateLimiter` (`src/lib/security/rate-limit.ts`) remains available if a server-side auth endpoint is ever added. |
 | Error handling | Generic in production, details only in Sentry. |
 | Secret scan | Run in CI/deploy checks. |
 | Dependency audit | No high/critical vulnerabilities before deploy. |
@@ -490,6 +998,15 @@ npm run sprint-verify
 
 ## 14. Environment Variables
 
+Environment values must be different for local/dev, staging, and production.
+
+| Context | Supabase values to use |
+|---------|------------------------|
+| Local `dev` work | Local Supabase values, or non-production values only when testing shared integrations. |
+| `dev` Vercel preview | Non-production Supabase URL, public key, and secret key. |
+| `staging` | Non-production Supabase URL, public key, and secret key. |
+| `prod` | Production Supabase URL, public key, and secret key. |
+
 | Variable | Scope | Purpose |
 |----------|-------|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Public | Supabase URL. |
@@ -507,6 +1024,8 @@ npm run sprint-verify
 
 Never prefix server-only secrets with `NEXT_PUBLIC_`.
 
+Never reuse production secrets in dev or staging.
+
 ---
 
 ## 15. Deployment
@@ -520,14 +1039,26 @@ Target deployment:
 | Rate limiting | Upstash |
 | Monitoring | Sentry |
 
+Branch deployment rule:
+
+| Action | Branch | Supabase project |
+|--------|--------|------------------|
+| Local daily development | `dev` | Local Supabase |
+| Shared dev preview | `dev` | `f1-league-manager-nonprod` |
+| Release testing | `staging` | `f1-league-manager-nonprod` |
+| Production release | `prod` | `f1-league-manager-prod` |
+
 Before production:
 
 1. `npm run sprint-verify`
 2. `npm audit --audit-level=high`
 3. Secret scan.
-4. Production build.
-5. E2E tests.
-6. Manual smoke tests.
+4. Confirm current branch is `prod`.
+5. Confirm Vercel production branch is `prod`.
+6. Confirm production env vars point to `f1-league-manager-prod`.
+7. Production build.
+8. E2E tests.
+9. Manual smoke tests.
 
 Production smoke tests:
 
@@ -559,5 +1090,7 @@ A feature is done only when:
 8. Supabase errors are checked before data is used.
 9. Admin state changes write audit logs.
 10. No secrets leak to client code.
-11. `npm run sprint-verify` passes.
-
+11. Branch and Supabase environment mapping is correct.
+12. A PR exists with review notes and test evidence.
+13. CI passes on the PR.
+14. `npm run sprint-verify` passes.
