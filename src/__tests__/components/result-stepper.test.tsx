@@ -882,6 +882,100 @@ describe("ResultStepper reserve assignment (B7)", () => {
   });
 });
 
+describe("ResultStepper points adjustment (F3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/csrf") {
+          return Promise.resolve(new Response(JSON.stringify({ token: "test-token" })));
+        }
+        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      }),
+    );
+  });
+
+  it("keeps a negative points adjustment (-5) instead of dropping the minus sign", async () => {
+    // F3 — the "Adj pts" input used to be type="number" with
+    // onChange={(e) => Number(e.target.value)}. Typing "-" into a number
+    // input is immediately discarded by the browser (a lone "-" isn't a
+    // valid number), so by the time the "5" keystroke landed the field held
+    // just "5" — never "-5". A controlled type="number" input can't hold
+    // that intermediate "-" at all, which is exactly what this test would
+    // catch: pre-fix, typing "-5" produces manual_points_adjustment: 5 (or
+    // 0), not -5.
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    // A classified finishing position is required to pass validation and
+    // reach Publish; race points (P1 = 25) let "-5" show as its own value
+    // distinct from the race points column on Review.
+    await user.type(screen.getByPlaceholderText("—"), "1");
+    const adjInput = screen.getByLabelText("Points adjustment for Driver One");
+    // The field starts on the default "0" (manual_points_adjustment: 0), so
+    // clear it first — same as an admin backspacing/selecting-all before
+    // entering a real value.
+    await user.clear(adjInput);
+    await user.type(adjInput, "-5");
+
+    expect(adjInput).toHaveValue("-5");
+
+    // Review step reflects the negative adjustment, not a mangled positive
+    // one — the "Adj" column shows "-5" and "Total champ" shows 20 (25 - 5).
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+    expect(screen.getByText("-5")).toBeInTheDocument();
+    expect(screen.getAllByText("20").length).toBeGreaterThan(0);
+
+    // Publish payload carries the real negative value through to the API.
+    await user.click(screen.getByRole("button", { name: "Publish Results" }));
+    const publishCall = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
+      String(url).includes("/publish"),
+    );
+    const body = JSON.parse(publishCall![1].body);
+    expect(body.results).toContainEqual(
+      expect.objectContaining({ driver_id: "driver-1", manual_points_adjustment: -5 }),
+    );
+  });
+
+  it("does not reset the adjustment to 0 while a lone '-' is mid-type", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    const adjInput = screen.getByLabelText("Points adjustment for Driver One");
+    await user.clear(adjInput);
+
+    // Type just the minus sign — the field must hold it (as text) without
+    // the underlying numeric value snapping back to a wiped-out state.
+    await user.type(adjInput, "-");
+    expect(adjInput).toHaveValue("-");
+
+    // Finish the number; the row's value should be the completed -5, proving
+    // the lone "-" wasn't silently discarded/reset before the next digit.
+    await user.type(adjInput, "5");
+    expect(adjInput).toHaveValue("-5");
+  });
+
+  it("rejects non-numeric characters typed into the adjustment field", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    const adjInput = screen.getByLabelText("Points adjustment for Driver One");
+    await user.clear(adjInput);
+
+    await user.type(adjInput, "-5abc");
+    expect(adjInput).toHaveValue("-5");
+  });
+});
+
 describe("ResultStepper penalty row removal focus (K2)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

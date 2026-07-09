@@ -160,6 +160,26 @@ export function computeSessionPenaltyTotals(
 }
 
 // ---------------------------------------------------------------------------
+// Drop untouched default rows before publish (exported for unit tests) — N2
+// ---------------------------------------------------------------------------
+
+// The results step gives every roster driver (including reserves/free agents
+// not entered in this session) a default "classified" row with a null
+// finishing_position. An untouched default carries no participation signal,
+// so it's dropped rather than published as a phantom classified/0-point row
+// — it was already excluded from validatePublishResults's classified-count
+// and duplicate-position checks, and calculateRacePoints scores it 0 either
+// way. Mirrors the qualifying step, which already drops untouched rows
+// before submission (ResultStepper.tsx handlePublish).
+export function filterPublishedResults(
+  results: RaceResultEntry[],
+): RaceResultEntry[] {
+  return results.filter(
+    (r) => !(r.result_status === "classified" && r.finishing_position === null),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Pure precondition check (exported for unit tests)
 // ---------------------------------------------------------------------------
 
@@ -237,8 +257,9 @@ export async function publishSession(
 
   const sessionPenaltyPtsByDriver = computeSessionPenaltyTotals(penalties);
 
-  // 2. Calculate server-authoritative points_awarded for each result
-  const resultRows = results.map((r) => ({
+  // 2. Calculate server-authoritative points_awarded for each result (N2 —
+  // filterPublishedResults drops untouched non-participant default rows).
+  const resultRows = filterPublishedResults(results).map((r) => ({
     race_session_id: sessionId,
     driver_id: r.driver_id,
     team_id: r.team_id,

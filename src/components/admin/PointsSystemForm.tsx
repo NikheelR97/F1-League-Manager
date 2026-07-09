@@ -12,15 +12,10 @@ import { Label } from "@/components/ui/label";
 import { MAX_POINTS_POSITIONS, STANDARD_POINTS } from "@/lib/constants";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 
-const positionsSchema = z
-  .record(z.string(), z.number().int().min(0).max(999))
-  .refine((v) => Object.keys(v).length > 0, { message: "At least one position required" });
-
 const pointsSystemSchema = z.object({
   fastest_lap_points: z.number().int().min(0).max(10),
   max_positions: z.number().int().min(1).max(MAX_POINTS_POSITIONS),
   name: z.string().trim().min(1, "Name is required").max(80),
-  points_by_position: positionsSchema,
   pole_position_points: z.number().int().min(0).max(10),
 });
 
@@ -84,6 +79,16 @@ export function PointsSystemForm({ leagueId }: PointsSystemFormProps) {
 
   async function onSubmit(values: PointsSystemFields) {
     // Build points_by_position from rows
+    const validPositions = rows.filter((r) => r.position > 0).map((r) => r.position);
+    if (validPositions.length === 0) {
+      setError("root", { message: "At least one position is required" });
+      return;
+    }
+    if (new Set(validPositions).size !== validPositions.length) {
+      setError("root", { message: "Positions must be unique" });
+      return;
+    }
+
     const points_by_position: Record<string, number> = {};
     for (const { points, position } of rows) {
       if (position > 0) {

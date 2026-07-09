@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { formatDate } from "@/lib/format-date";
 import { getDriverPenaltyTotals } from "@/lib/penalties/get-driver-penalty-totals";
+import { formatPosition } from "@/lib/public/format-position";
 import { pageTitle } from "@/lib/public/page-title";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -227,7 +228,6 @@ export default async function DriverProfilePage({
             {results.map((r) => {
               const race = r.race_sessions as unknown as RaceSession | null;
               const circuit = race?.circuits as unknown as Circuit | null;
-              const isClassified = r.result_status === "classified";
               const totalPts = r.points_awarded + r.manual_points_adjustment;
               return (
                 <li
@@ -242,7 +242,7 @@ export default async function DriverProfilePage({
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="font-mono text-xs uppercase text-f1-muted">
-                      {isClassified ? `P${r.finishing_position}` : r.result_status.toUpperCase()}
+                      {formatPosition(r.result_status, r.finishing_position)}
                     </span>
                     <span className="font-mono text-sm font-bold text-f1-white">{totalPts} pts</span>
                   </div>

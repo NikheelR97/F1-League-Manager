@@ -130,6 +130,10 @@ export function AddLeagueDriverForm({ drivers, leagueId, teams }: AddLeagueDrive
           />
           Reserve driver
         </label>
+        <p className="text-xs text-f1-muted">
+          Reserve marks the driver&apos;s status only — a home team is still required. Reserves
+          can be assigned to any team per-race during result entry.
+        </p>
       </div>
 
       {/* Joined on */}

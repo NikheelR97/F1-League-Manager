@@ -5,9 +5,11 @@ import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { formatPosition } from "@/lib/public/format-position";
 import { pageTitle } from "@/lib/public/page-title";
 import { comparePublicRaceResults } from "@/lib/public/result-sort";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
+import { buildDriverPointsBreakdown } from "@/lib/results/standings";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
@@ -153,19 +155,23 @@ export default async function TeamProfilePage({
   const bestFinish = classifiedFinishes.length > 0 ? Math.min(...classifiedFinishes) : null;
   const fastestLapCount = (raceResults ?? []).filter((r) => r.fastest_lap).length;
 
-  const pointsByDriver = new Map<string, { id: string; name: string; points: number }>();
-  for (const r of raceResults ?? []) {
-    const driver = r.drivers as unknown as Driver | null;
-    if (!driver) continue;
-    const totalPts = r.points_awarded + r.manual_points_adjustment;
-    const existing = pointsByDriver.get(driver.id);
-    pointsByDriver.set(driver.id, {
-      id: driver.id,
-      name: driver.display_name,
-      points: (existing?.points ?? 0) + totalPts,
-    });
-  }
-  const driverBreakdown = [...pointsByDriver.values()].sort((a, b) => b.points - a.points);
+  // F1 — this breakdown is constructor-context, so it must reconcile with
+  // the header's team_standings.total_points, which uses points_awarded
+  // only (see buildDriverPointsBreakdown / buildTeamStandings in standings.ts).
+  const driverBreakdown = buildDriverPointsBreakdown(
+    (raceResults ?? []).flatMap((r) => {
+      const driver = r.drivers as unknown as Driver | null;
+      if (!driver) return [];
+      return [
+        {
+          driver_id: driver.id,
+          driver_name: driver.display_name,
+          points_awarded: r.points_awarded,
+          manual_points_adjustment: r.manual_points_adjustment,
+        },
+      ];
+    }),
+  );
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -241,7 +247,7 @@ export default async function TeamProfilePage({
           <ul className="grid gap-1 sm:grid-cols-2">
             {driverBreakdown.map((d) => (
               <li
-                key={d.id}
+                key={d.driver_id}
                 className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm"
               >
                 <span className="text-f1-white">{d.name}</span>
@@ -274,8 +280,7 @@ export default async function TeamProfilePage({
                   const race = r.race_sessions as unknown as RaceSession | null;
                   const circuit = race?.circuits as unknown as Circuit | null;
                   const driver = r.drivers as unknown as Driver | null;
-                  const isClassified = r.result_status === "classified";
-                  const totalPts = r.points_awarded + r.manual_points_adjustment;
+                  const totalPts = r.points_awarded;
                   return (
                     <tr key={`${r.race_session_id}-${driver?.id}`} className="border-b border-f1-border/40 hover:bg-f1-dark">
                       <td className="py-2 pr-4 text-f1-white">
@@ -286,7 +291,7 @@ export default async function TeamProfilePage({
                       </td>
                       <td className="py-2 pr-4 text-f1-muted">{driver?.display_name ?? "—"}</td>
                       <td className="py-2 pr-4 text-right font-mono text-xs text-f1-muted">
-                        {isClassified ? `P${r.finishing_position}` : r.result_status.toUpperCase()}
+                        {formatPosition(r.result_status, r.finishing_position)}
                       </td>
                       <td className="py-2 text-right font-mono font-bold text-f1-white">{totalPts}</td>
                     </tr>
@@ -301,8 +306,7 @@ export default async function TeamProfilePage({
                 const race = r.race_sessions as unknown as RaceSession | null;
                 const circuit = race?.circuits as unknown as Circuit | null;
                 const driver = r.drivers as unknown as Driver | null;
-                const isClassified = r.result_status === "classified";
-                const totalPts = r.points_awarded + r.manual_points_adjustment;
+                const totalPts = r.points_awarded;
                 return (
                   <li
                     key={`${r.race_session_id}-${driver?.id}`}
@@ -317,7 +321,7 @@ export default async function TeamProfilePage({
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="font-mono text-xs uppercase text-f1-muted">
-                        {isClassified ? `P${r.finishing_position}` : r.result_status.toUpperCase()}
+                        {formatPosition(r.result_status, r.finishing_position)}
                       </span>
                       <span className="font-mono text-sm font-bold text-f1-white">{totalPts} pts</span>
                     </div>

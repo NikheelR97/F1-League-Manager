@@ -451,6 +451,13 @@ function ResultsStep({
     return drivers.find((d) => d.driver_id === id)?.display_name ?? id;
   }
 
+  // F3 — the "Adj pts" input needs to hold a lone "-" mid-keystroke while the
+  // admin types a negative value (e.g. "-5"). A controlled `type="number"`
+  // input snaps that intermediate "-" to 0 and wipes it before the next digit
+  // lands. Track the in-progress text per row here; row.manual_points_adjustment
+  // (a number) stays the source of truth everywhere else (Review step, payload).
+  const [rawAdjustments, setRawAdjustments] = useState<Record<string, string>>({});
+
   const statuses: ResultStatus[] = ["classified", "dnf", "dns", "dsq", "ban"];
 
   // M1 — display order follows the quali grid entered a step earlier, not
@@ -628,13 +635,26 @@ function ResultsStep({
                     <input
                       aria-label={`Points adjustment for ${driverName(row.driver_id)}`}
                       className="w-16 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
+                      inputMode="numeric"
                       placeholder="0"
-                      type="number"
-                      value={row.manual_points_adjustment}
-                      onChange={(e) =>
-                        update(row.driver_id, { manual_points_adjustment: Number(e.target.value) || 0 })
+                      type="text"
+                      value={rawAdjustments[row.driver_id] ?? String(row.manual_points_adjustment)}
+                      onBlur={() =>
+                        setRawAdjustments((prev) => {
+                          if (!(row.driver_id in prev)) return prev;
+                          const next = { ...prev };
+                          delete next[row.driver_id];
+                          return next;
+                        })
                       }
-                      onWheel={(e) => e.currentTarget.blur()}
+                      onChange={(e) => {
+                        const text = e.target.value;
+                        if (!/^-?\d*$/.test(text)) return;
+                        setRawAdjustments((prev) => ({ ...prev, [row.driver_id]: text }));
+                        update(row.driver_id, {
+                          manual_points_adjustment: text === "" || text === "-" ? 0 : Number(text),
+                        });
+                      }}
                     />
                   </td>
                   <td className="py-2">

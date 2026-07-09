@@ -93,12 +93,19 @@ export default async function Home() {
     .order("created_at", { ascending: false })
     .limit(MAX_PUBLIC_LEAGUE_CARDS);
 
+  // ponytail: fetch nav league links from the same query; cap at 3 for nav display
+  const navLeagueRows = leagueRows?.slice(0, 3) ?? [];
+  const navLeagueLinks = navLeagueRows.map((league: LeagueRow) => ({
+    href: `/leagues/${league.slug}`,
+    label: league.name,
+  }));
+
   const leagues = await Promise.all(
     (leagueRows ?? []).map((league: LeagueRow) => buildLeagueSummary(db, league)),
   );
 
   return (
-    <PublicShell>
+    <PublicShell leagueLinks={navLeagueLinks}>
       <section className="surface-band">
         <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:px-8">
           <div className="max-w-4xl">
