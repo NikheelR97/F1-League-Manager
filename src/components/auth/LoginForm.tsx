@@ -119,9 +119,17 @@ export function LoginForm({ nextPath }: LoginFormProps) {
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-f1-silver" htmlFor="login-password">
-          Password
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-f1-silver" htmlFor="login-password">
+            Password
+          </Label>
+          <Link
+            className="text-xs font-bold uppercase text-f1-red-text hover:text-white"
+            href="/forgot-password"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <Input
           aria-describedby={errors.password ? "login-password-error" : undefined}
           aria-invalid={!!errors.password}

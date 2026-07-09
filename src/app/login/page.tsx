@@ -11,6 +11,8 @@ export default async function LoginPage({
   const sp = await searchParams;
   const rawNext = typeof sp.next === "string" ? sp.next : null;
   const nextPath = getSafeNextPath(rawNext);
+  const resetSuccess = sp.reset === "success";
+  const resetError = sp.error === "reset-link";
 
   return (
     <main className="min-h-screen bg-f1-black text-f1-white">
@@ -54,6 +56,16 @@ export default async function LoginPage({
               Welcome back
             </h2>
           </div>
+          {resetSuccess ? (
+            <p className="mb-5 border border-f1-border bg-f1-dark p-3 text-sm text-f1-silver" role="status">
+              Password updated. Sign in with your new password.
+            </p>
+          ) : null}
+          {resetError ? (
+            <p className="mb-5 border border-f1-red bg-f1-dark p-3 text-sm text-f1-silver" role="alert">
+              That reset link is invalid or has expired. Request a new one.
+            </p>
+          ) : null}
           <LoginForm nextPath={nextPath} />
         </section>
       </div>
