@@ -11,6 +11,7 @@ import {
   buildReserveAssignmentRows,
   checkPublishPreconditions,
   computeSessionPenaltyTotals,
+  filterPublishedResults,
   resolveStintForDate,
   validatePublishResults,
   type PenaltyEntry,
@@ -691,6 +692,56 @@ describe("publishSession — position writes are delete-then-insert per session 
     expect(insertIdx).toBeGreaterThan(-1);
     expect(deleteMatch!.index!).toBeLessThan(insertIdx);
     expect(publishServiceSource).not.toMatch(/\.from\("race_results"\)\s*\.upsert/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9c. Non-participants no longer get a phantom classified row on publish (N2
+//     — reserves/free-agents left untouched in the results step default to
+//     result_status "classified" + finishing_position null. Pre-fix, that
+//     row was published as-is, rendering "Pnull" downstream. Filtering it
+//     out here is safe: validatePublishResults already excludes it from the
+//     classified-count/duplicate-position checks, and calculateRacePoints
+//     scores it 0, so points/standings are unaffected either way.)
+// ---------------------------------------------------------------------------
+
+describe("filterPublishedResults", () => {
+  const participant: RaceResultEntry = {
+    driver_id: "d1",
+    team_id: "t1",
+    finishing_position: 3,
+    result_status: "classified",
+    fastest_lap: false,
+    manual_points_adjustment: 0,
+    raw_result: null,
+    notes: null,
+  };
+
+  const untouchedNonParticipant: RaceResultEntry = {
+    driver_id: "reserve-1",
+    team_id: "t1",
+    finishing_position: null,
+    result_status: "classified",
+    fastest_lap: false,
+    manual_points_adjustment: 0,
+    raw_result: null,
+    notes: null,
+  };
+
+  it("drops a classified row with a null finishing_position", () => {
+    expect(filterPublishedResults([participant, untouchedNonParticipant])).toEqual([
+      participant,
+    ]);
+  });
+
+  it("keeps a non-classified row with a null finishing_position (e.g. DNS)", () => {
+    const dns: RaceResultEntry = { ...untouchedNonParticipant, result_status: "dns" };
+    expect(filterPublishedResults([dns])).toEqual([dns]);
+  });
+
+  it("keeps every row when all are properly classified", () => {
+    const rows = [participant, { ...participant, driver_id: "d2", finishing_position: 4 }];
+    expect(filterPublishedResults(rows)).toEqual(rows);
   });
 });
 
