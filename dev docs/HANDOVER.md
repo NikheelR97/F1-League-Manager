@@ -453,6 +453,40 @@ Outputs (screenshots, session state) go to gitignored `.uat-artifacts/`. Credent
 
 ---
 
+## Auth URL Config Tool (scripts/set-auth-urls.mjs)
+
+Manual ops tool to configure a Supabase project's Auth **Site URL** and **redirect allowlist** (`uri_allow_list`) via the Supabase **Management API** — no dashboard login needed. Used to fix password-recovery and auth-email redirects per environment, since the app has no server-side reset trigger and relies on Supabase-issued recovery links.
+
+**Prerequisite:** Supabase personal access token exported as `SUPABASE_ACCESS_TOKEN` env var (create one at `https://supabase.com/dashboard/account/tokens`). Never commit or paste this token in chat, docs, or commits.
+
+**Usage** (run from repo root via PowerShell). Two forms — by project name (recommended) or by explicit project ref:
+
+```powershell
+$env:SUPABASE_ACCESS_TOKEN="sbp_..."
+
+# by name (auto-resolves the ref):
+node scripts/set-auth-urls.mjs --name <projectName> "<siteUrl>" "<comma,separated,redirect,allowlist>"
+
+# by ref:
+node scripts/set-auth-urls.mjs <projectRef> "<siteUrl>" "<comma,separated,redirect,allowlist>"
+```
+
+**Examples:**
+
+Staging (non-prod project):
+```powershell
+node scripts/set-auth-urls.mjs --name f1-league-manager-nonprod "https://staging.nikheelr.com" "https://staging.nikheelr.com/**,http://localhost:3000/**,https://*.vercel.app/**"
+```
+
+Production (`f1-league-manager-prod`):
+```powershell
+node scripts/set-auth-urls.mjs --name f1-league-manager-prod "https://league-manager.nikheelr.com" "https://league-manager.nikheelr.com/**"
+```
+
+On success (HTTP 200), the tool prints the applied `site_url` and `uri_allow_list`. **Important:** Production allowlist must stay strict — domain only, no localhost or Vercel preview wildcards. Not part of CI; manual ops only.
+
+---
+
 ## 1. What We Are Building
 
 We are building a web app for managing F1 esports leagues.
