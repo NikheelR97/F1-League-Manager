@@ -487,6 +487,39 @@ On success (HTTP 200), the tool prints the applied `site_url` and `uri_allow_lis
 
 ---
 
+## Vercel Domain Ops Tool (scripts/vercel-alias.mjs)
+
+Manual ops tool to point a Vercel custom domain at a deployment via the Vercel API — no dashboard login needed. Used to fix a staging or production custom domain that isn't serving the latest branch build.
+
+**Prerequisite:** Vercel access token exported as `VERCEL_TOKEN` env var (create one at `https://vercel.com/account/tokens`, scoped to the team). Never commit or paste this token in chat, docs, or commits.
+
+**Usage** (run from repo root via PowerShell). Two modes with defaults: project `f1-league-manager`, branch `staging`, domain `staging.nikheelr.com`, team slug `nikheel-rajmans-projects`.
+
+1. **One-time alias** (immediate unblock — pins the domain to the current latest READY deployment of the branch; does NOT survive the next push to the branch):
+
+```powershell
+$env:VERCEL_TOKEN="..."
+node scripts/vercel-alias.mjs [project] [branch] [domain] [teamSlug]
+```
+
+2. **Permanent branch binding** (recommended — binds the domain to the git branch so every future deployment auto-serves on it):
+
+```powershell
+node scripts/vercel-alias.mjs --assign-branch [project] [branch] [domain] [teamSlug]
+```
+
+**Verify:** After the domain update, verify the binding with:
+
+```bash
+curl -I https://<domain>/forgot-password
+```
+
+Expect HTTP 200 after the latest build is serving.
+
+**Note:** Manual ops tool, not part of CI. If a custom domain stops updating after a branch merge, the domain is usually not bound to the branch. Use mode 2 (or set it manually in Vercel → Project → Settings → Domains → Git Branch) to fix it durably.
+
+---
+
 ## 1. What We Are Building
 
 We are building a web app for managing F1 esports leagues.
