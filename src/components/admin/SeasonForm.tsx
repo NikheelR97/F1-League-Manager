@@ -18,19 +18,24 @@ const seasonSchema = z.object({
 
 type SeasonFields = z.infer<typeof seasonSchema>;
 
-export function SeasonForm() {
+interface SeasonFormProps {
+  leagueId: string;
+}
+
+export function SeasonForm({ leagueId }: SeasonFormProps) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
   const {
     formState: { errors, isSubmitting },
     handleSubmit,
     register,
+    reset,
     setError,
   } = useForm<SeasonFields>({ resolver: zodResolver(seasonSchema) });
 
   async function onSubmit(values: SeasonFields) {
     const payload = { ...values, ends_on: values.ends_on || null };
-    const res = await fetch("/api/admin/seasons", {
+    const res = await fetch(`/api/admin/leagues/${leagueId}/seasons`, {
       body: JSON.stringify(payload),
       headers: {
         "content-type": "application/json",
@@ -40,10 +45,16 @@ export function SeasonForm() {
     });
 
     if (!res.ok) {
-      setError("root", { message: "Failed to create season" });
+      const body = await res.json().catch(() => ({}));
+      const message =
+        typeof (body as { error?: unknown }).error === "string"
+          ? (body as { error: string }).error
+          : "Failed to create season.";
+      setError("root", { message });
       return;
     }
 
+    reset();
     router.refresh();
   }
 

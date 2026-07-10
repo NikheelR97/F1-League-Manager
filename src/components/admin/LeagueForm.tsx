@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import Link from "next/link";
-
 import { FormError } from "@/components/ui/FormError";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +17,6 @@ const leagueSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
   penalty_threshold: z.number().int().min(1).max(99),
   pole_position_enabled: z.boolean(),
-  season_id: z.string().uuid("Please select a season"),
   slug: z
     .string()
     .trim()
@@ -29,16 +26,7 @@ const leagueSchema = z.object({
 
 type LeagueFields = z.infer<typeof leagueSchema>;
 
-interface Season {
-  id: string;
-  name: string;
-}
-
-interface LeagueFormProps {
-  seasons: Season[];
-}
-
-export function LeagueForm({ seasons }: LeagueFormProps) {
+export function LeagueForm() {
   const router = useRouter();
   const csrfToken = useCsrfToken();
   const {
@@ -92,32 +80,10 @@ export function LeagueForm({ seasons }: LeagueFormProps) {
 
   return (
     <form className="space-y-5" noValidate onSubmit={handleSubmit(onSubmit)}>
-      {seasons.length === 0 && (
-        <p className="border border-f1-red bg-f1-dark p-3 text-sm text-f1-silver">
-          No seasons exist yet.{" "}
-          <Link className="text-f1-red underline" href="/admin/seasons">
-            Create a season first.
-          </Link>
-        </p>
-      )}
-
-      {/* Season */}
-      <div className="space-y-1">
-        <Label htmlFor="league-season">Season</Label>
-        <select
-          className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none"
-          id="league-season"
-          {...register("season_id")}
-        >
-          <option value="">Select a season…</option>
-          {seasons.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-        {errors.season_id && (
-          <p className="text-xs text-destructive">{errors.season_id.message}</p>
-        )}
-      </div>
+      <p className="border border-f1-border bg-f1-dark p-3 text-sm text-f1-silver">
+        Leagues start with no season. Once created, add &quot;Season 1&quot; on the
+        league page to start entering drivers and results.
+      </p>
 
       {/* Name */}
       <div className="space-y-1">
@@ -215,7 +181,7 @@ export function LeagueForm({ seasons }: LeagueFormProps) {
 
       <button
         className="w-full min-h-11 border border-f1-red bg-f1-red px-4 py-2 text-sm font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black disabled:opacity-50"
-        disabled={isSubmitting || seasons.length === 0}
+        disabled={isSubmitting}
         type="submit"
       >
         {isSubmitting ? "Creating…" : "Create League"}

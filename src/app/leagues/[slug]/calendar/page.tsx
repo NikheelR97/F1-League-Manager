@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar, MapPin } from "lucide-react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate } from "@/lib/format-date";
 import { pageTitle } from "@/lib/public/page-title";
@@ -33,6 +34,17 @@ export default async function LeagueCalendarPage({
 
   const league = await resolvePublicLeague(slug);
   if (!league) notFound();
+
+  if (!league.season) {
+    return (
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <EmptyState
+          message="This league doesn't have an active season yet. Check back soon."
+          title="No season yet"
+        />
+      </div>
+    );
+  }
 
   const db = createSupabaseServiceRoleClient();
 

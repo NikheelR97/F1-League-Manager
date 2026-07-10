@@ -56,4 +56,14 @@ describe("LeagueWheelHistoryPage", () => {
       screen.getByText(/randomly draws the next circuit from this league's remaining pool/i),
     ).toBeInTheDocument();
   });
+
+  it("renders an empty state instead of crashing when the league has no current season", async () => {
+    vi.mocked(resolvePublicLeague).mockResolvedValue({ ...league, season: null });
+
+    render(
+      await LeagueWheelHistoryPage({ params: Promise.resolve({ slug: "standard" }) }),
+    );
+
+    expect(screen.getByText("No season yet")).toBeInTheDocument();
+  });
 });

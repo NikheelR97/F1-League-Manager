@@ -6,7 +6,8 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { TransferForm } from "@/components/admin/TransferForm";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate } from "@/lib/format-date";
-import { MAX_DRIVERS_LIST, MAX_SEASONS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
+import { MAX_DRIVERS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
+import { getCurrentSeason } from "@/lib/leagues/get-current-season";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 const MAX_SESSIONS_LIST = 20;
@@ -21,15 +22,11 @@ export default async function NewTransferPage({
 
   const [
     { data: league, error: leagueError },
-    { data: allSeasons, error: seasonsError },
+    currentSeason,
     { data: teams, error: teamsError },
   ] = await Promise.all([
-    db.from("leagues").select("id, name, season_id").eq("id", leagueId).single(),
-    db
-      .from("seasons")
-      .select("id, is_current")
-      .order("starts_on", { ascending: false })
-      .limit(MAX_SEASONS_LIST),
+    db.from("leagues").select("id, name").eq("id", leagueId).single(),
+    getCurrentSeason(db, leagueId),
     db
       .from("teams")
       .select("id, name")
@@ -42,35 +39,34 @@ export default async function NewTransferPage({
     return <ErrorState message="Failed to load league." />;
   }
 
-  if (seasonsError || teamsError) {
+  if (teamsError) {
     return <ErrorState message="Failed to load transfer data." />;
   }
 
   if (!league) notFound();
 
-  // M8 — resolve the effective season the same way the league detail page
-  // does: current season first, falling back to the league's initial season.
-  const currentSeason = (allSeasons ?? []).find((s) => s.is_current);
-  const effectiveSeasonId = currentSeason?.id ?? league.season_id;
+  const effectiveSeasonId = currentSeason?.id ?? null;
 
-  const [{ data: entries, error: entriesError }, { data: raceSessions }] = await Promise.all([
-    db
-      .from("league_driver_entries")
-      .select("id, is_reserve, drivers(display_name), driver_team_stints(ends_on, team_id, teams(name))")
-      .eq("league_id", leagueId)
-      .eq("season_id", effectiveSeasonId)
-      .is("left_on", null)
-      .order("joined_on")
-      .limit(MAX_DRIVERS_LIST),
-    db
-      .from("race_sessions")
-      .select("id, name, scheduled_at")
-      .eq("league_id", leagueId)
-      .eq("season_id", effectiveSeasonId)
-      .eq("status", "completed")
-      .order("scheduled_at", { ascending: false })
-      .limit(MAX_SESSIONS_LIST),
-  ]);
+  const [{ data: entries, error: entriesError }, { data: raceSessions }] = effectiveSeasonId
+    ? await Promise.all([
+        db
+          .from("league_driver_entries")
+          .select("id, is_reserve, drivers(display_name), driver_team_stints(ends_on, team_id, teams(name))")
+          .eq("league_id", leagueId)
+          .eq("season_id", effectiveSeasonId)
+          .is("left_on", null)
+          .order("joined_on")
+          .limit(MAX_DRIVERS_LIST),
+        db
+          .from("race_sessions")
+          .select("id, name, scheduled_at")
+          .eq("league_id", leagueId)
+          .eq("season_id", effectiveSeasonId)
+          .eq("status", "completed")
+          .order("scheduled_at", { ascending: false })
+          .limit(MAX_SESSIONS_LIST),
+      ])
+    : [{ data: [], error: null }, { data: [] }];
 
   if (entriesError) {
     return <ErrorState message="Failed to load transfer data." />;
@@ -125,12 +121,18 @@ export default async function NewTransferPage({
         title="Record Transfer"
       />
       <div className="max-w-xl">
-        <TransferForm
-          drivers={drivers}
-          leagueId={leagueId}
-          sessions={sessions}
-          teams={teamsWithCounts}
-        />
+        {effectiveSeasonId ? (
+          <TransferForm
+            drivers={drivers}
+            leagueId={leagueId}
+            sessions={sessions}
+            teams={teamsWithCounts}
+          />
+        ) : (
+          <p className="text-sm text-f1-muted">
+            This league has no current season yet — create one before recording transfers.
+          </p>
+        )}
       </div>
     </div>
   );
