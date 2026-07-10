@@ -22,9 +22,9 @@ const leagueSlug = `e2e-points-league-${runId}`;
 const pointsSystemName = `E2E Points System ${runId}`;
 
 test("admin can create a points system for a league", async ({ page }) => {
-  // Create a fresh league to attach the points system to.
+  // Create a fresh league to attach the points system to. Points systems are
+  // league-scoped only (no season dependency), so no season needs to exist.
   await page.goto("/admin/leagues/new");
-  await page.getByLabel("Season").selectOption({ label: "2025 Season" });
   await page.getByLabel("Name").fill(leagueName);
   await page.getByLabel("Slug").fill(leagueSlug);
   await page.getByRole("button", { name: "Create League" }).click();

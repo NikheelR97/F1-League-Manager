@@ -18,7 +18,7 @@ export default async function ImportPage() {
         .limit(MAX_LEAGUES_LIST),
       db
         .from("seasons")
-        .select("id, name, starts_on, is_current, is_archived")
+        .select("id, name, starts_on, is_current, is_archived, league_id")
         .order("starts_on", { ascending: false })
         .limit(MAX_SEASONS_LIST),
     ]);

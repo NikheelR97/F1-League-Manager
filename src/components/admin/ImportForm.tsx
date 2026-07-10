@@ -22,6 +22,7 @@ interface Season {
   starts_on: string;
   is_current: boolean;
   is_archived: boolean;
+  league_id: string;
 }
 
 interface ImportFormProps {
@@ -42,8 +43,14 @@ export function ImportForm({ leagues, seasons }: ImportFormProps) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [leagueId, setLeagueId] = useState(leagues[0]?.id ?? "");
-  const [seasonId, setSeasonId] = useState(seasons[0]?.id ?? "");
+  const seasonsForLeague = seasons.filter((s) => s.league_id === leagueId);
+  const [seasonId, setSeasonId] = useState(seasonsForLeague[0]?.id ?? "");
   const [state, setState] = useState<UploadState>({ phase: "idle" });
+
+  function handleLeagueChange(newLeagueId: string) {
+    setLeagueId(newLeagueId);
+    setSeasonId(seasons.find((s) => s.league_id === newLeagueId)?.id ?? "");
+  }
 
   async function handleUpload(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -152,7 +159,7 @@ export function ImportForm({ leagues, seasons }: ImportFormProps) {
               disabled={busy}
               id="import-league"
               value={leagueId}
-              onChange={(e) => setLeagueId(e.target.value)}
+              onChange={(e) => handleLeagueChange(e.target.value)}
             >
               {leagues.map((l) => (
                 <option key={l.id} value={l.id}>
@@ -172,7 +179,7 @@ export function ImportForm({ leagues, seasons }: ImportFormProps) {
               value={seasonId}
               onChange={(e) => setSeasonId(e.target.value)}
             >
-              {seasons.map((s) => (
+              {seasonsForLeague.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                   {s.is_current ? " (current)" : ""}
@@ -249,8 +256,8 @@ export function ImportForm({ leagues, seasons }: ImportFormProps) {
           <p>
             Import confirmed. This season is now locked against re-import. Penalty totals are not yet
             updated for this season — run Carry-Over on{" "}
-            <Link className="underline" href={`/admin/seasons/${seasonId}`}>
-              the Season page
+            <Link className="underline" href={`/admin/leagues/${leagueId}`}>
+              the League page
             </Link>{" "}
             before relying on ban alerts.
           </p>

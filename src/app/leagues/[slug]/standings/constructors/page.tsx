@@ -50,7 +50,7 @@ const UUID_RE =
 async function getConstructorStandingsData(
   leagueId: string,
   seasonId: string,
-  fallbackSeason: LeagueSeason,
+  fallbackSeason: LeagueSeason | null,
 ) {
   const db = createSupabaseServiceRoleClient();
 
@@ -95,7 +95,18 @@ export default async function ConstructorStandingsPage({
 
   const rawSeason = typeof sp.season === "string" ? sp.season : null;
   const seasonId =
-    rawSeason && UUID_RE.test(rawSeason) ? rawSeason : league.season.id;
+    rawSeason && UUID_RE.test(rawSeason) ? rawSeason : league.season?.id;
+
+  if (!seasonId) {
+    return (
+      <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <EmptyState
+          message="This league doesn't have an active season yet. Check back soon."
+          title="No season yet"
+        />
+      </div>
+    );
+  }
 
   const getCachedConstructorStandings = unstable_cache(
     getConstructorStandingsData,
@@ -117,7 +128,7 @@ export default async function ConstructorStandingsPage({
   const updatedAt = standings[0]?.updated_at ?? null;
 
   const displaySeason =
-    seasons.find((s) => s.id === seasonId)?.name ?? league.season.name;
+    seasons.find((s) => s.id === seasonId)?.name ?? league.season?.name ?? "";
 
   type TeamRow = { id: string; name: string; color_hex: string };
 

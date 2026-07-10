@@ -230,6 +230,13 @@ describe("S9 import service", () => {
     // The bound is in the parser but the service respects the parsed list
     expect(workbookParser).toContain("MAX_WORKBOOK_DRIVERS");
   });
+
+  it("validates the target season belongs to the target league before importing", () => {
+    // seasons.league_id is the FK backstop; runImport gives a clean error
+    // instead of relying on a constraint-violation 500 later in the import.
+    expect(importService).toContain('.eq("id", seasonId).eq("league_id", leagueId)');
+    expect(importService).toContain("Season not found for this league");
+  });
 });
 
 // ---------------------------------------------------------------------------

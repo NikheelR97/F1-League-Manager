@@ -3,21 +3,22 @@
 -- Run after `supabase db reset` or `supabase migration up`.
 
 -- ============================================================
--- Season
--- ============================================================
-insert into public.seasons (id, name, starts_on, ends_on, is_current) values
-  ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '2025 Season', '2025-03-01', '2025-12-31', true);
-
--- ============================================================
 -- Leagues
 -- ============================================================
 insert into public.leagues
-  (id, name, slug, format, status, season_id, fastest_lap_enabled, pole_position_enabled, constructor_championship_enabled, penalty_threshold)
+  (id, name, slug, format, status, fastest_lap_enabled, pole_position_enabled, constructor_championship_enabled, penalty_threshold)
 values
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Informal League', 'informal', 'informal', 'active',
-   'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', true, false, false, 12),
+   true, false, false, 12),
   ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'Standard League', 'standard', 'standard', 'active',
-   'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', true, false, true, 12);
+   true, false, true, 12);
+
+-- ============================================================
+-- Seasons — one per league (seasons are league-owned)
+-- ============================================================
+insert into public.seasons (id, name, starts_on, ends_on, is_current, league_id) values
+  ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '2025 Season', '2025-03-01', '2025-12-31', true, 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'),
+  ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', '2025 Season', '2025-03-01', '2025-12-31', true, 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12');
 
 -- ============================================================
 -- Points systems
@@ -101,16 +102,16 @@ insert into public.league_driver_entries (id, league_id, season_id, driver_id, i
 
 -- Standard League
 insert into public.league_driver_entries (id, league_id, season_id, driver_id, is_reserve, joined_on) values
-  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', false, '2025-03-01'),
-  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', false, '2025-03-01'),
-  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23', false, '2025-03-01'),
-  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a24', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a24', false, '2025-03-01'),
-  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a25', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a25', false, '2025-03-01'),
-  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a26', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a26', false, '2025-03-01'),
-  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a27', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a27', false, '2025-03-01'),
-  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a28', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a28', false, '2025-03-01'),
-  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a29', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a29', false, '2025-03-01'),
-  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a30', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a30', false, '2025-03-01');
+  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', false, '2025-03-01'),
+  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', false, '2025-03-01'),
+  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23', false, '2025-03-01'),
+  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a24', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a24', false, '2025-03-01'),
+  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a25', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a25', false, '2025-03-01'),
+  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a26', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a26', false, '2025-03-01'),
+  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a27', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a27', false, '2025-03-01'),
+  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a28', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a28', false, '2025-03-01'),
+  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a29', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a29', false, '2025-03-01'),
+  ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a30', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a30', false, '2025-03-01');
 
 -- ============================================================
 -- Driver team stints (2 drivers per team, starts 2025-03-01)
@@ -184,14 +185,14 @@ insert into public.race_sessions
 values
   ('09eebc99-9c0b-4ef8-bb6d-6bb9bd380a21',
    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
-   'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+   'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    (select id from public.circuits where slug = 'suzuka'),
    'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'Round 1 — Japan', 'STDRD1', 1, 50,
    '2025-04-06 05:00:00+00', 'completed', '2025-04-06 08:00:00+00'),
   ('09eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
-   'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+   'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    (select id from public.circuits where slug = 'shanghai'),
    'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'Round 2 — China', 'STDRD2', 1, 50,
@@ -250,43 +251,43 @@ insert into public.driver_standings
   (league_id, season_id, driver_id, team_id, position, previous_position, total_points, wins, podiums, fastest_laps)
 values
   -- 1st: Viktor Petrov (Alpine Ace, 25 pts + FL) — up from 2nd last round
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21',
    1, 2, 26, 1, 1, 1),
   -- 2nd: Lucas Santos (Grid Warrior, 18 pts) — down from 1st last round
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
    2, 1, 18, 0, 1, 0),
   -- 3rd: Nadia Laurent (Apex Chasers, 15 pts)
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a25', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23',
    3, null, 15, 0, 1, 0),
   -- 4th: Oliver Schmidt (Pit Stop Kings, 12 pts) — up from 5th last round
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a27', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a24',
    4, 5, 12, 0, 0, 0),
   -- 5th: Ryan McAllister (Tarmac Beasts, 10 pts) — down from 4th last round
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a29', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a25',
    5, 4, 10, 0, 0, 0),
   -- 6th: Amir Hassan (Alpine Ace, 8 pts)
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21',
    6, null, 8, 0, 0, 0),
   -- 7th: Ethan Brooks (Grid Warrior, 6 pts)
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a24', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
    7, null, 6, 0, 0, 0),
   -- 8th: Ji-ho Choi (Apex Chasers, 4 pts)
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a26', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23',
    8, null, 4, 0, 0, 0),
   -- 9th: Isabella Costa (Pit Stop Kings, 2 pts)
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a28', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a24',
    9, null, 2, 0, 0, 0),
   -- 10th: Elena Volkova (Tarmac Beasts, 1 pt)
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a30', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a25',
    10, null, 1, 0, 0, 0);
 
@@ -297,13 +298,13 @@ values
 insert into public.team_standings
   (league_id, season_id, team_id, position, previous_position, total_points, wins, podiums)
 values
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 1, 2, 34, 1, 1),  -- Alpine Ace (26 + 8) — up from 2nd last round
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 2, 1, 24, 0, 1),  -- Grid Warrior (18 + 6) — down from 1st last round
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a23', 3, null, 19, 0, 1),  -- Apex Chasers (15 + 4)
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a24', 4, null, 14, 0, 0),  -- Pit Stop Kings (12 + 2)
-  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+  ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a25', 5, null, 11, 0, 0);  -- Tarmac Beasts (10 + 1)

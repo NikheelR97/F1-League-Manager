@@ -12,7 +12,6 @@ const createLeagueSchema = z.object({
   name: z.string().trim().min(1).max(100),
   penalty_threshold: z.number().int().min(1).max(99).default(12),
   pole_position_enabled: z.boolean().default(false),
-  season_id: z.string().uuid(),
   slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
     message: "Slug must be lowercase letters, numbers, and hyphens only",
   }),
@@ -21,9 +20,14 @@ const createLeagueSchema = z.object({
 export async function GET(req: NextRequest) {
   return withAdminGuard(req, async () => {
     const db = createSupabaseServiceRoleClient();
+    // leagues.season_id was dropped (seasons now belong to leagues, not the
+    // other way round) — a league's current season is the one row in its
+    // seasons list with is_current = true, so pull the whole (small) list
+    // and let the caller pick it out. Leagues can legitimately have zero
+    // seasons (brand new, nothing created yet).
     const { data, error } = await db
       .from("leagues")
-      .select("id, name, slug, format, status, season_id, seasons(name)")
+      .select("id, name, slug, format, status, seasons(id, name, is_current)")
       .order("created_at", { ascending: false })
       .limit(MAX_LEAGUES_LIST);
 

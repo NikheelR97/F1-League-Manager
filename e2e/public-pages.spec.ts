@@ -15,7 +15,6 @@ import { ADMIN_STORAGE_STATE } from "../playwright.config";
 test.use({ storageState: ADMIN_STORAGE_STATE });
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:3000";
-const SEASON_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"; // 2025 Season (seed.sql)
 const MOBILE_VIEWPORT = { height: 800, width: 375 };
 
 async function csrfHeaders(request: APIRequestContext) {
@@ -44,7 +43,6 @@ test("T17: freshly created league with no sessions shows empty states, not crash
       name: `E2E Empty League ${runId}`,
       slug: `e2e-empty-league-${runId}`,
       format: "informal",
-      season_id: SEASON_ID,
     },
   });
   expect(leagueRes.status()).toBe(201);
@@ -55,6 +53,16 @@ test("T17: freshly created league with no sessions shows empty states, not crash
     data: { status: "active" },
   });
   expect(activateRes.status()).toBe(200);
+
+  // A brand-new league has zero seasons, which would make the public pages
+  // below render their "No season yet" branch instead of the empty-state
+  // messages this test actually asserts — create the first season (auto-
+  // current) so the "has a season but no data" empty states are exercised.
+  const seasonRes = await request.post(`/api/admin/leagues/${league.id}/seasons`, {
+    headers,
+    data: { name: "Season 1", starts_on: "2025-01-01" },
+  });
+  expect(seasonRes.status()).toBe(201);
 
   const slug = league.slug;
 

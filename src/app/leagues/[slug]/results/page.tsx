@@ -43,7 +43,18 @@ export default async function ResultsIndexPage({
 
   const rawSeason = typeof sp.season === "string" ? sp.season : null;
   const seasonId =
-    rawSeason && UUID_RE.test(rawSeason) ? rawSeason : league.season.id;
+    rawSeason && UUID_RE.test(rawSeason) ? rawSeason : league.season?.id;
+
+  if (!seasonId) {
+    return (
+      <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <EmptyState
+          message="This league doesn't have an active season yet. Check back soon."
+          title="No season yet"
+        />
+      </div>
+    );
+  }
 
   const db = createSupabaseServiceRoleClient();
 
@@ -64,7 +75,7 @@ export default async function ResultsIndexPage({
   const results = sessions ?? [];
   const lastSession = results[0];
   const displaySeason =
-    seasons.find((s) => s.id === seasonId)?.name ?? league.season.name;
+    seasons.find((s) => s.id === seasonId)?.name ?? league.season?.name ?? "";
 
   type Circuit = { name: string; country: string; grand_prix_name: string; round_number: number | null };
 

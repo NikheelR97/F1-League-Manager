@@ -3,6 +3,7 @@ import { type NextRequest } from "next/server";
 
 import { cacheTag } from "@/lib/cache/tags";
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
+import { getCurrentSeason } from "@/lib/leagues/get-current-season";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import { selectWheelCircuit } from "@/lib/wheel/wheel-service";
 
@@ -16,12 +17,20 @@ export async function POST(
 
     const { data: league, error: leagueError } = await db
       .from("leagues")
-      .select("id, season_id")
+      .select("id")
       .eq("id", leagueId)
-      .single();
+      .maybeSingle();
 
     if (leagueError || !league) {
       return Response.json({ error: "League not found" }, { status: 404 });
+    }
+
+    const currentSeason = await getCurrentSeason(db, leagueId);
+    if (!currentSeason) {
+      return Response.json(
+        { error: "League has no current season — create one first." },
+        { status: 409 },
+      );
     }
 
     // Check if there's already a pending spin
@@ -55,7 +64,7 @@ export async function POST(
       .from("wheel_spins")
       .insert({
         league_id: leagueId,
-        season_id: league.season_id,
+        season_id: currentSeason.id,
         circuit_id: chosen.circuit_id,
         status: "pending",
         spun_by: auth.user.id,

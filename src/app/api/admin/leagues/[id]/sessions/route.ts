@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { cacheTag } from "@/lib/cache/tags";
+import { getCurrentSeason } from "@/lib/leagues/get-current-season";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import { validateWheelConfirmation } from "@/lib/wheel/wheel-service";
 
@@ -50,11 +51,19 @@ export async function POST(
 
     const { data: league } = await db
       .from("leagues")
-      .select("id, season_id")
+      .select("id")
       .eq("id", leagueId)
-      .single();
+      .maybeSingle();
 
     if (!league) return Response.json({ error: "League not found" }, { status: 404 });
+
+    const currentSeason = await getCurrentSeason(db, leagueId);
+    if (!currentSeason) {
+      return Response.json(
+        { error: "League has no current season — create one first." },
+        { status: 409 },
+      );
+    }
 
     let body: z.infer<typeof createSessionSchema>;
     try {
@@ -72,7 +81,7 @@ export async function POST(
         .select("status, circuit_id")
         .eq("id", body.wheel_spin_id)
         .eq("league_id", leagueId)
-        .eq("season_id", league.season_id)
+        .eq("season_id", currentSeason.id)
         .single();
         
       if (spinError && spinError.code !== "PGRST116") {
@@ -107,7 +116,7 @@ export async function POST(
           target_race_length_percent: body.race_length_percent,
           target_race_number: body.race_number,
           target_scheduled_at: body.scheduled_at,
-          target_season_id: league.season_id,
+          target_season_id: currentSeason.id,
           target_session_code: body.session_code,
           target_wheel_spin_id: body.wheel_spin_id,
         });
@@ -154,7 +163,7 @@ export async function POST(
         race_length_percent: body.race_length_percent,
         race_number: body.race_number,
         scheduled_at: body.scheduled_at,
-        season_id: league.season_id,
+        season_id: currentSeason.id,
         session_code: body.session_code,
       })
       .select("id, name, session_code")

@@ -140,7 +140,7 @@ export function LeagueHub({
             {league.status}
           </StatusPill>
           <h1>{league.name}</h1>
-          <p className="text-sm text-f1-muted">{league.season.name}</p>
+          <p className="text-sm text-f1-muted">{league.season?.name}</p>
           {nextRace && nextRaceIsPast ? (
             <p className="font-mono text-sm text-f1-muted">{formatDate(nextRace.scheduled_at)}</p>
           ) : (
@@ -152,7 +152,7 @@ export function LeagueHub({
       <div className="mx-auto w-full max-w-7xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center gap-4 border-b border-f1-border pb-4 text-xs text-f1-muted">
           <span className="font-bold uppercase text-f1-white">{league.name}</span>
-          <span>{league.season.name}</span>
+          <span>{league.season?.name}</span>
           {latestSession && (
             <Link
               className="inline-flex items-center min-h-11 text-f1-white underline-offset-2 hover:text-f1-red hover:underline"

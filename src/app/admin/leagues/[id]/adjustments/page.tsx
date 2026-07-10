@@ -8,7 +8,8 @@ import { AdjustmentForm } from "@/components/admin/AdjustmentForm";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate } from "@/lib/format-date";
-import { MAX_DRIVERS_LIST, MAX_SEASONS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
+import { MAX_DRIVERS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
+import { getCurrentSeason } from "@/lib/leagues/get-current-season";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 const MAX_ADJUSTMENTS_LIST = 100;
@@ -21,60 +22,52 @@ export default async function LeagueAdjustmentsPage({
   const { id: leagueId } = await params;
   const db = createSupabaseServiceRoleClient();
 
-  const [{ data: league, error: leagueError }, { data: allSeasons, error: seasonsError }] =
+  const [{ data: league, error: leagueError }, currentSeason, { data: teams, error: teamsError }] =
     await Promise.all([
-      db.from("leagues").select("id, name, season_id").eq("id", leagueId).single(),
+      db.from("leagues").select("id, name").eq("id", leagueId).single(),
+      getCurrentSeason(db, leagueId),
       db
-        .from("seasons")
-        .select("id, is_current")
-        .order("starts_on", { ascending: false })
-        .limit(MAX_SEASONS_LIST),
+        .from("teams")
+        .select("id, name")
+        .eq("league_id", leagueId)
+        .order("name")
+        .limit(MAX_TEAMS_PER_LEAGUE),
     ]);
 
   if (leagueError && leagueError.code !== "PGRST116") {
     return <ErrorState message="Failed to load league." />;
   }
-  if (seasonsError) {
-    return <ErrorState message="Failed to load seasons." />;
+  if (teamsError) {
+    return <ErrorState message="Failed to load teams." />;
   }
   if (!league) notFound();
 
-  // M8 — resolve the effective season the same way transfers/new does:
-  // current season first, falling back to the league's initial season.
-  const currentSeason = (allSeasons ?? []).find((s) => s.is_current);
-  const effectiveSeasonId = currentSeason?.id ?? league.season_id;
+  const effectiveSeasonId = currentSeason?.id ?? null;
 
-  const [
-    { data: entries, error: entriesError },
-    { data: teams, error: teamsError },
-    { data: adjustments, error: adjustmentsError },
-  ] = await Promise.all([
-    db
-      .from("league_driver_entries")
-      .select("driver_id, drivers(display_name)")
-      .eq("league_id", leagueId)
-      .eq("season_id", effectiveSeasonId)
-      .is("left_on", null)
-      .order("joined_on")
-      .limit(MAX_DRIVERS_LIST),
-    db
-      .from("teams")
-      .select("id, name")
-      .eq("league_id", leagueId)
-      .order("name")
-      .limit(MAX_TEAMS_PER_LEAGUE),
-    db
-      .from("championship_adjustments")
-      .select(
-        "id, adjustment_kind, points_delta, reason, created_at, driver_id, team_id, drivers(display_name), teams(name)",
-      )
-      .eq("league_id", leagueId)
-      .eq("season_id", effectiveSeasonId)
-      .order("created_at", { ascending: false })
-      .limit(MAX_ADJUSTMENTS_LIST),
-  ]);
+  const [{ data: entries, error: entriesError }, { data: adjustments, error: adjustmentsError }] =
+    effectiveSeasonId
+      ? await Promise.all([
+          db
+            .from("league_driver_entries")
+            .select("driver_id, drivers(display_name)")
+            .eq("league_id", leagueId)
+            .eq("season_id", effectiveSeasonId)
+            .is("left_on", null)
+            .order("joined_on")
+            .limit(MAX_DRIVERS_LIST),
+          db
+            .from("championship_adjustments")
+            .select(
+              "id, adjustment_kind, points_delta, reason, created_at, driver_id, team_id, drivers(display_name), teams(name)",
+            )
+            .eq("league_id", leagueId)
+            .eq("season_id", effectiveSeasonId)
+            .order("created_at", { ascending: false })
+            .limit(MAX_ADJUSTMENTS_LIST),
+        ])
+      : [{ data: [], error: null }, { data: [], error: null }];
 
-  if (entriesError || teamsError || adjustmentsError) {
+  if (entriesError || adjustmentsError) {
     return <ErrorState message="Failed to load adjustment data." />;
   }
 
@@ -157,7 +150,13 @@ export default async function LeagueAdjustmentsPage({
         </div>
 
         <div>
-          <AdjustmentForm leagueId={leagueId} seasonId={effectiveSeasonId} targets={targets} />
+          {effectiveSeasonId ? (
+            <AdjustmentForm leagueId={leagueId} seasonId={effectiveSeasonId} targets={targets} />
+          ) : (
+            <p className="text-sm text-f1-muted">
+              This league has no current season yet — create one before recording adjustments.
+            </p>
+          )}
         </div>
       </div>
     </div>

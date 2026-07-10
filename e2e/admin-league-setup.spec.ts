@@ -32,8 +32,7 @@ test.describe.serial("Admin league setup flow", () => {
       page.getByRole("heading", { name: "New League" }),
     ).toBeVisible();
 
-    // Fill in the form
-    await page.getByLabel("Season").selectOption({ label: "2025 Season" });
+    // Leagues start with zero seasons — no season picker on this form anymore.
     await page.getByLabel("Name").fill(leagueName);
     await page.getByLabel("Slug").fill(leagueSlug);
 
@@ -46,11 +45,36 @@ test.describe.serial("Admin league setup flow", () => {
     await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
   });
 
+  test("admin can create the first season for the league", async ({ page }) => {
+    await page.goto(createdLeagueUrl);
+
+    // Brand-new league has zero seasons — the season section shows the
+    // "create the first one" empty state and the SeasonForm.
+    await expect(
+      page.getByRole("heading", { name: "Create the First Season" }),
+    ).toBeVisible();
+
+    await page.getByLabel("Name").fill("Season 1");
+    await page.getByLabel("Start Date").fill("2025-01-01");
+    await page.getByRole("button", { name: "Create Season" }).click();
+
+    // A league's first season is auto-marked current (SeasonForm route logic).
+    // Exact match: "Season 1" also appears in the page-header subtitle
+    // ("<format> · Season 1"), so scope to the season-list item.
+    await expect(page.getByText("Season 1", { exact: true })).toBeVisible();
+    await expect(page.getByText("Current")).toBeVisible();
+  });
+
   test("admin can add a team to a league", async ({ page }) => {
     await page.goto(createdLeagueUrl);
 
     // Add a team
     await page.getByRole("link", { name: /Add Team/i }).click();
+
+    // Wait for the New Team page to mount before filling. The league detail
+    // page also has a "Name" field (the create-season form), so filling before
+    // navigation completes can target the wrong, unmounting input.
+    await expect(page.getByRole("heading", { name: "New Team" })).toBeVisible();
 
     await page.getByLabel("Name").fill(teamName);
     await page.getByRole("button", { name: "Create Team" }).click();
