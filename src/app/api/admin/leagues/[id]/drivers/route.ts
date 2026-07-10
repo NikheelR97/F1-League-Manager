@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { MAX_DRIVERS_LIST, MAX_PRIMARY_DRIVERS_PER_TEAM } from "@/lib/constants";
+import { getCurrentSeason } from "@/lib/leagues/get-current-season";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 const addDriverSchema = z.object({
@@ -110,18 +111,12 @@ export async function POST(
     }
 
     // Fetch the current season for this league
-    const { data: league, error: leagueError } = await db
-      .from("leagues")
-      .select("season_id")
-      .eq("id", leagueId)
-      .single();
-
-    if (leagueError && leagueError.code !== "PGRST116") {
-      return Response.json({ error: "Failed to load league" }, { status: 500 });
-    }
-
-    if (!league?.season_id) {
-      return Response.json({ error: "League has no season" }, { status: 422 });
+    const currentSeason = await getCurrentSeason(db, leagueId);
+    if (!currentSeason) {
+      return Response.json(
+        { error: "League has no current season — create one first." },
+        { status: 409 },
+      );
     }
 
     // Check driver isn't already active in this league
@@ -150,7 +145,7 @@ export async function POST(
         is_reserve,
         joined_on,
         league_id: leagueId,
-        season_id: league.season_id,
+        season_id: currentSeason.id,
       })
       .select("id")
       .single();

@@ -48,7 +48,7 @@ const UUID_RE =
 async function getDriverStandingsData(
   leagueId: string,
   seasonId: string,
-  fallbackSeason: LeagueSeason,
+  fallbackSeason: LeagueSeason | null,
 ) {
   const db = createSupabaseServiceRoleClient();
 
@@ -92,7 +92,18 @@ export default async function DriverStandingsPage({
   // Resolve the requested season — fall back to the league's current season
   const rawSeason = typeof sp.season === "string" ? sp.season : null;
   const seasonId =
-    rawSeason && UUID_RE.test(rawSeason) ? rawSeason : league.season.id;
+    rawSeason && UUID_RE.test(rawSeason) ? rawSeason : league.season?.id;
+
+  if (!seasonId) {
+    return (
+      <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <EmptyState
+          message="This league doesn't have an active season yet. Check back soon."
+          title="No season yet"
+        />
+      </div>
+    );
+  }
 
   const getCachedDriverStandings = unstable_cache(
     getDriverStandingsData,
@@ -113,7 +124,7 @@ export default async function DriverStandingsPage({
   const leaderPoints = standings[0]?.total_points ?? 0;
   const updatedAt = standings[0]?.updated_at ?? null;
   const displaySeason =
-    seasons.find((s) => s.id === seasonId)?.name ?? league.season.name;
+    seasons.find((s) => s.id === seasonId)?.name ?? league.season?.name ?? "";
 
   type DriverRow = { id: string; display_name: string; racing_number: number | null };
   type TeamRow = { id: string; name: string; color_hex: string };

@@ -6,10 +6,14 @@ import { Pencil, Plus } from "lucide-react";
 import { z } from "zod";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { CarryOverForm } from "@/components/admin/CarryOverForm";
 import { LeagueAssetUpload } from "@/components/admin/LeagueAssetUpload";
 import { LeagueStatusButton } from "@/components/admin/LeagueStatusButton";
+import { SeasonActions } from "@/components/admin/SeasonActions";
+import { SeasonForm } from "@/components/admin/SeasonForm";
 import { SeasonSelector } from "@/components/admin/SeasonSelector";
 import { SessionDeleteButton } from "@/components/admin/SessionDeleteButton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { MAX_DRIVERS_LIST, MAX_SEASONS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -42,12 +46,13 @@ export default async function LeagueDetailPage({
   ] = await Promise.all([
     db
       .from("leagues")
-      .select("id, name, slug, format, status, fastest_lap_enabled, pole_position_enabled, constructor_championship_enabled, penalty_threshold, season_id, seasons(name)")
+      .select("id, name, slug, format, status, fastest_lap_enabled, pole_position_enabled, constructor_championship_enabled, penalty_threshold")
       .eq("id", leagueId)
       .single(),
     db
       .from("seasons")
-      .select("id, name, is_current, is_archived, starts_on")
+      .select("id, name, starts_on, ends_on, is_current, is_archived")
+      .eq("league_id", leagueId)
       .order("starts_on", { ascending: false })
       .limit(MAX_SEASONS_LIST),
     db
@@ -72,55 +77,54 @@ export default async function LeagueDetailPage({
   if (!league) notFound();
 
   // Resolve which season to display. Priority:
-  // 1. Valid season_id from URL param
-  // 2. The current season (is_current = true)
-  // 3. The league's own initial season_id
+  // 1. Valid season_id from URL param (must belong to this league)
+  // 2. The league's current season (is_current = true)
+  // A brand-new league has zero seasons — effectiveSeasonId is then null and
+  // season-scoped sections below degrade to their empty states.
   const seasons = allSeasons ?? [];
   const currentSeason = seasons.find((s) => s.is_current);
   const effectiveSeasonId =
-    (seasonIdParam && seasons.some((s) => s.id === seasonIdParam)
-      ? seasonIdParam
-      : null) ??
+    (seasonIdParam && seasons.some((s) => s.id === seasonIdParam) ? seasonIdParam : null) ??
     currentSeason?.id ??
-    league.season_id;
+    null;
 
   const [{ data: entries, error: entriesError }, { data: sessions }, { data: banWatch }] =
-    await Promise.all([
-      db
-        .from("league_driver_entries")
-        .select("id, is_reserve, drivers(display_name, racing_number), driver_team_stints(team_id, ends_on, teams(name, color_hex))")
-        .eq("league_id", leagueId)
-        .eq("season_id", effectiveSeasonId)
-        .is("left_on", null)
-        .order("joined_on")
-        .limit(MAX_DRIVERS_LIST),
-      db
-        .from("race_sessions")
-        .select("id, name, session_code, scheduled_at, status, circuits(name, country)")
-        .eq("league_id", leagueId)
-        .eq("season_id", effectiveSeasonId)
-        .order("scheduled_at", { ascending: false })
-        .limit(MAX_SESSIONS_LIST),
-      // Mirrors the public hub's penalty-watch query (driver_penalty_totals,
-      // ban_threshold_reached) so admin and public never disagree — see B2/B12.
-      db
-        .from("driver_penalty_totals")
-        .select("driver_id, penalty_points, drivers(display_name)")
-        .eq("league_id", leagueId)
-        .eq("season_id", effectiveSeasonId)
-        .eq("ban_threshold_reached", true)
-        .order("penalty_points", { ascending: false })
-        .limit(10),
-    ]);
+    effectiveSeasonId
+      ? await Promise.all([
+          db
+            .from("league_driver_entries")
+            .select("id, is_reserve, drivers(display_name, racing_number), driver_team_stints(team_id, ends_on, teams(name, color_hex))")
+            .eq("league_id", leagueId)
+            .eq("season_id", effectiveSeasonId)
+            .is("left_on", null)
+            .order("joined_on")
+            .limit(MAX_DRIVERS_LIST),
+          db
+            .from("race_sessions")
+            .select("id, name, session_code, scheduled_at, status, circuits(name, country)")
+            .eq("league_id", leagueId)
+            .eq("season_id", effectiveSeasonId)
+            .order("scheduled_at", { ascending: false })
+            .limit(MAX_SESSIONS_LIST),
+          // Mirrors the public hub's penalty-watch query (driver_penalty_totals,
+          // ban_threshold_reached) so admin and public never disagree — see B2/B12.
+          db
+            .from("driver_penalty_totals")
+            .select("driver_id, penalty_points, drivers(display_name)")
+            .eq("league_id", leagueId)
+            .eq("season_id", effectiveSeasonId)
+            .eq("ban_threshold_reached", true)
+            .order("penalty_points", { ascending: false })
+            .limit(10),
+        ])
+      : [{ data: [], error: null }, { data: [] }, { data: [] }];
 
   if (entriesError) {
     return <ErrorState message="Failed to load league management data." />;
   }
 
   const effectiveSeasonName =
-    seasons.find((s) => s.id === effectiveSeasonId)?.name ??
-    (league.seasons as unknown as { name: string } | null)?.name ??
-    "—";
+    seasons.find((s) => s.id === effectiveSeasonId)?.name ?? "No season yet";
 
   return (
     <div className="space-y-8">
@@ -139,7 +143,7 @@ export default async function LeagueDetailPage({
           >
             {league.status}
           </span>
-          <SeasonSelector seasons={seasons} selectedSeasonId={effectiveSeasonId} />
+          <SeasonSelector seasons={seasons} selectedSeasonId={effectiveSeasonId ?? ""} />
           <LeagueStatusButton currentStatus={league.status} leagueId={leagueId} />
         </div>
       </div>
@@ -165,6 +169,69 @@ export default async function LeagueDetailPage({
               .filter(Boolean)
               .join(" · ") || "None"}
           </p>
+        </div>
+      </section>
+
+      {/* Seasons */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-bold uppercase text-f1-muted">
+          Seasons ({seasons.length})
+        </h2>
+
+        {!seasons.length ? (
+          <EmptyState
+            message="Create the first season below to start adding drivers, teams, and race results."
+            title="Create the First Season"
+          />
+        ) : (
+          <ul className="space-y-2">
+            {seasons.map((season) => (
+              <li key={season.id}>
+                <div className="space-y-3 border border-f1-border bg-f1-dark p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-bold text-f1-white">{season.name}</p>
+                      <p className="font-mono text-xs text-f1-muted">
+                        {season.starts_on}
+                        {season.ends_on ? ` → ${season.ends_on}` : " → ongoing"}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {season.is_current && (
+                        <span className="border border-f1-red px-2 py-0.5 text-xs font-bold uppercase text-f1-red-text">
+                          Current
+                        </span>
+                      )}
+                      {season.is_archived && (
+                        <span className="border border-f1-border px-2 py-0.5 text-xs font-bold uppercase text-f1-muted">
+                          Archived
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <SeasonActions
+                    isArchived={season.is_archived}
+                    isCurrent={season.is_current}
+                    leagueId={leagueId}
+                    seasonId={season.id}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold uppercase text-f1-muted">New Season</h3>
+            <SeasonForm leagueId={leagueId} />
+          </div>
+          {seasons.length > 1 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase text-f1-muted">Carry-Over</h3>
+              <CarryOverForm leagueId={leagueId} seasons={seasons} />
+            </div>
+          )}
         </div>
       </section>
 
@@ -231,7 +298,9 @@ export default async function LeagueDetailPage({
             </Link>
           </div>
         </div>
-        {!sessions?.length ? (
+        {!effectiveSeasonId ? (
+          <p className="text-sm text-f1-muted">Create a season first to schedule race sessions.</p>
+        ) : !sessions?.length ? (
           <p className="text-sm text-f1-muted">No sessions yet. Add one to start entering results.</p>
         ) : (
           <ul className="space-y-2">
@@ -398,7 +467,9 @@ export default async function LeagueDetailPage({
           </div>
         </div>
 
-        {!entries?.length ? (
+        {!effectiveSeasonId ? (
+          <p className="text-sm text-f1-muted">Create a season first to add drivers.</p>
+        ) : !entries?.length ? (
           <p className="text-sm text-f1-muted">No drivers assigned yet.</p>
         ) : (
           <ul className="space-y-2">

@@ -12,7 +12,7 @@ export default async function LeaguesPage() {
   const db = createSupabaseServiceRoleClient();
   const { data: leagues, error: leaguesError } = await db
     .from("leagues")
-    .select("id, name, slug, format, status, seasons(name)")
+    .select("id, name, slug, format, status")
     .order("created_at", { ascending: false })
     .limit(MAX_LEAGUES_LIST);
 
@@ -48,8 +48,7 @@ export default async function LeaguesPage() {
                 <div>
                   <p className="font-bold text-f1-white">{league.name}</p>
                   <p className="font-mono text-xs text-f1-muted">
-                    {league.slug} · {league.format} ·{" "}
-                    {(league.seasons as unknown as { name: string } | null)?.name ?? "—"}
+                    {league.slug} · {league.format}
                   </p>
                 </div>
                 <span

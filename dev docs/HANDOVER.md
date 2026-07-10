@@ -194,27 +194,33 @@ Known deferred S9 items:
 
 ### S8 Notes (archived)
 
-S8 adds admin operations — seasons management, carry-over of penalties and bans, super-admin user role management, and the audit log viewer:
+S8 adds admin operations — seasons management, carry-over of penalties and bans, super-admin user role management, and the audit log viewer. (Seasons management was later reshaped by the season-ownership flip — see "Season ownership" below — but the rest of S8 is unchanged.)
 
-1. Seasons can be marked as current (clears the flag from all others) or archived (togglable). The current season cannot be archived.
-2. An archived season cannot be made current.
-3. Carry-over: copies each driver's end-of-season `penalty_points` and `ban_threshold_reached` flag from `driver_penalty_totals` into `carry_over_penalty_points` and `carry_over_ban_count` on new `league_driver_entries`. Safe to re-run (upsert).
-4. Super-admin user management: super_admins can promote or demote other users' roles. Normal admins cannot access this page or API. A super_admin cannot change their own role.
-5. Audit log viewer: server-rendered table at `/admin/audit` with filters for actor, action, entity type, entity ID (pass a league or season UUID to scope by league/season), and date range. Append-only — no update or delete policies exist on `audit_logs`. All search params are validated with Zod before reaching the DB.
-6. Admin nav gains "Audit Log" for all admins and "User Roles" for super_admins only.
-7. Season selector on the league admin detail page (`/admin/leagues/[id]`): a `?season_id=` URL param (Zod-validated UUID) switches the season context; `race_sessions` and `league_driver_entries` are filtered by the chosen season. Defaults to the current season, then the league's own initial season. The selector is hidden when only one season exists.
+1. Super-admin user management: super_admins can promote or demote other users' roles. Normal admins cannot access this page or API. A super_admin cannot change their own role.
+2. Audit log viewer: server-rendered table at `/admin/audit` with filters for actor, action, entity type, entity ID (pass a league or season UUID to scope by league/season), and date range. Append-only — no update or delete policies exist on `audit_logs`. All search params are validated with Zod before reaching the DB.
+3. Admin nav gains "Audit Log" for all admins and "User Roles" for super_admins only.
 
 Important S8 rules:
 
 ```text
 - Only super_admin may call GET /api/admin/users or PATCH /api/admin/users/[id]/role.
 - A super_admin cannot change their own role (prevents accidental self-lockout).
-- Cannot mark an archived season as current.
-- Cannot archive the current season.
-- Carry-over upserts on (league_id, season_id, driver_id) — safe to re-run.
 - audit_logs has no update or delete RLS policies — append-only by design.
 - The Discord webhook env var (DISCORD_WEBHOOK_URL) is present in env.ts and .env.example but no webhook sending is implemented yet.
 ```
+
+#### Season ownership (post season-ownership-flip)
+
+Seasons belong to a league, not the other way round: `seasons.league_id uuid NOT NULL REFERENCES leagues(id)`, with `UNIQUE (league_id, name)` and a composite `UNIQUE (id, league_id)` that backs the child-table FKs below. `leagues.season_id` was dropped entirely — a league's current season is *derived*, never stored on the league row: `seasons WHERE league_id = ? AND is_current` (one row max, enforced by a partial unique index `ON seasons (league_id) WHERE is_current`; see `src/lib/leagues/get-current-season.ts`). A brand-new league starts with zero seasons — that's valid, not an error state — and every write endpoint that used to stamp a season (add driver, create session, wheel spin) now resolves the league's current season server-side and returns 409 if there isn't one yet.
+
+1. Seasons are managed on the league detail page (`/admin/leagues/[id]`): list, create, set-current, archive, carry-over. There is no global `/admin/seasons` — season CRUD lives entirely under `/api/admin/leagues/[id]/seasons/*`, scoped to one league. A league's first season is auto-marked current on creation; later seasons only become current via the explicit set-current route or carry-over.
+2. Marking a season current clears the flag from that league's other seasons only (never touches other leagues). An archived season cannot be made current, and the current season cannot be archived.
+3. Carry-over is the season-rollover action: `POST /api/admin/leagues/[id]/carry-over` takes `{from_season_id, to_season_id}` (both validated as belonging to the calling league), copies each driver's end-of-season `penalty_points`/`ban_threshold_reached` from `driver_penalty_totals` into `carry_over_penalty_points`/`carry_over_ban_count` on new `league_driver_entries` (upsert, safe to re-run), and **on success sets the target season current** — that's what makes new race data land in "Season 2" instead of silently continuing to write into the old season. See `e2e/season-rollover.spec.ts` for the end-to-end regression coverage.
+4. Integrity without triggers: every child table carrying both `league_id` and `season_id` (`race_sessions`, `league_driver_entries`, `wheel_spins`, `penalties`, `championship_adjustments`, `driver_penalty_totals`, `driver_standings`, `team_standings`, `workbook_migrations`) has a composite FK `(season_id, league_id) REFERENCES seasons (id, league_id)`, so a row can never reference a season belonging to a different league — this is the backstop behind the "both seasons must belong to this league" checks in the carry-over/adjustments routes.
+5. Public pages default to the league's current season (`resolvePublicLeague`); the existing `?season=` URL param + `resolveLeagueSeasons` selector behavior is unchanged, just re-pointed at league-owned seasons. A league with no current season renders empty states ("No season yet"), not a crash.
+6. Season selector on the league admin detail page uses a `?season_id=` URL param (Zod-validated UUID, must belong to the league) to switch season context for `race_sessions`/`league_driver_entries`; defaults to the league's current season. The selector is hidden when only one season exists.
+
+Full design rationale and migration approach: `dev docs/SEASON_FLIP_SPRINT_PLAN.md`.
 
 S8 migration: `supabase/migrations/20260512000000_s8_admin_operations.sql`
 

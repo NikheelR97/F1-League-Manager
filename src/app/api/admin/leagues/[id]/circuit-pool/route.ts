@@ -18,9 +18,9 @@ export async function PUT(
 
     const { data: league } = await db
       .from("leagues")
-      .select("id, season_id")
+      .select("id")
       .eq("id", leagueId)
-      .single();
+      .maybeSingle();
 
     if (!league) return Response.json({ error: "League not found" }, { status: 404 });
 

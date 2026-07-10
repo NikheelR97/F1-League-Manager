@@ -21,7 +21,6 @@ import { ADMIN_STORAGE_STATE } from "../playwright.config";
 test.use({ storageState: ADMIN_STORAGE_STATE });
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:3000";
-const SEASON_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"; // 2025 Season (seed.sql)
 const FERRARI_DRIVER_ID = "e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"; // Alessandro Ferrari
 // Seeded completed Informal League session (Bahrain) — used read-only to probe
 // the "cannot delete a completed session" 400 without publishing our own.
@@ -62,7 +61,6 @@ test.describe.serial("Lifecycle — fresh isolated league (T11, T12, T14, T15, T
         name: leagueName,
         slug: leagueSlug,
         format: "informal",
-        season_id: SEASON_ID,
       },
     });
     expect(leagueRes.status()).toBe(201);
@@ -73,6 +71,15 @@ test.describe.serial("Lifecycle — fresh isolated league (T11, T12, T14, T15, T
       data: { status: "active" },
     });
     expect(statusRes.status()).toBe(200);
+
+    // A brand-new league has zero seasons — session/driver creation below
+    // resolves the league's current season server-side and 409s without one.
+    // The first season created for a league is auto-marked current.
+    const seasonRes = await request.post(`/api/admin/leagues/${leagueId}/seasons`, {
+      headers,
+      data: { name: "Season 1", starts_on: "2025-01-01" },
+    });
+    expect(seasonRes.status()).toBe(201);
 
     const teamARes = await request.post(`/api/admin/leagues/${leagueId}/teams`, {
       headers,

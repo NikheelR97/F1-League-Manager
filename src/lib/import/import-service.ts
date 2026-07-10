@@ -71,13 +71,15 @@ export async function runImport(
 ): Promise<ImportResult | ImportError> {
   const db = createSupabaseServiceRoleClient();
 
-  // 1. Verify league + season exist
+  // 1. Verify league + season exist, and that the season belongs to this
+  // league (the composite FK on child tables is the backstop; this gives a
+  // clean error instead of a constraint-violation 500 later).
   const [{ data: league }, { data: season }] = await Promise.all([
     db.from("leagues").select("id, fastest_lap_enabled, pole_position_enabled, constructor_championship_enabled, penalty_threshold").eq("id", leagueId).single(),
-    db.from("seasons").select("id").eq("id", seasonId).single(),
+    db.from("seasons").select("id").eq("id", seasonId).eq("league_id", leagueId).single(),
   ]);
   if (!league) return { ok: false, error: "League not found" };
-  if (!season) return { ok: false, error: "Season not found" };
+  if (!season) return { ok: false, error: "Season not found for this league" };
 
   // 2. Load circuits indexed by slug
   const { data: circuitsRaw } = await db
