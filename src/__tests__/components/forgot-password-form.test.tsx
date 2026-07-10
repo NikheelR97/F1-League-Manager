@@ -12,12 +12,7 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
-// Isolates the redirectTo assertion from real Supabase env vars — this suite
-// only cares that the form derives the URL from the public env, not that
-// readPublicEnv itself validates correctly (that's env.test.ts's job).
-vi.mock("@/lib/env-public", () => ({
-  readPublicEnv: () => ({ NEXT_PUBLIC_SITE_URL: "http://localhost:3000" }),
-}));
+// redirectTo is built from window.location.origin (jsdom: http://localhost:3000).
 
 describe("ForgotPasswordForm", () => {
   beforeEach(() => {

@@ -8,7 +8,6 @@ import { z } from "zod";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { readPublicEnv } from "@/lib/env-public";
 import { useFocusOnMount } from "@/lib/hooks/use-focus-on-mount";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -37,18 +36,15 @@ export function ForgotPasswordForm() {
   async function onSubmit(values: ForgotPasswordFields) {
     try {
       const supabase = createSupabaseBrowserClient();
-      // Pass explicit static process.env refs: Next.js only inlines
-      // `process.env.NEXT_PUBLIC_*` into the browser bundle when referenced
-      // literally. A no-arg readPublicEnv() reads process.env dynamically,
-      // which is undefined client-side and throws (mirrors client.ts).
-      const { NEXT_PUBLIC_SITE_URL } = readPublicEnv({
-        NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      });
-
+      // Use the browser's actual origin as the redirect base so the recovery
+      // link always returns to the exact host the user is on (localhost /
+      // staging / prod / Vercel preview). This avoids depending on
+      // NEXT_PUBLIC_SITE_URL being configured per-environment — an unset value
+      // falls back to the ephemeral per-deployment Vercel URL, which sends the
+      // link to a throwaway *.vercel.app host. Every real origin is covered by
+      // the Supabase redirect allowlist.
       await supabase.auth.resetPasswordForEmail(values.email.trim(), {
-        redirectTo: `${NEXT_PUBLIC_SITE_URL}/auth/callback?next=/reset-password`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       });
     } catch {
       // Swallow all failures (network, misconfig, etc). Neither a Supabase
