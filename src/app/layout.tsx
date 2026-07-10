@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { JetBrains_Mono, Titillium_Web, Geist } from "next/font/google";
 
 import "./globals.css";
+import { AuthRecoveryRedirect } from "@/components/auth/AuthRecoveryRedirect";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -33,7 +34,10 @@ export default function RootLayout({
       className={cn("h-full", "antialiased", titillium.variable, jetBrainsMono.variable, "font-sans", geist.variable)}
       lang="en"
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <AuthRecoveryRedirect />
+        {children}
+      </body>
     </html>
   );
 }
