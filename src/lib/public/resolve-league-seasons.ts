@@ -8,7 +8,9 @@ export interface LeagueSeason {
 }
 
 interface ResolveLeagueSeasonsOptions {
-  fallbackSeason?: LeagueSeason;
+  // Nullable because a league's current season (resolve-league.ts) may be
+  // null (zero seasons, or all seasons archived without a new current one).
+  fallbackSeason?: LeagueSeason | null;
 }
 
 /**

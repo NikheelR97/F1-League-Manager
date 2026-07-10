@@ -9,6 +9,7 @@ import {
   F1_STANDARD_RACE_PCT,
   MAX_PUBLIC_LEAGUE_CARDS,
 } from "@/lib/constants";
+import { getCurrentSeason } from "@/lib/leagues/get-current-season";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import type { LeagueSummary } from "@/lib/ui/league-data";
 
@@ -22,38 +23,46 @@ interface LeagueRow {
   slug: string;
   format: string;
   status: string;
-  season_id: string;
 }
 
-async function buildLeagueSummary(db: Db, league: LeagueRow): Promise<LeagueSummary> {
-  const [{ data: driverLeader }, { data: constructorLeader }, { data: nextRace }] =
-    await Promise.all([
-      db
-        .from("driver_standings")
-        .select("total_points, drivers(display_name)")
-        .eq("league_id", league.id)
-        .eq("season_id", league.season_id)
-        .order("position")
-        .limit(1)
-        .maybeSingle(),
-      db
-        .from("team_standings")
-        .select("total_points, teams(name)")
-        .eq("league_id", league.id)
-        .eq("season_id", league.season_id)
-        .order("position")
-        .limit(1)
-        .maybeSingle(),
-      db
-        .from("race_sessions")
-        .select("name, circuits(name)")
-        .eq("league_id", league.id)
-        .eq("season_id", league.season_id)
-        .eq("status", "scheduled")
-        .order("scheduled_at")
-        .limit(1)
-        .maybeSingle(),
-    ]);
+// seasonId is null for a league with no current season (zero seasons, or all
+// archived) — standings/next-race are skipped rather than queried, so the
+// card still renders with the same "No results yet" / "TBD" fallbacks used
+// when a season exists but has no data yet.
+async function buildLeagueSummary(
+  db: Db,
+  league: LeagueRow,
+  seasonId: string | null,
+): Promise<LeagueSummary> {
+  const [{ data: driverLeader }, { data: constructorLeader }, { data: nextRace }] = seasonId
+    ? await Promise.all([
+        db
+          .from("driver_standings")
+          .select("total_points, drivers(display_name)")
+          .eq("league_id", league.id)
+          .eq("season_id", seasonId)
+          .order("position")
+          .limit(1)
+          .maybeSingle(),
+        db
+          .from("team_standings")
+          .select("total_points, teams(name)")
+          .eq("league_id", league.id)
+          .eq("season_id", seasonId)
+          .order("position")
+          .limit(1)
+          .maybeSingle(),
+        db
+          .from("race_sessions")
+          .select("name, circuits(name)")
+          .eq("league_id", league.id)
+          .eq("season_id", seasonId)
+          .eq("status", "scheduled")
+          .order("scheduled_at")
+          .limit(1)
+          .maybeSingle(),
+      ])
+    : [{ data: null }, { data: null }, { data: null }];
 
   const driver = driverLeader?.drivers as unknown as { display_name: string } | null;
   const constructor = constructorLeader?.teams as unknown as { name: string } | null;
@@ -88,7 +97,7 @@ export default async function Home() {
   const db = createSupabaseServiceRoleClient();
   const { data: leagueRows } = await db
     .from("leagues")
-    .select("id, name, slug, format, status, season_id")
+    .select("id, name, slug, format, status")
     .neq("status", "draft")
     .order("created_at", { ascending: false })
     .limit(MAX_PUBLIC_LEAGUE_CARDS);
@@ -101,7 +110,10 @@ export default async function Home() {
   }));
 
   const leagues = await Promise.all(
-    (leagueRows ?? []).map((league: LeagueRow) => buildLeagueSummary(db, league)),
+    (leagueRows ?? []).map(async (league: LeagueRow) => {
+      const season = await getCurrentSeason(db, league.id);
+      return buildLeagueSummary(db, league, season?.id ?? null);
+    }),
   );
 
   return (

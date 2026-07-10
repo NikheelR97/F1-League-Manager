@@ -20,7 +20,9 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-// Must match supabase/seed.sql
+// Must match supabase/seed.sql. Seasons are league-owned: SEASON_ID is the
+// Informal league's own season row (league_id = INFORMAL_LEAGUE_ID), not a
+// season shared with the Standard league (which now has its own ...a12 season).
 const INFORMAL_LEAGUE_ID = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
 const SEASON_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
 const RED_RACING_TEAM_ID = "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";

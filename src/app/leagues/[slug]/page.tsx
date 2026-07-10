@@ -5,6 +5,7 @@ import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
 
 import { LeagueHub } from "@/components/league/LeagueHub";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { cacheTag } from "@/lib/cache/tags";
 import { pageTitle } from "@/lib/public/page-title";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
@@ -129,6 +130,20 @@ export default async function LeaguePage({ params }: LeaguePageProps) {
   // (standings/results/wheel joins) is where the real traffic savings are.
   const league = await resolvePublicLeague(slug);
   if (!league) notFound();
+
+  // A brand-new league (or one with all seasons archived) has no current
+  // season to scope any of this data to — show an empty state rather than
+  // querying with an undefined season_id.
+  if (!league.season) {
+    return (
+      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <EmptyState
+          message="This league doesn't have an active season yet. Check back soon."
+          title="No season yet"
+        />
+      </div>
+    );
+  }
 
   const isWheelLeague = league.format === "standard";
 

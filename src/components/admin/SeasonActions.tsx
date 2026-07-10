@@ -8,10 +8,11 @@ import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 interface Props {
   isCurrent: boolean;
   isArchived: boolean;
+  leagueId: string;
   seasonId: string;
 }
 
-export function SeasonActions({ isCurrent, isArchived, seasonId }: Props) {
+export function SeasonActions({ isCurrent, isArchived, leagueId, seasonId }: Props) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export function SeasonActions({ isCurrent, isArchived, seasonId }: Props) {
         <button
           className="border border-f1-red px-4 py-2 text-sm font-bold uppercase text-f1-red transition-colors hover:bg-f1-red hover:text-white disabled:opacity-50"
           disabled={busy}
-          onClick={() => patch(`/api/admin/seasons/${seasonId}/current`)}
+          onClick={() => patch(`/api/admin/leagues/${leagueId}/seasons/${seasonId}/current`)}
           type="button"
         >
           Mark as Current
@@ -49,7 +50,7 @@ export function SeasonActions({ isCurrent, isArchived, seasonId }: Props) {
         <button
           className="border border-f1-border px-4 py-2 text-sm font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white disabled:opacity-50"
           disabled={busy}
-          onClick={() => patch(`/api/admin/seasons/${seasonId}/archive`)}
+          onClick={() => patch(`/api/admin/leagues/${leagueId}/seasons/${seasonId}/archive`)}
           type="button"
         >
           {isArchived ? "Unarchive" : "Archive"}

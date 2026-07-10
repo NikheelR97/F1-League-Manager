@@ -10,11 +10,27 @@ const leagueDetailPage = readFileSync(
 
 // Source files for security regression checks
 const seasonCurrentRoute = readFileSync(
-  "src/app/api/admin/seasons/[id]/current/route.ts",
+  "src/app/api/admin/leagues/[id]/seasons/[seasonId]/current/route.ts",
   "utf8",
 );
 const seasonArchiveRoute = readFileSync(
-  "src/app/api/admin/seasons/[id]/archive/route.ts",
+  "src/app/api/admin/leagues/[id]/seasons/[seasonId]/archive/route.ts",
+  "utf8",
+);
+const seasonsListRoute = readFileSync(
+  "src/app/api/admin/leagues/[id]/seasons/route.ts",
+  "utf8",
+);
+const driversRoute = readFileSync(
+  "src/app/api/admin/leagues/[id]/drivers/route.ts",
+  "utf8",
+);
+const sessionsRoute = readFileSync(
+  "src/app/api/admin/leagues/[id]/sessions/route.ts",
+  "utf8",
+);
+const wheelSpinRoute = readFileSync(
+  "src/app/api/admin/leagues/[id]/wheel/spin/route.ts",
   "utf8",
 );
 const usersRoute = readFileSync("src/app/api/admin/users/route.ts", "utf8");
@@ -37,8 +53,8 @@ const s8Migration = readFileSync(
 // ---------------------------------------------------------------------------
 
 const carryOverBodySchema = z.object({
-  source_season_id: z.string().uuid(),
-  target_season_id: z.string().uuid(),
+  from_season_id: z.string().uuid(),
+  to_season_id: z.string().uuid(),
 });
 
 // ---------------------------------------------------------------------------
@@ -58,10 +74,15 @@ describe("S8 season.set_current route", () => {
     expect(seasonCurrentRoute).toContain("withAdminGuard");
   });
 
-  it("validates the season id before querying", () => {
+  it("validates the league id and season id before querying", () => {
     expect(seasonCurrentRoute).toContain("paramsSchema");
     expect(seasonCurrentRoute).toContain("z.string().uuid()");
-    expect(seasonCurrentRoute).toContain("Invalid season id");
+    expect(seasonCurrentRoute).toContain("Invalid league or season id");
+  });
+
+  it("scopes the season lookup to the league (rejects a season from another league)", () => {
+    expect(seasonCurrentRoute).toContain('.eq("league_id", leagueId)');
+    expect(seasonCurrentRoute).toContain("Season not found in this league");
   });
 
   it("refuses to mark an archived season as current", () => {
@@ -70,14 +91,40 @@ describe("S8 season.set_current route", () => {
     expect(seasonCurrentRoute).toContain("Cannot mark an archived season as current");
   });
 
-  it("clears is_current on all other seasons", () => {
+  it("clears is_current on the league's other seasons, scoped by league_id", () => {
     expect(seasonCurrentRoute).toContain("is_current: false");
+    expect(seasonCurrentRoute).toContain('.eq("league_id", leagueId)');
     expect(seasonCurrentRoute).toContain("neq");
   });
 
   it("writes audit log on success", () => {
     expect(seasonCurrentRoute).toContain("season.set_current");
     expect(seasonCurrentRoute).toContain("writeAdminAuditLog");
+  });
+});
+
+describe("S8 league-scoped seasons list/create route", () => {
+  it("uses withAdminGuard for both GET and POST", () => {
+    expect(seasonsListRoute).toContain("export async function GET");
+    expect(seasonsListRoute).toContain("export async function POST");
+    expect(seasonsListRoute).toContain("withAdminGuard");
+  });
+
+  it("scopes both list and create to the league via league_id", () => {
+    expect(seasonsListRoute).toContain('.eq("league_id", leagueId)');
+    expect(seasonsListRoute).toContain("league_id: leagueId");
+  });
+
+  it("surfaces the unique-name-per-league constraint violation as a clean 409", () => {
+    expect(seasonsListRoute).toContain('error.code === "23505"');
+    expect(seasonsListRoute).toContain(
+      "A season with that name already exists in this league",
+    );
+    expect(seasonsListRoute).toContain("409");
+  });
+
+  it("sets is_current true only for a league's first season", () => {
+    expect(seasonsListRoute).toContain("is_current: (count ?? 0) === 0");
   });
 });
 
@@ -90,10 +137,15 @@ describe("S8 season.archive route", () => {
     expect(seasonArchiveRoute).toContain("withAdminGuard");
   });
 
-  it("validates the season id before querying", () => {
+  it("validates the league id and season id before querying", () => {
     expect(seasonArchiveRoute).toContain("paramsSchema");
     expect(seasonArchiveRoute).toContain("z.string().uuid()");
-    expect(seasonArchiveRoute).toContain("Invalid season id");
+    expect(seasonArchiveRoute).toContain("Invalid league or season id");
+  });
+
+  it("scopes the season lookup to the league (rejects a season from another league)", () => {
+    expect(seasonArchiveRoute).toContain('.eq("league_id", leagueId)');
+    expect(seasonArchiveRoute).toContain("Season not found in this league");
   });
 
   it("refuses to archive the current season", () => {
@@ -119,21 +171,21 @@ describe("S8 season.archive route", () => {
 describe("S8 carry-over schema", () => {
   it("accepts valid UUIDs for both seasons", () => {
     const result = carryOverBodySchema.safeParse({
-      source_season_id: "00000000-0000-4000-8000-000000000001",
-      target_season_id: "00000000-0000-4000-8000-000000000002",
+      from_season_id: "00000000-0000-4000-8000-000000000001",
+      to_season_id: "00000000-0000-4000-8000-000000000002",
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects non-UUID source_season_id", () => {
+  it("rejects non-UUID from_season_id", () => {
     expect(
-      carryOverBodySchema.safeParse({ source_season_id: "bad", target_season_id: "00000000-0000-4000-8000-000000000002" }).success,
+      carryOverBodySchema.safeParse({ from_season_id: "bad", to_season_id: "00000000-0000-4000-8000-000000000002" }).success,
     ).toBe(false);
   });
 
-  it("rejects non-UUID target_season_id", () => {
+  it("rejects non-UUID to_season_id", () => {
     expect(
-      carryOverBodySchema.safeParse({ source_season_id: "00000000-0000-4000-8000-000000000001", target_season_id: "" }).success,
+      carryOverBodySchema.safeParse({ from_season_id: "00000000-0000-4000-8000-000000000001", to_season_id: "" }).success,
     ).toBe(false);
   });
 });
@@ -151,6 +203,19 @@ describe("S8 carry-over route", () => {
 
   it("rejects when source and target seasons are the same", () => {
     expect(carryOverRoute).toContain("Source and target seasons must differ");
+  });
+
+  it("rejects when either season does not belong to this league", () => {
+    // Both from_season_id and to_season_id are checked against seasons scoped
+    // to league_id = leagueId; anything not found in that set is a 400.
+    expect(carryOverRoute).toContain('.eq("league_id", leagueId)');
+    expect(carryOverRoute).toContain("Both seasons must belong to this league");
+    expect(carryOverRoute).toContain("status: 400");
+  });
+
+  it("sets the target season current on success (this IS the season-rollover action)", () => {
+    expect(carryOverRoute).toContain('.eq("id", body.to_season_id)');
+    expect(carryOverRoute).toContain("is_current: true");
   });
 
   it("carries over penalty_points to carry_over_penalty_points", () => {
@@ -177,6 +242,30 @@ describe("S8 carry-over route", () => {
     expect(carryOverRoute).toContain("season.carry_over");
     expect(carryOverRoute).toContain("driver_count");
     expect(carryOverRoute).toContain("writeAdminAuditLog");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// League has no current season — write endpoints 409 instead of crashing
+// ---------------------------------------------------------------------------
+
+describe("S8 write endpoints 409 when the league has no current season", () => {
+  it("add-driver route resolves the current season via getCurrentSeason and 409s when absent", () => {
+    expect(driversRoute).toContain("getCurrentSeason");
+    expect(driversRoute).toContain("League has no current season");
+    expect(driversRoute).toContain("status: 409");
+  });
+
+  it("create-session route resolves the current season via getCurrentSeason and 409s when absent", () => {
+    expect(sessionsRoute).toContain("getCurrentSeason");
+    expect(sessionsRoute).toContain("League has no current season");
+    expect(sessionsRoute).toContain("status: 409");
+  });
+
+  it("wheel spin route resolves the current season via getCurrentSeason and 409s when absent", () => {
+    expect(wheelSpinRoute).toContain("getCurrentSeason");
+    expect(wheelSpinRoute).toContain("League has no current season");
+    expect(wheelSpinRoute).toContain("status: 409");
   });
 });
 
@@ -292,9 +381,15 @@ describe("S8 season selector on league admin page", () => {
     expect(leagueDetailPage).toContain("league_driver_entries");
   });
 
-  it("defaults to current season, then league season_id if no param", () => {
+  it("defaults to the league's current season (is_current) if no param, scoped by league_id", () => {
     expect(leagueDetailPage).toContain("is_current");
-    expect(leagueDetailPage).toContain("league.season_id");
+    expect(leagueDetailPage).toContain('.eq("league_id", leagueId)');
+    expect(leagueDetailPage).not.toContain("league.season_id");
+  });
+
+  it("degrades gracefully when the league has no seasons yet", () => {
+    expect(leagueDetailPage).toContain("effectiveSeasonId ?");
+    expect(leagueDetailPage).toContain("Create the First Season");
   });
 });
 

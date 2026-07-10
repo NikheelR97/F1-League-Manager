@@ -153,13 +153,20 @@ vi.mock("@/lib/supabase/service-role", () => ({
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 
-function makeChain(result: unknown) {
+// resolvePublicLeague issues two independent queries: the league row
+// (.from("leagues")...single()) and, only when a league row was found, its
+// current season via getCurrentSeason (.from("seasons")...maybeSingle()).
+// A single mock chain can host both terminal methods since they're called on
+// the same mocked db object regardless of which table name was passed to
+// .from() (the mock doesn't distinguish tables).
+function makeChain(leagueResult: unknown, seasonResult: unknown = { data: null, error: null }) {
   const chain = {
     from: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     neq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue(result),
+    single: vi.fn().mockResolvedValue(leagueResult),
+    maybeSingle: vi.fn().mockResolvedValue(seasonResult),
   };
   return chain;
 }
@@ -173,28 +180,31 @@ describe("resolvePublicLeague", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null when the league has no linked season", async () => {
+  it("returns the league with season: null when it has no current season (not the whole result)", async () => {
     vi.mocked(createSupabaseServiceRoleClient).mockReturnValue(
-      makeChain({
-        data: {
-          id: "league-1",
-          name: "Test League",
-          slug: "test",
-          format: "feature",
-          status: "active",
-          fastest_lap_enabled: true,
-          pole_position_enabled: false,
-          constructor_championship_enabled: false,
-          penalty_threshold: 12,
-          logo_path: null,
-          hero_image_path: null,
-          seasons: null,
+      makeChain(
+        {
+          data: {
+            id: "league-1",
+            name: "Test League",
+            slug: "test",
+            format: "feature",
+            status: "active",
+            fastest_lap_enabled: true,
+            pole_position_enabled: false,
+            constructor_championship_enabled: false,
+            penalty_threshold: 12,
+            logo_path: null,
+            hero_image_path: null,
+          },
+          error: null,
         },
-        error: null,
-      }) as unknown as ReturnType<typeof createSupabaseServiceRoleClient>,
+        { data: null, error: null },
+      ) as unknown as ReturnType<typeof createSupabaseServiceRoleClient>,
     );
     const result = await resolvePublicLeague("test");
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result?.season).toBeNull();
   });
 
   it("applies .neq('status', 'draft') to exclude draft leagues", async () => {
@@ -207,25 +217,27 @@ describe("resolvePublicLeague", () => {
   });
 
   it("returns a shaped PublicLeague for a valid active league", async () => {
-    const season = { id: "season-1", name: "Season 1" };
+    const season = { id: "season-1", name: "Season 1", starts_on: "2026-01-01", ends_on: null, is_current: true };
     vi.mocked(createSupabaseServiceRoleClient).mockReturnValue(
-      makeChain({
-        data: {
-          id: "league-1",
-          name: "Standard",
-          slug: "standard",
-          format: "feature",
-          status: "active",
-          fastest_lap_enabled: true,
-          pole_position_enabled: true,
-          constructor_championship_enabled: true,
-          penalty_threshold: 12,
-          logo_path: "/logos/standard.png",
-          hero_image_path: null,
-          seasons: season,
+      makeChain(
+        {
+          data: {
+            id: "league-1",
+            name: "Standard",
+            slug: "standard",
+            format: "feature",
+            status: "active",
+            fastest_lap_enabled: true,
+            pole_position_enabled: true,
+            constructor_championship_enabled: true,
+            penalty_threshold: 12,
+            logo_path: "/logos/standard.png",
+            hero_image_path: null,
+          },
+          error: null,
         },
-        error: null,
-      }) as unknown as ReturnType<typeof createSupabaseServiceRoleClient>,
+        { data: season, error: null },
+      ) as unknown as ReturnType<typeof createSupabaseServiceRoleClient>,
     );
     const result = await resolvePublicLeague("standard");
     expect(result).toMatchObject({

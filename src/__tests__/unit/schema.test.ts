@@ -4,11 +4,27 @@ const migrationSql = readFileSync(
   "supabase/migrations/20260507161000_s1_core_schema.sql",
   "utf8",
 );
+const seasonFlipMigrationSql = readFileSync(
+  "supabase/migrations/20260710120000_league_owned_seasons.sql",
+  "utf8",
+).replace(/\r\n/g, "\n");
 const allMigrationSql = readdirSync("supabase/migrations")
   .filter((fileName) => fileName.endsWith(".sql"))
   .sort()
   .map((fileName) => readFileSync(`supabase/migrations/${fileName}`, "utf8").replace(/\r\n/g, "\n"))
   .join("\n");
+
+const seasonScopedChildTables = [
+  "race_sessions",
+  "league_driver_entries",
+  "wheel_spins",
+  "penalties",
+  "championship_adjustments",
+  "driver_penalty_totals",
+  "driver_standings",
+  "team_standings",
+  "workbook_migrations",
+] as const;
 
 const coreTables = [
   "profiles",
@@ -66,6 +82,58 @@ describe("S1 database migration", () => {
     );
     expect(allMigrationSql).toContain(
       "grant select (\n  id,\n  league_id,\n  season_id,\n  driver_id,\n  race_session_id,\n  penalty_points,\n  reason,\n  status,\n  created_at\n) on public.penalties to anon, authenticated;",
+    );
+  });
+});
+
+describe("season ownership flip migration", () => {
+  it("makes seasons belong to a league via a not-null FK", () => {
+    expect(seasonFlipMigrationSql).toContain(
+      "alter table public.seasons\n  add column league_id uuid references public.leagues (id) on delete cascade;",
+    );
+    expect(seasonFlipMigrationSql).toContain(
+      "alter table public.seasons alter column league_id set not null;",
+    );
+  });
+
+  it("allows at most one current season per league via a partial unique index", () => {
+    expect(seasonFlipMigrationSql).toContain(
+      "create unique index seasons_one_current_per_league\n  on public.seasons (league_id) where is_current;",
+    );
+  });
+
+  it("scopes seasons uniquely to their league", () => {
+    expect(seasonFlipMigrationSql).toContain(
+      "add constraint seasons_league_name_unique unique (league_id, name);",
+    );
+    expect(seasonFlipMigrationSql).toContain(
+      "add constraint seasons_id_league_unique unique (id, league_id);",
+    );
+  });
+
+  it("adds a composite (season_id, league_id) FK on every season-scoped child table", () => {
+    expect.assertions(seasonScopedChildTables.length);
+
+    for (const tableName of seasonScopedChildTables) {
+      expect(seasonFlipMigrationSql).toContain(
+        `alter table public.${tableName}\n  add constraint ${tableName}_season_league_fk\n  foreign key (season_id, league_id) references public.seasons (id, league_id) on delete restrict;`,
+      );
+    }
+  });
+
+  it("drops the redundant single-column season_id FK on every child table so PostgREST embeds stay unambiguous", () => {
+    expect.assertions(seasonScopedChildTables.length);
+
+    for (const tableName of seasonScopedChildTables) {
+      expect(seasonFlipMigrationSql).toContain(
+        `alter table public.${tableName} drop constraint ${tableName}_season_id_fkey;`,
+      );
+    }
+  });
+
+  it("drops the now-redundant leagues.season_id column", () => {
+    expect(seasonFlipMigrationSql).toContain(
+      "alter table public.leagues drop column season_id;",
     );
   });
 });

@@ -41,7 +41,6 @@ describe("Home page", () => {
             slug: "standard",
             format: "standard",
             status: "active",
-            season_id: "season-1",
           },
           {
             id: "league-2",
@@ -49,9 +48,11 @@ describe("Home page", () => {
             slug: "informal",
             format: "informal",
             status: "active",
-            season_id: "season-2",
           },
         ],
+      }),
+      seasons: makeChain({
+        single: { id: "season-1", name: "Season 1", starts_on: "2026-01-01", ends_on: null, is_current: true },
       }),
       driver_standings: makeChain({
         single: { total_points: 25, drivers: { display_name: "Max Verstappen" } },
@@ -87,9 +88,11 @@ describe("Home page", () => {
             slug: "new-league",
             format: "custom",
             status: "active",
-            season_id: "season-3",
           },
         ],
+      }),
+      seasons: makeChain({
+        single: { id: "season-3", name: "Season 1", starts_on: "2026-01-01", ends_on: null, is_current: true },
       }),
       driver_standings: makeChain({ single: null }),
       team_standings: makeChain({ single: null }),
@@ -99,6 +102,33 @@ describe("Home page", () => {
     render(await Home());
 
     expect(screen.getByRole("heading", { name: "New League" })).toBeInTheDocument();
+    expect(screen.getByText("TBD")).toBeInTheDocument();
+    expect(screen.getAllByText("No results yet")).toHaveLength(2);
+  });
+
+  it("renders a league with no current season without crashing (empty state, no queries)", async () => {
+    mockTables({
+      leagues: makeChain({
+        list: [
+          {
+            id: "league-4",
+            name: "Brand New League",
+            slug: "brand-new-league",
+            format: "custom",
+            status: "active",
+          },
+        ],
+      }),
+      // getCurrentSeason finds no is_current row — league has zero seasons.
+      seasons: makeChain({ single: null }),
+      driver_standings: makeChain({ single: null }),
+      team_standings: makeChain({ single: null }),
+      race_sessions: makeChain({ single: null }),
+    });
+
+    render(await Home());
+
+    expect(screen.getByRole("heading", { name: "Brand New League" })).toBeInTheDocument();
     expect(screen.getByText("TBD")).toBeInTheDocument();
     expect(screen.getAllByText("No results yet")).toHaveLength(2);
   });

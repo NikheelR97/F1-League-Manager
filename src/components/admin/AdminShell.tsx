@@ -1,4 +1,4 @@
-import { ClipboardList, FileUp, Flag, LayoutDashboard, Menu, ShieldCheck, Trophy, Users } from "lucide-react";
+import { ClipboardList, FileUp, Flag, Menu, ShieldCheck, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 
 import { SignOutButton } from "@/components/auth/SignOutButton";
@@ -11,7 +11,6 @@ interface AdminShellProps {
 
 const baseNavItems = [
   { href: "/admin/leagues", icon: Trophy, label: "Leagues" },
-  { href: "/admin/seasons", icon: LayoutDashboard, label: "Seasons" },
   { href: "/admin/drivers", icon: Users, label: "Drivers" },
   { href: "/admin/reserves", icon: Flag, label: "Reserves" },
   { href: "/admin/audit", icon: ClipboardList, label: "Audit Log" },

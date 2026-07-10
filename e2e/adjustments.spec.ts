@@ -20,7 +20,6 @@ import { ADMIN_STORAGE_STATE } from "../playwright.config";
 test.use({ storageState: ADMIN_STORAGE_STATE });
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:3000";
-const SEASON_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"; // 2025 Season (seed.sql)
 // Alessandro Ferrari — an existing seeded driver. league_driver_entries
 // uniqueness is scoped to (league_id, driver_id), so reusing a driver already
 // active in the seeded Informal League is safe in a brand-new league.
@@ -42,6 +41,7 @@ function pointsCell(page: Page) {
 
 test.describe.serial("Adjustments — fresh isolated league (T4, T5)", () => {
   let leagueId = "";
+  let seasonId = "";
 
   test("arrange: league + team + points system + driver + published baseline (25 pts)", async ({
     page,
@@ -55,7 +55,6 @@ test.describe.serial("Adjustments — fresh isolated league (T4, T5)", () => {
         name: leagueName,
         slug: leagueSlug,
         format: "informal",
-        season_id: SEASON_ID,
         fastest_lap_enabled: false,
         pole_position_enabled: false,
         constructor_championship_enabled: false,
@@ -71,6 +70,15 @@ test.describe.serial("Adjustments — fresh isolated league (T4, T5)", () => {
       data: { status: "active" },
     });
     expect(statusRes.status()).toBe(200);
+
+    // A brand-new league has zero seasons — driver/adjustment creation below
+    // requires one. The first season created for a league is auto-current.
+    const seasonRes = await request.post(`/api/admin/leagues/${leagueId}/seasons`, {
+      headers,
+      data: { name: "Season 1", starts_on: "2025-01-01" },
+    });
+    expect(seasonRes.status()).toBe(201);
+    seasonId = ((await seasonRes.json()) as { season: { id: string } }).season.id;
 
     const teamRes = await request.post(`/api/admin/leagues/${leagueId}/teams`, {
       headers,
@@ -173,7 +181,7 @@ test.describe.serial("Adjustments — fresh isolated league (T4, T5)", () => {
         driver_id: FERRARI_DRIVER_ID,
         points_delta: 5,
         reason: "e2e T4 bonus",
-        season_id: SEASON_ID,
+        season_id: seasonId,
       },
     });
     expect(adjRes.status()).toBe(201);
@@ -208,7 +216,7 @@ test.describe.serial("Adjustments — fresh isolated league (T4, T5)", () => {
       adjustment_kind: "bonus" as const,
       driver_id: FERRARI_DRIVER_ID,
       reason: "e2e T5 rejected",
-      season_id: SEASON_ID,
+      season_id: seasonId,
     };
 
     const wayOver = await request.post(`/api/admin/leagues/${leagueId}/adjustments`, {
