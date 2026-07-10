@@ -7,7 +7,7 @@ const migrationSql = readFileSync(
 const seasonFlipMigrationSql = readFileSync(
   "supabase/migrations/20260710120000_league_owned_seasons.sql",
   "utf8",
-);
+).replace(/\r\n/g, "\n");
 const allMigrationSql = readdirSync("supabase/migrations")
   .filter((fileName) => fileName.endsWith(".sql"))
   .sort()
