@@ -124,11 +124,11 @@ export default async function TeamProfilePage({
       ? db
           .from("race_results")
           .select(
-            "race_session_id, finishing_position, result_status, raw_result, fastest_lap, points_awarded, manual_points_adjustment, drivers(id, display_name), race_sessions(name, circuits(name, grand_prix_name))",
+            "race_session_id, finishing_position, result_status, raw_result, fastest_lap, points_awarded, manual_points_adjustment, drivers(id, display_name), race_sessions(name, scheduled_at, circuits(name, grand_prix_name))",
           )
           .eq("team_id", teamId)
           .in("race_session_id", sessionIds)
-          .order("race_session_id")
+          .order("scheduled_at", { referencedTable: "race_sessions", ascending: true })
           .limit(50)
       : { data: [] },
     sessionIds.length > 0
@@ -294,8 +294,11 @@ export default async function TeamProfilePage({
                   const totalPts = r.points_awarded;
                   return (
                     <tr key={`${r.race_session_id}-${driver?.id}`} className="border-b border-f1-border/40 hover:bg-f1-dark">
-                      <td className="py-2 pr-4 text-f1-white">
-                        {circuit?.grand_prix_name ?? race?.name ?? "—"}
+                      <td className="py-2 pr-4">
+                        <div className="text-f1-white">
+                          {circuit?.grand_prix_name ?? "—"}
+                          {race?.name && <span className="ml-2 text-xs text-f1-muted">{race.name}</span>}
+                        </div>
                         {r.fastest_lap && (
                           <span className="ml-2 text-xs font-bold text-team-mclaren">FL</span>
                         )}
@@ -324,7 +327,10 @@ export default async function TeamProfilePage({
                     className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm"
                   >
                     <div>
-                      <span className="text-f1-white">{circuit?.grand_prix_name ?? race?.name ?? "—"}</span>
+                      <div className="text-f1-white">
+                        {circuit?.grand_prix_name ?? "—"}
+                        {race?.name && <span className="ml-2 text-xs text-f1-muted">{race.name}</span>}
+                      </div>
                       {r.fastest_lap && (
                         <span className="ml-2 text-xs font-bold text-team-mclaren">FL</span>
                       )}

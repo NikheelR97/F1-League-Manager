@@ -114,11 +114,11 @@ export default async function DriverProfilePage({
       ? db
           .from("race_results")
           .select(
-            "race_session_id, finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, race_sessions(name, circuits(name))",
+            "race_session_id, finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, race_sessions(name, scheduled_at, circuits(name))",
           )
           .eq("driver_id", driverId)
           .in("race_session_id", sessionIds)
-          .order("race_session_id")
+          .order("scheduled_at", { referencedTable: "race_sessions", ascending: true })
           .limit(50)
       : { data: [] },
     db
@@ -246,7 +246,10 @@ export default async function DriverProfilePage({
                   className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm"
                 >
                   <div>
-                    <span className="text-f1-white">{circuit?.name ?? race?.name ?? "—"}</span>
+                    <div className="text-f1-white">
+                      {circuit?.name ?? "—"}
+                      {race?.name && <span className="ml-2 text-xs text-f1-muted">{race.name}</span>}
+                    </div>
                     {r.fastest_lap && (
                       <span className="ml-2 text-xs font-bold text-team-mclaren">FL</span>
                     )}
