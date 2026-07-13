@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FormError } from "@/components/ui/FormError";
+import { StatusPill } from "@/components/ui/StatusPill";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 import { useFocusOnMount } from "@/lib/hooks/use-focus-on-mount";
 
@@ -29,6 +30,9 @@ export interface SessionDriver {
   // M7 — the driver's present-day team, used only to flag when it differs
   // from `team_id` (which is resolved as of the session's own date).
   present_team_id?: string;
+  // M8 — true when an admin applied a Ban Watch ban for this driver; the
+  // Results step pre-selects Status=BAN and shows a SUSPENDED badge.
+  pending_ban?: boolean;
   racing_number: number | null;
   team_id: string;
   team_name: string;
@@ -167,7 +171,10 @@ function defaultResultRow(d: SessionDriver): RaceResultRow {
     manual_points_adjustment: 0,
     notes: "",
     raw_result: "",
-    result_status: "classified",
+    // M8 — a driver with an applied Ban Watch ban starts pre-selected BAN
+    // instead of the usual default, so publishing the round without
+    // touching their row still records the enforcement.
+    result_status: d.pending_ban ? "ban" : "classified",
     team_id: d.team_id,
     covering_for_driver_id: null,
   };
@@ -552,6 +559,9 @@ function ResultsStep({
                       {driver?.left_roster && (
                         <span className="text-xs text-f1-muted uppercase">Left roster</span>
                       )}
+                      {driver?.pending_ban && (
+                        <StatusPill tone="red">Suspended</StatusPill>
+                      )}
                       {bannedByDriver.has(row.driver_id) && (
                         <span
                           className="text-xs text-destructive uppercase"
@@ -641,6 +651,14 @@ function ResultsStep({
                       <p className="mt-1 w-32 text-xs text-destructive" id={posErrorId}>
                         P{posConflict.position} assigned to{" "}
                         {posConflict.driverIds.map((id) => driverName(id)).join(" and ")}
+                      </p>
+                    )}
+                    {/* M11 — a classified driver with no position silently
+                        never appears in the published result (see
+                        filterPublishedResults); nudge rather than block. */}
+                    {!posConflict && row.result_status === "classified" && row.finishing_position === null && (
+                      <p className="mt-1 w-32 text-xs text-yellow-400">
+                        No position set &mdash; add one or change Status to DNS.
                       </p>
                     )}
                   </td>
@@ -1064,7 +1082,7 @@ function ReviewStep({
                         {isThresholdAlert && (
                           <span
                             className="text-xs text-destructive uppercase"
-                            title="Alert only — admin decision required"
+                            title="Preview only, before publish — admin decision required. The league page's Ban Watch reflects the same threshold once published."
                           >
                             Threshold alert
                           </span>

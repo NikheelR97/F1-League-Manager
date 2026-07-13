@@ -119,27 +119,37 @@ export function resolveStintForDate<T extends { starts_on: string; ends_on: stri
 
 export interface ReserveAssignmentRow {
   race_session_id: string;
-  original_driver_id: string;
+  original_driver_id: string | null;
   reserve_driver_id: string;
   team_id: string;
   assigned_by: string;
 }
 
-// ponytail: only writes a row when the admin named who the reserve covered
-// for (original_driver_id is NOT NULL in the schema); left blank, no
-// assignment is recorded rather than blocking publish over it.
-// M4 — also skipped when the reserve raced as a free agent: team_id is
-// NOT NULL on race_reserve_assignments, and there is no team to record.
+// M4 — the tracker previously only recorded an assignment when the admin
+// named who the reserve covered for. A reserve who raced for a team other
+// than their home/current one (driver_team_stints' active stint) is now also
+// recorded even with no "Covering For" set — original_driver_id is nullable
+// on race_reserve_assignments as of the M8/M4 migration. Skipped when the
+// reserve raced as a free agent (team_id null — no team to record) or when
+// they raced for their own home team (not a reserve assignment at all).
+// `reserveHomeTeamByDriver` is built with a single query in publishSession,
+// never per-row.
 export function buildReserveAssignmentRows(
   results: RaceResultEntry[],
   sessionId: string,
   actorId: string,
+  reserveHomeTeamByDriver: Map<string, string | null> = new Map(),
 ): ReserveAssignmentRow[] {
   return results
-    .filter((r) => !!r.covering_for_driver_id && !!r.team_id)
+    .filter((r) => {
+      if (!r.team_id) return false;
+      if (r.covering_for_driver_id) return true;
+      if (!reserveHomeTeamByDriver.has(r.driver_id)) return false;
+      return reserveHomeTeamByDriver.get(r.driver_id) !== r.team_id;
+    })
     .map((r) => ({
       race_session_id: sessionId,
-      original_driver_id: r.covering_for_driver_id!,
+      original_driver_id: r.covering_for_driver_id ?? null,
       reserve_driver_id: r.driver_id,
       team_id: r.team_id!,
       assigned_by: actorId,
@@ -330,6 +340,24 @@ export async function publishSession(
     return { ok: false, status: 500, error: "Failed to save race results" };
   }
 
+  // 4a2. Clear pending_ban for any driver whose result is published as BAN
+  // this round — the applied ban has now been carried out. Unconditional
+  // (idempotent) rather than conditional on the flag's prior value. M8.
+  const bannedDriverIds = filterPublishedResults(results)
+    .filter((r) => r.result_status === "ban")
+    .map((r) => r.driver_id);
+  if (bannedDriverIds.length > 0) {
+    const { error: clearBanErr } = await db
+      .from("league_driver_entries")
+      .update({ pending_ban: false })
+      .eq("league_id", leagueId)
+      .eq("season_id", session.season_id)
+      .in("driver_id", bannedDriverIds);
+    if (clearBanErr) {
+      return { ok: false, status: 500, error: "Failed to clear pending ban flag" };
+    }
+  }
+
   // 4b. Write reserve assignments (delete-then-insert per session — same
   // idempotency pattern as the upserts above, so a re-publish never
   // duplicates or strands a stale row) — B7.
@@ -340,7 +368,31 @@ export async function publishSession(
   if (reserveDeleteErr) {
     return { ok: false, status: 500, error: "Failed to save reserve assignments" };
   }
-  const reserveAssignmentRows = buildReserveAssignmentRows(results, sessionId, actorId);
+  // M4 — one query for every reserve's home/current team (active stint),
+  // never per-row, so buildReserveAssignmentRows can tell a genuine reserve
+  // assignment (raced for a different team) from a reserve simply racing for
+  // their own team.
+  const { data: reserveEntries } = await db
+    .from("league_driver_entries")
+    .select("driver_id, driver_team_stints(team_id, ends_on)")
+    .eq("league_id", leagueId)
+    .eq("season_id", session.season_id)
+    .eq("is_reserve", true);
+  const reserveHomeTeamByDriver = new Map<string, string | null>(
+    (reserveEntries ?? []).map((e) => {
+      const stints = (e.driver_team_stints ?? []) as unknown as Array<{
+        team_id: string;
+        ends_on: string | null;
+      }>;
+      return [e.driver_id, stints.find((s) => s.ends_on === null)?.team_id ?? null];
+    }),
+  );
+  const reserveAssignmentRows = buildReserveAssignmentRows(
+    results,
+    sessionId,
+    actorId,
+    reserveHomeTeamByDriver,
+  );
   if (reserveAssignmentRows.length > 0) {
     const { error: reserveInsertErr } = await db
       .from("race_reserve_assignments")

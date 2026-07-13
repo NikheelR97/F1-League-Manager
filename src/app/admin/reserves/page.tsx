@@ -42,7 +42,11 @@ export default async function ReservesPage() {
   }
 
   const sessionIds = [...new Set(rows.map((a) => a.race_session_id))];
-  const driverIds = [...new Set(rows.flatMap((a) => [a.original_driver_id, a.reserve_driver_id]))];
+  // M4 — original_driver_id is now nullable (a reserve raced for a different
+  // team with no "Covering For" named); filter the null out before querying.
+  const driverIds = [
+    ...new Set(rows.flatMap((a) => [a.original_driver_id, a.reserve_driver_id].filter((id): id is string => !!id))),
+  ];
   const teamIds = [...new Set(rows.map((a) => a.team_id))];
 
   const [{ data: sessions }, { data: drivers }, { data: teams }] = await Promise.all([
@@ -90,7 +94,9 @@ export default async function ReservesPage() {
                     {driverById.get(a.reserve_driver_id)?.display_name ?? "Unknown"}
                   </td>
                   <td className="p-3 text-f1-muted">
-                    {driverById.get(a.original_driver_id)?.display_name ?? "Unknown"}
+                    {a.original_driver_id
+                      ? driverById.get(a.original_driver_id)?.display_name ?? "Unknown"
+                      : "—"}
                   </td>
                   <td className="p-3">
                     <div className="flex items-center gap-2">

@@ -650,6 +650,47 @@ describe("buildReserveAssignmentRows", () => {
     );
     expect(rows).toEqual([]);
   });
+
+  // M4 — a reserve who raced for a non-home team but had no "Covering For"
+  // named must still be recorded, with a null original_driver_id (now
+  // nullable on race_reserve_assignments).
+  it("writes a null-original row for a reserve raced for a non-home team with no covering_for set", () => {
+    const rows = buildReserveAssignmentRows(
+      [{ ...base, covering_for_driver_id: null }],
+      "session-1",
+      "actor-1",
+      new Map([["reserve-1", "home-team"]]),
+    );
+    expect(rows).toEqual([
+      {
+        race_session_id: "session-1",
+        original_driver_id: null,
+        reserve_driver_id: "reserve-1",
+        team_id: "team-1",
+        assigned_by: "actor-1",
+      },
+    ]);
+  });
+
+  it("skips a reserve who raced for their own home team — not an assignment", () => {
+    const rows = buildReserveAssignmentRows(
+      [{ ...base, covering_for_driver_id: null }],
+      "session-1",
+      "actor-1",
+      new Map([["reserve-1", "team-1"]]),
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("skips a free agent (null team_id) even with a known reserve home team", () => {
+    const rows = buildReserveAssignmentRows(
+      [{ ...base, team_id: null, covering_for_driver_id: null }],
+      "session-1",
+      "actor-1",
+      new Map([["reserve-1", "home-team"]]),
+    );
+    expect(rows).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------

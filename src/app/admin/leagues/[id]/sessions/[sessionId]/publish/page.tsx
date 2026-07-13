@@ -50,7 +50,7 @@ export default async function SessionPublishPage({
     db
       .from("league_driver_entries")
       .select(
-        "driver_id, is_reserve, drivers(display_name, racing_number), driver_team_stints(team_id, starts_on, ends_on, teams(name, color_hex))",
+        "driver_id, is_reserve, pending_ban, drivers(display_name, racing_number), driver_team_stints(team_id, starts_on, ends_on, teams(name, color_hex))",
       )
       .eq("league_id", leagueId)
       .is("left_on", null)
@@ -118,6 +118,7 @@ export default async function SessionPublishPage({
       display_name: driver?.display_name ?? "Unknown",
       driver_id: entry.driver_id,
       is_reserve: entry.is_reserve,
+      pending_ban: entry.pending_ban,
       present_team_id: activeStint?.team_id ?? resolvedStint?.team_id ?? "",
       racing_number: driver?.racing_number ?? null,
       team_id: resolvedStint?.team_id ?? "",
