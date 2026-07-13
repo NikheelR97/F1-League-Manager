@@ -134,7 +134,13 @@ export default async function DriverProfilePage({
   type RaceSession = { name: string; circuits: unknown };
   type Circuit = { name: string };
   type StintTeam = { id: string; name: string; color_hex: string };
-  const standingTeam = standing?.teams as unknown as StintTeam | null;
+
+  // Cluster B fix: the headline "Team" must agree with the TEAM HISTORY panel
+  // below, so both read the same open stint (ends_on null) instead of the
+  // headline using driver_standings' denormalized team, which can lag a
+  // transfer.
+  const currentStint = (stints ?? []).find((s) => s.ends_on === null) ?? null;
+  const currentTeam = currentStint ? (currentStint.teams as unknown as StintTeam | null) : null;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -161,21 +167,23 @@ export default async function DriverProfilePage({
             <p className="text-f1-white">{driver.country}</p>
           </div>
         )}
+        <div>
+          <p className="text-xs text-f1-muted">Team</p>
+          {currentTeam ? (
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="h-3 w-1 shrink-0"
+                style={{ backgroundColor: currentTeam.color_hex }}
+              />
+              <span className="font-bold text-f1-white">{currentTeam.name}</span>
+            </div>
+          ) : (
+            <p className="text-f1-muted">Free Agent</p>
+          )}
+        </div>
         {standing ? (
           <>
-            {standingTeam && (
-              <div>
-                <p className="text-xs text-f1-muted">Team</p>
-                <div className="flex items-center gap-2">
-                  <span
-                    aria-hidden="true"
-                    className="h-3 w-1 shrink-0"
-                    style={{ backgroundColor: standingTeam.color_hex }}
-                  />
-                  <span className="font-bold text-f1-white">{standingTeam.name}</span>
-                </div>
-              </div>
-            )}
             <div>
               <p className="text-xs text-f1-muted">Championship</p>
               <p className="font-mono font-bold text-f1-white">
