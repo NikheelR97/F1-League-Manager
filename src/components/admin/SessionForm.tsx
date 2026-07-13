@@ -51,6 +51,7 @@ interface Session {
   id: string;
   name: string;
   points_system_id: string;
+  published_at: string | null;
   race_length_percent: 25 | 50 | 100;
   race_number: 1 | 2;
   scheduled_at: string;
@@ -72,6 +73,7 @@ function generateCode(): string {
 }
 
 export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystems, session, wheelSpinId }: SessionFormProps) {
+  const isPublished = !!session?.published_at;
   const router = useRouter();
   const csrfToken = useCsrfToken();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -215,7 +217,8 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
         <select
           aria-describedby={errors.points_system_id ? "points-system-error" : undefined}
           aria-invalid={!!errors.points_system_id}
-          className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none"
+          className="w-full border border-f1-border bg-f1-dark px-3 py-2 text-sm text-f1-white focus:border-f1-red focus:outline-none disabled:opacity-50"
+          disabled={isPublished}
           id="points-system"
           {...register("points_system_id")}
         >
@@ -225,6 +228,7 @@ export function SessionForm({ circuits, initialCircuitId, leagueId, pointsSystem
             </option>
           ))}
         </select>
+        {isPublished && <p className="text-xs text-f1-muted">Locked — session is published</p>}
         {errors.points_system_id && <p className="text-xs text-destructive" id="points-system-error">{errors.points_system_id.message}</p>}
       </div>
 

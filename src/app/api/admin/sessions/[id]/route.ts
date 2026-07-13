@@ -43,12 +43,26 @@ export async function PATCH(
 
     const { data: existing, error: fetchError } = await db
       .from("race_sessions")
-      .select("league_id, name, status")
+      .select("league_id, name, status, published_at, points_system_id")
       .eq("id", sessionId)
       .single();
 
     if (fetchError || !existing) {
       return Response.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    if (
+      existing.published_at &&
+      body.points_system_id &&
+      body.points_system_id !== existing.points_system_id
+    ) {
+      return Response.json(
+        {
+          error:
+            "Cannot change the points system of a published session. Unpublish or delete and re-enter to rescore.",
+        },
+        { status: 400 },
+      );
     }
 
     if (body.points_system_id) {
