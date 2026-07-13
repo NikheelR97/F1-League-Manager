@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 
 interface ApplyBanButtonProps {
+  applied: boolean;
   driverId: string;
   driverName: string;
   leagueId: string;
@@ -15,14 +16,16 @@ interface ApplyBanButtonProps {
 // M8 — one-click enforcement for a Ban Watch row: sets pending_ban on the
 // driver's season entry so the next session's publish form pre-selects
 // Status=BAN for them (see ResultStepper).
-export function ApplyBanButton({ driverId, driverName, leagueId, seasonId }: ApplyBanButtonProps) {
+// applied=false: red "Apply ban" with confirm
+// applied=true: muted "Clear ban" without confirm (non-destructive direction)
+export function ApplyBanButton({ applied, driverId, driverName, leagueId, seasonId }: ApplyBanButtonProps) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function handleClick() {
-    if (!confirm(`Ban ${driverName} for the next round?`)) return;
+    if (!applied && !confirm(`Ban ${driverName} for the next round?`)) return;
     setBusy(true);
     setError("");
     try {
@@ -32,12 +35,12 @@ export function ApplyBanButton({ driverId, driverName, leagueId, seasonId }: App
           "content-type": "application/json",
           "x-csrf-token": csrfToken,
         },
-        body: JSON.stringify({ season_id: seasonId }),
+        body: JSON.stringify({ season_id: seasonId, pending_ban: !applied }),
       });
 
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? "Failed to apply ban");
+        setError(body.error ?? (applied ? "Failed to clear ban" : "Failed to apply ban"));
         return;
       }
 
@@ -47,15 +50,21 @@ export function ApplyBanButton({ driverId, driverName, leagueId, seasonId }: App
     }
   }
 
+  const buttonLabel = applied ? "Clear ban" : "Apply ban";
+  const busyLabel = applied ? "Clearing…" : "Applying…";
+  const buttonClass = applied
+    ? "border border-f1-muted px-2 py-0.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:bg-f1-muted hover:text-f1-black disabled:cursor-not-allowed disabled:opacity-50"
+    : "border border-f1-red px-2 py-0.5 text-xs font-bold uppercase text-f1-red-text transition-colors hover:bg-f1-red hover:text-white disabled:cursor-not-allowed disabled:opacity-50";
+
   return (
     <div className="flex flex-col items-end gap-1">
       <button
-        className="border border-f1-red px-2 py-0.5 text-xs font-bold uppercase text-f1-red-text transition-colors hover:bg-f1-red hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+        className={buttonClass}
         disabled={busy || !csrfToken}
         type="button"
         onClick={handleClick}
       >
-        {busy ? "Applying…" : "Apply ban"}
+        {busy ? busyLabel : buttonLabel}
       </button>
       {error && <p className="text-xs text-f1-red">{error}</p>}
     </div>

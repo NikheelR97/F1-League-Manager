@@ -470,16 +470,18 @@ export default async function LeagueDetailPage({
                       <span className="font-mono text-xs text-f1-red-text">
                         {row.penalty_points} pts
                       </span>
-                      {applied ? (
-                        <StatusPill tone="red">Ban applied &mdash; next round</StatusPill>
-                      ) : effectiveSeasonId ? (
-                        <ApplyBanButton
-                          driverId={row.driver_id}
-                          driverName={driverName}
-                          leagueId={leagueId}
-                          seasonId={effectiveSeasonId}
-                        />
-                      ) : null}
+                      <div className="flex flex-col items-end gap-1">
+                        {applied && <StatusPill tone="red">Ban applied &mdash; next round</StatusPill>}
+                        {effectiveSeasonId && (
+                          <ApplyBanButton
+                            applied={applied}
+                            driverId={row.driver_id}
+                            driverName={driverName}
+                            leagueId={leagueId}
+                            seasonId={effectiveSeasonId}
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
                 </li>

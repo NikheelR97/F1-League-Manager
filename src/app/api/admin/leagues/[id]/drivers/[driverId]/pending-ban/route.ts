@@ -11,6 +11,7 @@ const paramsSchema = z.object({
 
 const bodySchema = z.object({
   season_id: z.string().uuid(),
+  pending_ban: z.boolean().default(true),
 });
 
 // M8 — Ban Watch's one-click "Apply ban": flags the driver's current-season
@@ -54,15 +55,15 @@ export async function PATCH(
 
     const { error: updateError } = await db
       .from("league_driver_entries")
-      .update({ pending_ban: true })
+      .update({ pending_ban: body.pending_ban })
       .eq("id", entry.id);
 
     if (updateError) {
-      return Response.json({ error: "Failed to apply ban" }, { status: 500 });
+      return Response.json({ error: "Failed to update ban status" }, { status: 500 });
     }
 
     await writeAdminAuditLog({
-      action: "driver.ban_applied",
+      action: body.pending_ban ? "driver.ban_applied" : "driver.ban_cleared",
       actorId: auth.user.id,
       entityId: driverId,
       entityType: "league_driver_entry",
