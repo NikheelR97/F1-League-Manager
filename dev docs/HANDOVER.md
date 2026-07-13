@@ -8,17 +8,49 @@
 
 ## Current Handover Notes
 
-Last updated: May 15, 2026.
+Last updated: July 13, 2026.
 
 Current branch state:
 
 | Item | Current state |
 |------|---------------|
-| Active development branch | `feature/s12-staging-prep` — staging smoke readiness and release prep evidence. |
-| Latest merged PR | PR #20, `fix(s12): migrate auth middleware to proxy` on `dev` |
-| Merge commit | `c9b9d7e` |
+| Integration branch | `dev` — all feature work merges here via PR. |
+| Latest merged PR | PR #50, `Fix all findings from the full-season GUI/UAT` on `dev` |
+| Merge commit | `da4c56f` (squash) |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
-| Latest migration applied locally | `20260513000000_s9_workbook_import.sql` (no new migration in S10 or S11) |
+| Latest migration applied locally | `20260713020000_pending_ban_and_reserve_nullable.sql` |
+
+> Local dev origin note: the app's admin-guard origin check is bound to the configured
+> `NEXT_PUBLIC_SITE_URL` (`http://localhost:3000` in `.env.local`). Browse the admin UI at
+> **`localhost:3000`**, not `127.0.0.1:3000` — the latter fails the origin check with a bare 403.
+
+### PR #50 — Full-season GUI/UAT fix cycle (July 2026)
+
+A full-season GUI/UAT (admin lifecycle + racer experience, all via the rendered UI) produced a
+prioritized fix plan; every finding is now resolved on `dev`. Highlights:
+
+```text
+- M1 round numbers come from the league schedule (session order), not the circuit's real-world
+  F1 slot (src/lib/public/league-round-number.ts).
+- M4 results can be team-less ("free agent"): race_results.team_id is nullable; constructor
+  standings (src/lib/results/standings.ts buildTeamStandings) skip null-team rows.
+- M5 the points system of a PUBLISHED session cannot be changed (guard in the session PATCH route)
+  — the only latent path to wrong championship points.
+- M6 qualifying can record DSQ/BAN/DNS (qualifying_results.qualifying_status).
+- Cluster C points systems are now editable with retroactive recalc behind a confirm dialog
+  (reuses recalculateStandings).
+- M7 archive is reversible (Reactivate control); M8 penalty-threshold Ban Watch has one-click
+  Apply/Clear ban (league_driver_entries.pending_ban).
+- Won't-fix by product decision: no race time/gap model (position + status is the intended model).
+```
+
+Three additive migrations landed with this PR (apply with `supabase migration up`, not a reset,
+if you have existing local data): `20260713000000_race_results_team_id_nullable.sql`,
+`20260713010000_qualifying_status.sql`, `20260713020000_pending_ban_and_reserve_nullable.sql`.
+
+Verification convention used this cycle: every fix was confirmed by observing the rendered GUI and
+re-confirming the seeded season's standings stayed canonical; `npm run qa` gates (type-check, lint,
+526 unit tests, build) plus the Playwright `verify` job all pass.
 
 S10 is the regression and security audit sprint. Key findings and audit results:
 
