@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { leagueRoundNumbers } from "@/lib/public/league-round-number";
 import { pageTitle } from "@/lib/public/page-title";
 import { comparePublicRaceResults } from "@/lib/public/result-sort";
 import { roundPrefix } from "@/lib/public/round-prefix";
@@ -30,14 +31,25 @@ export async function generateMetadata({
   const db = createSupabaseServiceRoleClient();
   const { data: session } = await db
     .from("race_sessions")
-    .select("name, circuits(grand_prix_name, round_number)")
+    .select("name, season_id, circuits(grand_prix_name, round_number)")
     .eq("id", sessionId)
     .eq("league_id", league.id)
     .single();
 
   const circuit = session?.circuits as unknown as { grand_prix_name: string; round_number: number | null } | null;
   const displayName = circuit?.grand_prix_name ?? session?.name ?? "Race Result";
-  return { title: pageTitle(`${roundPrefix(circuit?.round_number, displayName)}${displayName}`) };
+
+  const { data: siblings } = session
+    ? await db
+        .from("race_sessions")
+        .select("id, scheduled_at")
+        .eq("league_id", league.id)
+        .eq("season_id", session.season_id)
+        .eq("status", "completed")
+    : { data: null };
+  const roundNumber = siblings ? leagueRoundNumbers(siblings).get(sessionId) : undefined;
+
+  return { title: pageTitle(`${roundPrefix(roundNumber, displayName)}${displayName}`) };
 }
 
 // HANDOVER sort order: finished → lap down → dnf → dsq → ban → dnp
@@ -71,7 +83,7 @@ export default async function RaceResultPage({
   ] = await Promise.all([
     db
       .from("race_sessions")
-      .select("id, name, race_number, race_length_percent, published_at, circuits(name, country, grand_prix_name, round_number)")
+      .select("id, name, season_id, race_number, race_length_percent, published_at, circuits(name, country, grand_prix_name, round_number)")
       .eq("id", sessionId)
       .eq("league_id", league.id)
       .eq("status", "completed")
@@ -107,6 +119,17 @@ export default async function RaceResultPage({
   const circuit = session.circuits as unknown as Circuit | null;
   const displayName = circuit?.grand_prix_name ?? session.name;
 
+  // League round number = this session's rank by scheduled_at among the
+  // league's completed sessions this season — not circuits.round_number,
+  // which is the circuit's real-world F1 calendar slot.
+  const { data: siblings } = await db
+    .from("race_sessions")
+    .select("id, scheduled_at")
+    .eq("league_id", league.id)
+    .eq("season_id", session.season_id)
+    .eq("status", "completed");
+  const roundNumber = leagueRoundNumbers(siblings ?? []).get(session.id);
+
   const sortedResults = [...(raceResults ?? [])].sort(comparePublicRaceResults);
 
   const fastestLapRow = sortedResults.find((r) => r.fastest_lap);
@@ -118,7 +141,7 @@ export default async function RaceResultPage({
         lastRound={session.name}
         leagueName={league.name}
         seasonName={league.season.name}
-        title={`${roundPrefix(circuit?.round_number, displayName)}${displayName}`}
+        title={`${roundPrefix(roundNumber, displayName)}${displayName}`}
         updatedAt={session.published_at}
       />
 

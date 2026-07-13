@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { SeasonSelector } from "@/components/league/SeasonSelector";
 import { formatDate } from "@/lib/format-date";
+import { leagueRoundNumbers } from "@/lib/public/league-round-number";
 import { pageTitle } from "@/lib/public/page-title";
 import { roundPrefix } from "@/lib/public/round-prefix";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
@@ -74,6 +75,7 @@ export default async function ResultsIndexPage({
 
   const results = sessions ?? [];
   const lastSession = results[0];
+  const roundNumbers = leagueRoundNumbers(results);
   const displaySeason =
     seasons.find((s) => s.id === seasonId)?.name ?? league.season?.name ?? "";
 
@@ -111,7 +113,7 @@ export default async function ResultsIndexPage({
                 >
                   <div>
                     <p className="font-bold text-f1-white">
-                      {roundPrefix(circuit?.round_number, displayName)}
+                      {roundPrefix(roundNumbers.get(session.id), displayName)}
                       {displayName}
                     </p>
                     <p className="text-xs text-f1-muted">
