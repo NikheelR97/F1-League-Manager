@@ -91,7 +91,7 @@ export default async function RaceResultPage({
       .single(),
     db
       .from("qualifying_results")
-      .select("qualifying_position, is_pole, drivers(display_name, racing_number), teams(name, color_hex)")
+      .select("driver_id, qualifying_position, qualifying_status, is_pole, drivers(display_name, racing_number), teams(name, color_hex)")
       .eq("race_session_id", sessionId)
       .order("qualifying_position")
       .limit(20),
@@ -174,10 +174,15 @@ export default async function RaceResultPage({
               {qualifying.map((q) => {
                 const driver = q.drivers as unknown as Driver | null;
                 const team = q.teams as unknown as Team | null;
+                const isClassified = q.qualifying_status === "classified";
                 return (
-                  <tr key={q.qualifying_position} className="border-b border-f1-border/40">
+                  <tr key={q.driver_id} className="border-b border-f1-border/40">
                     <td className="py-1.5 pr-4 font-mono font-bold text-f1-white">
-                      {q.qualifying_position}{q.is_pole ? " 🏁" : ""}
+                      {isClassified ? (
+                        <>{q.qualifying_position}{q.is_pole ? " 🏁" : ""}</>
+                      ) : (
+                        <ResultStatus status={q.qualifying_status} />
+                      )}
                     </td>
                     <td className="py-1.5 pr-4 text-f1-white">{driver?.display_name ?? "—"}</td>
                     <td className="py-1.5">
@@ -196,12 +201,19 @@ export default async function RaceResultPage({
             {qualifying.map((q) => {
               const driver = q.drivers as unknown as Driver | null;
               const team = q.teams as unknown as Team | null;
+              const isClassified = q.qualifying_status === "classified";
               return (
-                <li key={q.qualifying_position} className="flex items-center gap-3 border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm">
-                  <span className="w-6 font-mono font-bold text-f1-white">{q.qualifying_position}</span>
+                <li key={q.driver_id} className="flex items-center gap-3 border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm">
+                  <span className="w-6 font-mono font-bold text-f1-white">
+                    {isClassified ? q.qualifying_position : "—"}
+                  </span>
                   <span aria-hidden="true" className="h-3 w-1" style={{ backgroundColor: team?.color_hex ?? "#444" }} />
                   <span className="text-f1-white">{driver?.display_name ?? "—"}</span>
-                  <span className="ml-auto text-xs text-f1-muted">{team?.name ?? "—"}</span>
+                  {isClassified ? (
+                    <span className="ml-auto text-xs text-f1-muted">{team?.name ?? "—"}</span>
+                  ) : (
+                    <span className="ml-auto"><ResultStatus status={q.qualifying_status} /></span>
+                  )}
                 </li>
               );
             })}

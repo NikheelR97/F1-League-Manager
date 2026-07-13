@@ -10,7 +10,9 @@ import { publishSession } from "@/lib/results/publish-service";
 const qualifyingSchema = z.object({
   driver_id: z.string().uuid(),
   team_id: z.string().uuid(),
-  qualifying_position: z.number().int().positive(),
+  // M6 — a DSQ/BAN/DNS driver may have no numeric position.
+  qualifying_position: z.number().int().positive().nullable(),
+  qualifying_status: z.enum(["classified", "dsq", "ban", "dns"]).default("classified"),
   is_pole: z.boolean(),
 });
 

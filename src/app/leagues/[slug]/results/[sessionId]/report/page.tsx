@@ -79,7 +79,7 @@ export default async function RaceReportPage({
     db
       .from("qualifying_results")
       .select(
-        "qualifying_position, is_pole, drivers(display_name, racing_number), teams(name, color_hex)",
+        "driver_id, qualifying_position, qualifying_status, is_pole, drivers(display_name, racing_number), teams(name, color_hex)",
       )
       .eq("race_session_id", sessionId)
       .order("qualifying_position")
@@ -340,15 +340,16 @@ export default async function RaceReportPage({
             {qualifying.map((q) => {
               const driver = q.drivers as unknown as Driver | null;
               const team = q.teams as unknown as Team | null;
+              const isClassified = q.qualifying_status === "classified";
               return (
                 <li
-                  key={q.qualifying_position}
+                  key={q.driver_id}
                   className="flex items-center gap-2 border border-f1-border/40 bg-f1-dark px-2.5 py-1.5 text-xs"
                 >
                   <span
                     className={`w-4 font-mono font-bold ${q.is_pole ? "text-f1-red" : "text-f1-muted"}`}
                   >
-                    {q.qualifying_position}
+                    {isClassified ? q.qualifying_position : "—"}
                   </span>
                   <span
                     aria-hidden="true"
@@ -358,6 +359,11 @@ export default async function RaceReportPage({
                   <span className="truncate text-f1-white">
                     {driver?.display_name ?? "—"}
                   </span>
+                  {!isClassified && (
+                    <span className="ml-auto shrink-0">
+                      <ResultStatus status={q.qualifying_status} />
+                    </span>
+                  )}
                 </li>
               );
             })}

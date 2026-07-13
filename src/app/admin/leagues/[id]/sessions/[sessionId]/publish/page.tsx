@@ -217,7 +217,7 @@ export default async function SessionPublishPage({
     ] = await Promise.all([
       db
         .from("qualifying_results")
-        .select("driver_id, team_id, qualifying_position, is_pole")
+        .select("driver_id, team_id, qualifying_position, qualifying_status, is_pole")
         .eq("race_session_id", sessionId),
       db
         .from("race_results")
@@ -244,6 +244,7 @@ export default async function SessionPublishPage({
       driver_id: q.driver_id,
       is_pole: q.is_pole,
       qualifying_position: q.qualifying_position,
+      qualifying_status: q.qualifying_status,
       team_id: q.team_id,
     }));
 

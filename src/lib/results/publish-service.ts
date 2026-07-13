@@ -16,7 +16,9 @@ import {
 export interface QualifyingEntry {
   driver_id: string;
   team_id: string;
-  qualifying_position: number;
+  qualifying_position: number | null;
+  // M6 — a DSQ/BAN/DNS driver may have no position; defaults to "classified".
+  qualifying_status: "classified" | "dsq" | "ban" | "dns";
   is_pole: boolean;
 }
 
@@ -304,6 +306,7 @@ export async function publishSession(
         driver_id: q.driver_id,
         team_id: q.team_id,
         qualifying_position: q.qualifying_position,
+        qualifying_status: q.qualifying_status,
         is_pole: q.is_pole,
       })),
     );
