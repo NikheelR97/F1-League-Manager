@@ -179,7 +179,16 @@ export default async function RaceResultPage({
                   <tr key={q.driver_id} className="border-b border-f1-border/40">
                     <td className="py-1.5 pr-4 font-mono font-bold text-f1-white">
                       {isClassified ? (
-                        <>{q.qualifying_position}{q.is_pole ? " 🏁" : ""}</>
+                        <>
+                          <span className={q.is_pole ? "text-f1-red" : ""}>
+                            {q.qualifying_position}
+                          </span>
+                          {q.is_pole && (
+                            <span className="ml-2 text-xs font-bold uppercase text-f1-red">
+                              P
+                            </span>
+                          )}
+                        </>
                       ) : (
                         <ResultStatus status={q.qualifying_status} />
                       )}
@@ -324,7 +333,14 @@ export default async function RaceResultPage({
               const driver = p.drivers as unknown as { display_name: string } | null;
               return (
                 <li key={p.id} className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm">
-                  <span className="text-f1-white">{driver?.display_name ?? "—"}</span>
+                  <div>
+                    <span className="text-f1-white">{driver?.display_name ?? "—"}</span>
+                    {p.reason && (
+                      <span className="ml-3 text-xs text-f1-muted">
+                        {p.reason}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-right">
                     <span className="font-mono text-xs text-f1-red">{p.penalty_points} pts</span>
                     <span className="ml-3 font-mono text-xs uppercase text-f1-muted">{p.status}</span>

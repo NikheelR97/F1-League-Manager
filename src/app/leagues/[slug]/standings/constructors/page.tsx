@@ -153,7 +153,7 @@ export default async function ConstructorStandingsPage({
         <EmptyState message="Constructor standings will appear once results are published." title="No standings yet" />
       ) : (
         <>
-          <StandingsSearch />
+          <StandingsSearch label="Find a constructor..." />
           <table className="hidden w-full text-sm md:table">
             <thead>
               <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
@@ -246,6 +246,9 @@ export default async function ConstructorStandingsPage({
               );
             })}
           </ul>
+
+          {/* Tiebreak note */}
+          <p className="text-xs text-f1-muted">Ties broken by wins, then podiums.</p>
         </>
       )}
     </div>
