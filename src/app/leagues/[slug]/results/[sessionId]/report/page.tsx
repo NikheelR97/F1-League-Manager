@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ResultStatus } from "@/components/ui/ResultStatus";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { pageTitle } from "@/lib/public/page-title";
@@ -258,8 +259,8 @@ export default async function RaceReportPage({
                       <td className="py-2 pr-4 text-right font-mono text-f1-white">
                         {totalPts}
                       </td>
-                      <td className="py-2 text-right font-mono text-xs uppercase text-f1-muted">
-                        {isClassified ? "" : r.result_status}
+                      <td className="py-2 text-right">
+                        <ResultStatus status={r.result_status} />
                       </td>
                     </tr>
                   );
@@ -306,9 +307,7 @@ export default async function RaceReportPage({
                         {totalPts} pts
                       </span>
                       {!isClassified && (
-                        <span className="font-mono text-xs uppercase text-f1-muted">
-                          {r.result_status}
-                        </span>
+                        <ResultStatus status={r.result_status} />
                       )}
                     </div>
                   </li>
