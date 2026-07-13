@@ -7,6 +7,7 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   draft: ["active"],
   active: ["archived"],
+  archived: ["active"],
 };
 
 const bodySchema = z.object({

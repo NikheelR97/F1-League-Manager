@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FormError } from "@/components/ui/FormError";
+import { StatusPill } from "@/components/ui/StatusPill";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 import { useFocusOnMount } from "@/lib/hooks/use-focus-on-mount";
 
@@ -29,6 +30,9 @@ export interface SessionDriver {
   // M7 — the driver's present-day team, used only to flag when it differs
   // from `team_id` (which is resolved as of the session's own date).
   present_team_id?: string;
+  // M8 — true when an admin applied a Ban Watch ban for this driver; the
+  // Results step pre-selects Status=BAN and shows a SUSPENDED badge.
+  pending_ban?: boolean;
   racing_number: number | null;
   team_id: string;
   team_name: string;
@@ -49,10 +53,15 @@ export interface SessionInfo {
   points_system: PointsSystemPreview;
 }
 
+// M6 — no "dnf" here: a DNF isn't a meaningful qualifying outcome, only
+// classified/dsq/ban/dns are.
+type QualifyingStatus = "classified" | "dsq" | "ban" | "dns";
+
 export interface QualifyingRow {
   driver_id: string;
   is_pole: boolean;
   qualifying_position: number | null;
+  qualifying_status: QualifyingStatus;
   team_id: string;
 }
 
@@ -145,7 +154,13 @@ function previewRacePoints(
 }
 
 function defaultQualifyingRow(d: SessionDriver): QualifyingRow {
-  return { driver_id: d.driver_id, is_pole: false, qualifying_position: null, team_id: d.team_id };
+  return {
+    driver_id: d.driver_id,
+    is_pole: false,
+    qualifying_position: null,
+    qualifying_status: "classified",
+    team_id: d.team_id,
+  };
 }
 
 function defaultResultRow(d: SessionDriver): RaceResultRow {
@@ -156,7 +171,10 @@ function defaultResultRow(d: SessionDriver): RaceResultRow {
     manual_points_adjustment: 0,
     notes: "",
     raw_result: "",
-    result_status: "classified",
+    // M8 — a driver with an applied Ban Watch ban starts pre-selected BAN
+    // instead of the usual default, so publishing the round without
+    // touching their row still records the enforcement.
+    result_status: d.pending_ban ? "ban" : "classified",
     team_id: d.team_id,
     covering_for_driver_id: null,
   };
@@ -340,16 +358,20 @@ function QualifyingStep({
     onChange(rows.map((r) => ({ ...r, is_pole: r.driver_id === driverId })));
   }
 
+  const statuses: QualifyingStatus[] = ["classified", "dsq", "ban", "dns"];
+
   return (
     <div className="space-y-3">
       <p className="text-xs text-f1-muted">
-        Enter qualifying positions. Leave blank for drivers who did not qualify (DNS).
+        Enter qualifying positions. Leave blank and status Classified for drivers who did not
+        qualify (DNS) without recording it — or set the status explicitly for a DSQ/BAN/DNS.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-f1-border text-left text-xs text-f1-muted">
               <th className="pb-2 pr-4">Driver</th>
+              <th className="pb-2 pr-4 w-28">Status</th>
               <th className="pb-2 pr-4 w-24">Quali pos</th>
               <th className="pb-2 w-16 text-center">Pole</th>
             </tr>
@@ -382,6 +404,20 @@ function QualifyingStep({
                         </span>
                       )}
                     </div>
+                  </td>
+                  <td className="py-2 pr-4">
+                    <select
+                      aria-label={`Qualifying status for ${driver?.display_name ?? row.driver_id}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none uppercase"
+                      value={row.qualifying_status}
+                      onChange={(e) =>
+                        update(row.driver_id, { qualifying_status: e.target.value as QualifyingStatus })
+                      }
+                    >
+                      {statuses.map((s) => (
+                        <option key={s} value={s}>{s.toUpperCase()}</option>
+                      ))}
+                    </select>
                   </td>
                   <td className="py-2 pr-4">
                     <input
@@ -523,6 +559,9 @@ function ResultsStep({
                       {driver?.left_roster && (
                         <span className="text-xs text-f1-muted uppercase">Left roster</span>
                       )}
+                      {driver?.pending_ban && (
+                        <StatusPill tone="red">Suspended</StatusPill>
+                      )}
                       {bannedByDriver.has(row.driver_id) && (
                         <span
                           className="text-xs text-destructive uppercase"
@@ -555,10 +594,11 @@ function ResultsStep({
                       value={row.team_id}
                       onChange={(e) => update(row.driver_id, { team_id: e.target.value })}
                     >
+                      <option value="">No team / free agent</option>
                       {teams.map((t) => (
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
-                      {!teams.find((t) => t.id === row.team_id) && (
+                      {row.team_id && !teams.find((t) => t.id === row.team_id) && (
                         <option value={row.team_id}>{driver?.team_name ?? "Unknown"}</option>
                       )}
                     </select>
@@ -611,6 +651,14 @@ function ResultsStep({
                       <p className="mt-1 w-32 text-xs text-destructive" id={posErrorId}>
                         P{posConflict.position} assigned to{" "}
                         {posConflict.driverIds.map((id) => driverName(id)).join(" and ")}
+                      </p>
+                    )}
+                    {/* M11 — a classified driver with no position silently
+                        never appears in the published result (see
+                        filterPublishedResults); nudge rather than block. */}
+                    {!posConflict && row.result_status === "classified" && row.finishing_position === null && (
+                      <p className="mt-1 w-32 text-xs text-yellow-400">
+                        No position set &mdash; add one or change Status to DNS.
                       </p>
                     )}
                   </td>
@@ -1034,7 +1082,7 @@ function ReviewStep({
                         {isThresholdAlert && (
                           <span
                             className="text-xs text-destructive uppercase"
-                            title="Alert only — admin decision required"
+                            title="Preview only, before publish — admin decision required. The league page's Ban Watch reflects the same threshold once published."
                           >
                             Threshold alert
                           </span>
@@ -1283,11 +1331,17 @@ export function ResultStepper({
     setPublishing(true);
     try {
       const qualifying = qualifyingRows
-        .filter((q) => q.qualifying_position !== null)
+        // M6 — an untouched default row (classified, no position) carries no
+        // participation signal and is dropped, same as before. A row with an
+        // explicit non-classified status is kept even with no position, so a
+        // DSQ/BAN/DNS is recorded rather than silently omitted.
+        .filter((q) => q.qualifying_position !== null || q.qualifying_status !== "classified")
         .map((q) => ({
           driver_id: q.driver_id,
           is_pole: q.is_pole,
-          qualifying_position: q.qualifying_position!,
+          qualifying_position: q.qualifying_position,
+          // Restored drafts saved before this field existed won't have it.
+          qualifying_status: q.qualifying_status ?? "classified",
           team_id: q.team_id,
         }));
 
@@ -1299,7 +1353,9 @@ export function ResultStepper({
         notes: r.notes || null,
         raw_result: r.raw_result || null,
         result_status: r.result_status,
-        team_id: r.team_id,
+        // M4 — "" is the UI sentinel for "No team / free agent" (a select
+        // can't hold null); convert to null at the wire boundary.
+        team_id: r.team_id || null,
         // Restored drafts saved before this field existed won't have it.
         covering_for_driver_id: r.covering_for_driver_id ?? null,
       }));

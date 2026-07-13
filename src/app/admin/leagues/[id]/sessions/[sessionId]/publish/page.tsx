@@ -50,7 +50,7 @@ export default async function SessionPublishPage({
     db
       .from("league_driver_entries")
       .select(
-        "driver_id, is_reserve, drivers(display_name, racing_number), driver_team_stints(team_id, starts_on, ends_on, teams(name, color_hex))",
+        "driver_id, is_reserve, pending_ban, drivers(display_name, racing_number), driver_team_stints(team_id, starts_on, ends_on, teams(name, color_hex))",
       )
       .eq("league_id", leagueId)
       .is("left_on", null)
@@ -118,6 +118,7 @@ export default async function SessionPublishPage({
       display_name: driver?.display_name ?? "Unknown",
       driver_id: entry.driver_id,
       is_reserve: entry.is_reserve,
+      pending_ban: entry.pending_ban,
       present_team_id: activeStint?.team_id ?? resolvedStint?.team_id ?? "",
       racing_number: driver?.racing_number ?? null,
       team_id: resolvedStint?.team_id ?? "",
@@ -217,7 +218,7 @@ export default async function SessionPublishPage({
     ] = await Promise.all([
       db
         .from("qualifying_results")
-        .select("driver_id, team_id, qualifying_position, is_pole")
+        .select("driver_id, team_id, qualifying_position, qualifying_status, is_pole")
         .eq("race_session_id", sessionId),
       db
         .from("race_results")
@@ -244,6 +245,7 @@ export default async function SessionPublishPage({
       driver_id: q.driver_id,
       is_pole: q.is_pole,
       qualifying_position: q.qualifying_position,
+      qualifying_status: q.qualifying_status,
       team_id: q.team_id,
     }));
 
@@ -256,7 +258,8 @@ export default async function SessionPublishPage({
       notes: r.notes ?? "",
       raw_result: r.raw_result ?? "",
       result_status: r.result_status,
-      team_id: r.team_id,
+      // M4 — "" is the stepper's UI sentinel for a null (free-agent) team_id.
+      team_id: r.team_id ?? "",
     }));
 
     initialPenaltyRows = (publishedPenalties ?? []).map((p) => ({
@@ -284,7 +287,9 @@ export default async function SessionPublishPage({
     const activeDriverIds = new Set(drivers.map((d) => d.driver_id));
     const publishedTeamByDriver = new Map<string, string>();
     for (const r of publishedResults ?? []) {
-      if (!publishedTeamByDriver.has(r.driver_id)) publishedTeamByDriver.set(r.driver_id, r.team_id);
+      // M4 — a free agent's published row has team_id null; "" is the same
+      // UI sentinel used everywhere else in this component.
+      if (!publishedTeamByDriver.has(r.driver_id)) publishedTeamByDriver.set(r.driver_id, r.team_id ?? "");
     }
     for (const q of publishedQualifying ?? []) {
       if (!publishedTeamByDriver.has(q.driver_id)) publishedTeamByDriver.set(q.driver_id, q.team_id);

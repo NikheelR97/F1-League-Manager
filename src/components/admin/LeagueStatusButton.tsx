@@ -13,6 +13,7 @@ interface LeagueStatusButtonProps {
 const NEXT_STATUS: Record<string, { label: string; target: "active" | "archived" }> = {
   draft: { label: "Activate League", target: "active" },
   active: { label: "Archive League", target: "archived" },
+  archived: { label: "Reactivate League", target: "active" },
 };
 
 export function LeagueStatusButton({ leagueId, currentStatus }: LeagueStatusButtonProps) {
@@ -35,6 +36,9 @@ export function LeagueStatusButton({ leagueId, currentStatus }: LeagueStatusButt
 
   async function handleClick() {
     if (!csrfToken) return;
+    if (next.target === "archived") {
+      if (!confirm("Archive this league? It will be hidden from active leagues but its results stay public. You can reactivate it later.")) return;
+    }
     setBusy(true);
     setError("");
 

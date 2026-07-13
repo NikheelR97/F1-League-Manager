@@ -23,20 +23,36 @@ type PointsSystemFields = z.infer<typeof pointsSystemSchema>;
 
 interface PointsSystemFormProps {
   leagueId: string;
+  // Edit mode: PATCHes the existing system instead of POSTing a new one, and
+  // prefills from the current row rather than the F1-standard defaults.
+  pointsSystemId?: string;
+  initialValues?: PointsSystemFields;
+  initialPositions?: Array<{ points: number; position: number }>;
+  // Count of already-published sessions scored by this system — drives the
+  // "this will rescore N published round(s)" confirm before saving an edit.
+  publishedSessionCount?: number;
 }
 
 const MAX_EDITABLE_POSITIONS = 10;
 
-export function PointsSystemForm({ leagueId }: PointsSystemFormProps) {
+export function PointsSystemForm({
+  leagueId,
+  pointsSystemId,
+  initialValues,
+  initialPositions,
+  publishedSessionCount = 0,
+}: PointsSystemFormProps) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
+  const isEdit = Boolean(pointsSystemId);
 
   // Local state: array of {position, points} pairs for the position editor
   const [rows, setRows] = useState<Array<{ points: number; position: number }>>(
-    Object.entries(STANDARD_POINTS).map(([pos, pts]) => ({
-      points: pts,
-      position: Number(pos),
-    })),
+    initialPositions ??
+      Object.entries(STANDARD_POINTS).map(([pos, pts]) => ({
+        points: pts,
+        position: Number(pos),
+      })),
   );
 
   const {
@@ -45,7 +61,7 @@ export function PointsSystemForm({ leagueId }: PointsSystemFormProps) {
     register,
     setError,
   } = useForm<PointsSystemFields>({
-    defaultValues: {
+    defaultValues: initialValues ?? {
       fastest_lap_points: 1,
       max_positions: 10,
       name: "Standard F1 Points",
@@ -89,6 +105,17 @@ export function PointsSystemForm({ leagueId }: PointsSystemFormProps) {
       return;
     }
 
+    if (isEdit && publishedSessionCount > 0) {
+      const round = publishedSessionCount === 1 ? "round" : "rounds";
+      if (
+        !confirm(
+          `This will rescore ${publishedSessionCount} published ${round}. Continue?`,
+        )
+      ) {
+        return;
+      }
+    }
+
     const points_by_position: Record<string, number> = {};
     for (const { points, position } of rows) {
       if (position > 0) {
@@ -97,19 +124,24 @@ export function PointsSystemForm({ leagueId }: PointsSystemFormProps) {
     }
 
     const payload = { ...values, points_by_position };
-    const res = await fetch(`/api/admin/leagues/${leagueId}/points-systems`, {
+    const url = isEdit
+      ? `/api/admin/leagues/${leagueId}/points-systems/${pointsSystemId}`
+      : `/api/admin/leagues/${leagueId}/points-systems`;
+    const res = await fetch(url, {
       body: JSON.stringify(payload),
       headers: {
         "content-type": "application/json",
         "x-csrf-token": csrfToken,
       },
-      method: "POST",
+      method: isEdit ? "PATCH" : "POST",
     });
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       setError("root", {
-        message: (body as { error?: string }).error ?? "Failed to create points system",
+        message:
+          (body as { error?: string }).error ??
+          `Failed to ${isEdit ? "save" : "create"} points system`,
       });
       return;
     }
@@ -232,7 +264,13 @@ export function PointsSystemForm({ leagueId }: PointsSystemFormProps) {
         disabled={isSubmitting}
         type="submit"
       >
-        {isSubmitting ? "Creating…" : "Create Points System"}
+        {isSubmitting
+          ? isEdit
+            ? "Saving…"
+            : "Creating…"
+          : isEdit
+            ? "Save Changes"
+            : "Create Points System"}
       </button>
     </form>
   );

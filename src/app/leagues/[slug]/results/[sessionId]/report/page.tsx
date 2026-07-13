@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ResultStatus } from "@/components/ui/ResultStatus";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { pageTitle } from "@/lib/public/page-title";
@@ -78,7 +79,7 @@ export default async function RaceReportPage({
     db
       .from("qualifying_results")
       .select(
-        "qualifying_position, is_pole, drivers(display_name, racing_number), teams(name, color_hex)",
+        "driver_id, qualifying_position, qualifying_status, is_pole, drivers(display_name, racing_number), teams(name, color_hex)",
       )
       .eq("race_session_id", sessionId)
       .order("qualifying_position")
@@ -252,14 +253,15 @@ export default async function RaceReportPage({
                             className="h-3 w-1 flex-shrink-0"
                             style={{ backgroundColor: team?.color_hex ?? "#444" }}
                           />
-                          <span className="text-f1-muted">{team?.name ?? "—"}</span>
+                          {/* M4 — team_id is null for a free-agent result. */}
+                          <span className="text-f1-muted">{team?.name ?? "Free agent"}</span>
                         </div>
                       </td>
                       <td className="py-2 pr-4 text-right font-mono text-f1-white">
                         {totalPts}
                       </td>
-                      <td className="py-2 text-right font-mono text-xs uppercase text-f1-muted">
-                        {isClassified ? "" : r.result_status}
+                      <td className="py-2 text-right">
+                        <ResultStatus status={r.result_status} />
                       </td>
                     </tr>
                   );
@@ -306,9 +308,7 @@ export default async function RaceReportPage({
                         {totalPts} pts
                       </span>
                       {!isClassified && (
-                        <span className="font-mono text-xs uppercase text-f1-muted">
-                          {r.result_status}
-                        </span>
+                        <ResultStatus status={r.result_status} />
                       )}
                     </div>
                   </li>
@@ -340,15 +340,16 @@ export default async function RaceReportPage({
             {qualifying.map((q) => {
               const driver = q.drivers as unknown as Driver | null;
               const team = q.teams as unknown as Team | null;
+              const isClassified = q.qualifying_status === "classified";
               return (
                 <li
-                  key={q.qualifying_position}
+                  key={q.driver_id}
                   className="flex items-center gap-2 border border-f1-border/40 bg-f1-dark px-2.5 py-1.5 text-xs"
                 >
                   <span
                     className={`w-4 font-mono font-bold ${q.is_pole ? "text-f1-red" : "text-f1-muted"}`}
                   >
-                    {q.qualifying_position}
+                    {isClassified ? q.qualifying_position : "—"}
                   </span>
                   <span
                     aria-hidden="true"
@@ -358,6 +359,11 @@ export default async function RaceReportPage({
                   <span className="truncate text-f1-white">
                     {driver?.display_name ?? "—"}
                   </span>
+                  {!isClassified && (
+                    <span className="ml-auto shrink-0">
+                      <ResultStatus status={q.qualifying_status} />
+                    </span>
+                  )}
                 </li>
               );
             })}

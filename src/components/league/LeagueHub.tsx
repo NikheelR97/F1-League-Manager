@@ -64,6 +64,7 @@ interface LeagueHubProps {
   topDrivers: TopDriver[];
   topConstructors: TopConstructor[];
   penaltyAlerts: PenaltyAlert[];
+  publishedRaceCount?: number;
   latestWheelSpin?: LatestWheelSpin | null;
   wheelPoolRemaining?: number | null;
 }
@@ -104,6 +105,7 @@ export function LeagueHub({
   topDrivers,
   topConstructors,
   penaltyAlerts,
+  publishedRaceCount = 0,
   latestWheelSpin = null,
   wheelPoolRemaining = null,
 }: LeagueHubProps) {
@@ -123,6 +125,7 @@ export function LeagueHub({
   // agent this wave) — a past-dated "next race" is a data problem (seeded/stale
   // scheduled_at), not an imminent one, so it shouldn't read "Race ready".
   const nextRaceIsPast = nextRace ? new Date(nextRace.scheduled_at).getTime() < now.getTime() : false;
+  const seasonComplete = !nextRace && publishedRaceCount > 0;
 
   return (
     <section>
@@ -141,7 +144,9 @@ export function LeagueHub({
           </StatusPill>
           <h1>{league.name}</h1>
           <p className="text-sm text-f1-muted">{league.season?.name}</p>
-          {nextRace && nextRaceIsPast ? (
+          {seasonComplete ? (
+            <p className="font-mono text-sm text-f1-muted">Season complete</p>
+          ) : nextRace && nextRaceIsPast ? (
             <p className="font-mono text-sm text-f1-muted">{formatDate(nextRace.scheduled_at)}</p>
           ) : (
             <RaceCountdown now={now} targetIso={nextRace?.scheduled_at ?? null} />

@@ -4,8 +4,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ResultStatus } from "@/components/ui/ResultStatus";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
+import { leagueRoundNumbers } from "@/lib/public/league-round-number";
 import { pageTitle } from "@/lib/public/page-title";
 import { comparePublicRaceResults } from "@/lib/public/result-sort";
 import { roundPrefix } from "@/lib/public/round-prefix";
@@ -30,14 +32,25 @@ export async function generateMetadata({
   const db = createSupabaseServiceRoleClient();
   const { data: session } = await db
     .from("race_sessions")
-    .select("name, circuits(grand_prix_name, round_number)")
+    .select("name, season_id, circuits(grand_prix_name, round_number)")
     .eq("id", sessionId)
     .eq("league_id", league.id)
     .single();
 
   const circuit = session?.circuits as unknown as { grand_prix_name: string; round_number: number | null } | null;
   const displayName = circuit?.grand_prix_name ?? session?.name ?? "Race Result";
-  return { title: pageTitle(`${roundPrefix(circuit?.round_number, displayName)}${displayName}`) };
+
+  const { data: siblings } = session
+    ? await db
+        .from("race_sessions")
+        .select("id, scheduled_at")
+        .eq("league_id", league.id)
+        .eq("season_id", session.season_id)
+        .eq("status", "completed")
+    : { data: null };
+  const roundNumber = siblings ? leagueRoundNumbers(siblings).get(sessionId) : undefined;
+
+  return { title: pageTitle(`${roundPrefix(roundNumber, displayName)}${displayName}`) };
 }
 
 // HANDOVER sort order: finished → lap down → dnf → dsq → ban → dnp
@@ -71,14 +84,14 @@ export default async function RaceResultPage({
   ] = await Promise.all([
     db
       .from("race_sessions")
-      .select("id, name, race_number, race_length_percent, published_at, circuits(name, country, grand_prix_name, round_number)")
+      .select("id, name, season_id, race_number, race_length_percent, published_at, circuits(name, country, grand_prix_name, round_number)")
       .eq("id", sessionId)
       .eq("league_id", league.id)
       .eq("status", "completed")
       .single(),
     db
       .from("qualifying_results")
-      .select("qualifying_position, is_pole, drivers(display_name, racing_number), teams(name, color_hex)")
+      .select("driver_id, qualifying_position, qualifying_status, is_pole, drivers(display_name, racing_number), teams(name, color_hex)")
       .eq("race_session_id", sessionId)
       .order("qualifying_position")
       .limit(20),
@@ -107,6 +120,17 @@ export default async function RaceResultPage({
   const circuit = session.circuits as unknown as Circuit | null;
   const displayName = circuit?.grand_prix_name ?? session.name;
 
+  // League round number = this session's rank by scheduled_at among the
+  // league's completed sessions this season — not circuits.round_number,
+  // which is the circuit's real-world F1 calendar slot.
+  const { data: siblings } = await db
+    .from("race_sessions")
+    .select("id, scheduled_at")
+    .eq("league_id", league.id)
+    .eq("season_id", session.season_id)
+    .eq("status", "completed");
+  const roundNumber = leagueRoundNumbers(siblings ?? []).get(session.id);
+
   const sortedResults = [...(raceResults ?? [])].sort(comparePublicRaceResults);
 
   const fastestLapRow = sortedResults.find((r) => r.fastest_lap);
@@ -118,7 +142,7 @@ export default async function RaceResultPage({
         lastRound={session.name}
         leagueName={league.name}
         seasonName={league.season.name}
-        title={`${roundPrefix(circuit?.round_number, displayName)}${displayName}`}
+        title={`${roundPrefix(roundNumber, displayName)}${displayName}`}
         updatedAt={session.published_at}
       />
 
@@ -150,10 +174,24 @@ export default async function RaceResultPage({
               {qualifying.map((q) => {
                 const driver = q.drivers as unknown as Driver | null;
                 const team = q.teams as unknown as Team | null;
+                const isClassified = q.qualifying_status === "classified";
                 return (
-                  <tr key={q.qualifying_position} className="border-b border-f1-border/40">
+                  <tr key={q.driver_id} className="border-b border-f1-border/40">
                     <td className="py-1.5 pr-4 font-mono font-bold text-f1-white">
-                      {q.qualifying_position}{q.is_pole ? " 🏁" : ""}
+                      {isClassified ? (
+                        <>
+                          <span className={q.is_pole ? "text-f1-red" : ""}>
+                            {q.qualifying_position}
+                          </span>
+                          {q.is_pole && (
+                            <span className="ml-2 text-xs font-bold uppercase text-f1-red">
+                              P
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <ResultStatus status={q.qualifying_status} />
+                      )}
                     </td>
                     <td className="py-1.5 pr-4 text-f1-white">{driver?.display_name ?? "—"}</td>
                     <td className="py-1.5">
@@ -172,12 +210,19 @@ export default async function RaceResultPage({
             {qualifying.map((q) => {
               const driver = q.drivers as unknown as Driver | null;
               const team = q.teams as unknown as Team | null;
+              const isClassified = q.qualifying_status === "classified";
               return (
-                <li key={q.qualifying_position} className="flex items-center gap-3 border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm">
-                  <span className="w-6 font-mono font-bold text-f1-white">{q.qualifying_position}</span>
+                <li key={q.driver_id} className="flex items-center gap-3 border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm">
+                  <span className="w-6 font-mono font-bold text-f1-white">
+                    {isClassified ? q.qualifying_position : "—"}
+                  </span>
                   <span aria-hidden="true" className="h-3 w-1" style={{ backgroundColor: team?.color_hex ?? "#444" }} />
                   <span className="text-f1-white">{driver?.display_name ?? "—"}</span>
-                  <span className="ml-auto text-xs text-f1-muted">{team?.name ?? "—"}</span>
+                  {isClassified ? (
+                    <span className="ml-auto text-xs text-f1-muted">{team?.name ?? "—"}</span>
+                  ) : (
+                    <span className="ml-auto"><ResultStatus status={q.qualifying_status} /></span>
+                  )}
                 </li>
               );
             })}
@@ -235,12 +280,13 @@ export default async function RaceResultPage({
                       <td className="py-2 pr-4">
                         <div className="flex items-center gap-2">
                           <span aria-hidden="true" className="h-3 w-1" style={{ backgroundColor: team?.color_hex ?? "#444" }} />
-                          <span className="text-f1-muted">{team?.name ?? "—"}</span>
+                          {/* M4 — team_id is null for a free-agent result: no constructor, but the driver still scored. */}
+                          <span className="text-f1-muted">{team?.name ?? "Free agent"}</span>
                         </div>
                       </td>
                       <td className="py-2 pr-4 text-right font-mono text-f1-white">{totalPts}</td>
-                      <td className="py-2 text-right font-mono text-xs uppercase text-f1-muted">
-                        {isClassified ? "" : r.result_status}
+                      <td className="py-2 text-right">
+                        <ResultStatus status={r.result_status} />
                       </td>
                     </tr>
                   );
@@ -267,7 +313,7 @@ export default async function RaceResultPage({
                       </span>
                       <span className="font-mono text-sm font-bold text-f1-white">{totalPts} pts</span>
                       {!isClassified && (
-                        <span className="font-mono text-xs uppercase text-f1-muted">{r.result_status}</span>
+                        <ResultStatus status={r.result_status} />
                       )}
                     </div>
                   </li>
@@ -287,7 +333,14 @@ export default async function RaceResultPage({
               const driver = p.drivers as unknown as { display_name: string } | null;
               return (
                 <li key={p.id} className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm">
-                  <span className="text-f1-white">{driver?.display_name ?? "—"}</span>
+                  <div>
+                    <span className="text-f1-white">{driver?.display_name ?? "—"}</span>
+                    {p.reason && (
+                      <span className="ml-3 text-xs text-f1-muted">
+                        {p.reason}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-right">
                     <span className="font-mono text-xs text-f1-red">{p.penalty_points} pts</span>
                     <span className="ml-3 font-mono text-xs uppercase text-f1-muted">{p.status}</span>

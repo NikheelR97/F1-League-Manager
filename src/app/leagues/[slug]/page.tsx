@@ -42,6 +42,7 @@ async function getLeagueHubData(leagueId: string, seasonId: string, isWheelLeagu
     { data: penaltyAlerts },
     { data: latestWheelSpin },
     { count: wheelPoolRemaining },
+    { count: publishedRaceCount },
   ] = await Promise.all([
     db
       .from("race_sessions")
@@ -102,6 +103,12 @@ async function getLeagueHubData(leagueId: string, seasonId: string, isWheelLeagu
           .eq("is_available", true)
           .is("used_at", null)
       : Promise.resolve({ count: null }),
+    db
+      .from("race_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("league_id", leagueId)
+      .eq("season_id", seasonId)
+      .eq("status", "completed"),
   ]);
 
   return {
@@ -109,6 +116,7 @@ async function getLeagueHubData(leagueId: string, seasonId: string, isWheelLeagu
     latestWheelSpin: latestWheelSpin ?? null,
     nextRace: nextRace ?? null,
     penaltyAlerts: penaltyAlerts ?? [],
+    publishedRaceCount: publishedRaceCount ?? 0,
     topConstructors: topConstructors ?? [],
     topDrivers: topDrivers ?? [],
     wheelPoolRemaining: isWheelLeague ? (wheelPoolRemaining ?? 0) : null,
@@ -184,6 +192,7 @@ export default async function LeaguePage({ params }: LeaguePageProps) {
       league={league}
       nextRace={data.nextRace}
       penaltyAlerts={data.penaltyAlerts}
+      publishedRaceCount={data.publishedRaceCount}
       topConstructors={data.topConstructors}
       topDrivers={data.topDrivers}
       wheelPoolRemaining={data.wheelPoolRemaining}

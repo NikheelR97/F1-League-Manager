@@ -15,7 +15,7 @@ const pointsByPositionSchema = z
     { message: `Must have 1–${MAX_POINTS_POSITIONS} positions` },
   );
 
-const createPointsSystemSchema = z.object({
+export const createPointsSystemSchema = z.object({
   fastest_lap_points: z.number().int().min(0).max(10).default(1),
   max_positions: z.number().int().min(1).max(MAX_POINTS_POSITIONS).default(10),
   name: z.string().trim().min(1).max(80),

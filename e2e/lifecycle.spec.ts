@@ -239,7 +239,7 @@ test.describe.serial("Lifecycle — fresh isolated league (T11, T12, T14, T15, T
     },
   );
 
-  test("T13: archiving is a one-way transition; reactivate (archived->active) is rejected (finding F5)", async ({
+  test("T13: archive is reversible — reactivate (archived->active) is supported (UAT M7)", async ({
     page,
     request,
   }) => {
@@ -259,10 +259,18 @@ test.describe.serial("Lifecycle — fresh isolated league (T11, T12, T14, T15, T
     await page.goto("/");
     await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
 
+    // UAT M7: archiving is no longer one-way — an archived league can be reactivated.
     const reactivateRes = await request.patch(`/api/admin/leagues/${leagueId}/status`, {
       headers,
       data: { status: "active" },
     });
-    expect(reactivateRes.status()).toBe(422);
+    expect(reactivateRes.status()).toBe(200);
+
+    // Round-trip confirms the transition is genuinely two-way.
+    const rearchiveRes = await request.patch(`/api/admin/leagues/${leagueId}/status`, {
+      headers,
+      data: { status: "archived" },
+    });
+    expect(rearchiveRes.status()).toBe(200);
   });
 });
