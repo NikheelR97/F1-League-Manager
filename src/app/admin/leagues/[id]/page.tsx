@@ -264,11 +264,20 @@ export default async function LeagueDetailPage({
           <ul className="space-y-2">
             {pointsSystems.map((ps) => (
               <li key={ps.id}>
-                <div className="border border-f1-border bg-f1-dark p-4">
-                  <p className="font-bold text-f1-white">{ps.name}</p>
-                  <p className="font-mono text-xs text-f1-muted">
-                    Top {ps.max_positions} · FL +{ps.fastest_lap_points} · Pole +{ps.pole_position_points}
-                  </p>
+                <div className="flex items-center justify-between border border-f1-border bg-f1-dark p-4">
+                  <div>
+                    <p className="font-bold text-f1-white">{ps.name}</p>
+                    <p className="font-mono text-xs text-f1-muted">
+                      Top {ps.max_positions} · FL +{ps.fastest_lap_points} · Pole +{ps.pole_position_points}
+                    </p>
+                  </div>
+                  <Link
+                    className="p-1 text-f1-muted transition-colors hover:text-f1-white"
+                    href={`/admin/leagues/${leagueId}/points-systems/${ps.id}/edit`}
+                    title="Edit Points System"
+                  >
+                    <Pencil aria-hidden="true" size={16} />
+                  </Link>
                 </div>
               </li>
             ))}
