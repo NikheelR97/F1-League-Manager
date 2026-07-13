@@ -102,8 +102,8 @@ describe("formatGap helper", () => {
     expect(formatGap(200, 100, 5)).toBe("-100 pts");
   });
 
-  it("handles zero gap for tied points outside position 1", () => {
-    expect(formatGap(200, 200, 2)).toBe("-0 pts");
+  it("shows TIED for zero gap outside position 1", () => {
+    expect(formatGap(200, 200, 2)).toBe("TIED");
   });
 });
 
