@@ -555,10 +555,11 @@ function ResultsStep({
                       value={row.team_id}
                       onChange={(e) => update(row.driver_id, { team_id: e.target.value })}
                     >
+                      <option value="">No team / free agent</option>
                       {teams.map((t) => (
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
-                      {!teams.find((t) => t.id === row.team_id) && (
+                      {row.team_id && !teams.find((t) => t.id === row.team_id) && (
                         <option value={row.team_id}>{driver?.team_name ?? "Unknown"}</option>
                       )}
                     </select>
@@ -1299,7 +1300,9 @@ export function ResultStepper({
         notes: r.notes || null,
         raw_result: r.raw_result || null,
         result_status: r.result_status,
-        team_id: r.team_id,
+        // M4 — "" is the UI sentinel for "No team / free agent" (a select
+        // can't hold null); convert to null at the wire boundary.
+        team_id: r.team_id || null,
         // Restored drafts saved before this field existed won't have it.
         covering_for_driver_id: r.covering_for_driver_id ?? null,
       }));

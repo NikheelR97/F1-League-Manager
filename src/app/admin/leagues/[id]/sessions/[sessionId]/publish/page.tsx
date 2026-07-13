@@ -256,7 +256,8 @@ export default async function SessionPublishPage({
       notes: r.notes ?? "",
       raw_result: r.raw_result ?? "",
       result_status: r.result_status,
-      team_id: r.team_id,
+      // M4 — "" is the stepper's UI sentinel for a null (free-agent) team_id.
+      team_id: r.team_id ?? "",
     }));
 
     initialPenaltyRows = (publishedPenalties ?? []).map((p) => ({
@@ -284,7 +285,9 @@ export default async function SessionPublishPage({
     const activeDriverIds = new Set(drivers.map((d) => d.driver_id));
     const publishedTeamByDriver = new Map<string, string>();
     for (const r of publishedResults ?? []) {
-      if (!publishedTeamByDriver.has(r.driver_id)) publishedTeamByDriver.set(r.driver_id, r.team_id);
+      // M4 — a free agent's published row has team_id null; "" is the same
+      // UI sentinel used everywhere else in this component.
+      if (!publishedTeamByDriver.has(r.driver_id)) publishedTeamByDriver.set(r.driver_id, r.team_id ?? "");
     }
     for (const q of publishedQualifying ?? []) {
       if (!publishedTeamByDriver.has(q.driver_id)) publishedTeamByDriver.set(q.driver_id, q.team_id);

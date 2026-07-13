@@ -16,7 +16,8 @@ const qualifyingSchema = z.object({
 
 const raceResultSchema = z.object({
   driver_id: z.string().uuid(),
-  team_id: z.string().uuid(),
+  // M4 — null means the driver raced as a free agent (no team).
+  team_id: z.string().uuid().nullable(),
   finishing_position: z.number().int().positive().nullable(),
   result_status: z.enum(["classified", "dnf", "dns", "dsq", "ban"]),
   fastest_lap: z.boolean(),

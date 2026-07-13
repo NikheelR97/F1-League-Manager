@@ -354,6 +354,23 @@ describe("buildTeamStandings", () => {
     );
     expect(standings[0].podiums).toBe(2);
   });
+
+  // M4 — a free-agent result (team_id null) must never roll up into any
+  // constructor's total; it's excluded entirely rather than creating a
+  // standings row keyed by null.
+  it("excludes free-agent results (team_id null) from every constructor total", () => {
+    const standings = buildTeamStandings(
+      [
+        { ...mkResult("d1", "t1", { pts: 25, pos: 1, adj: 0 }) },
+        { ...mkResult("d2", "t1", { pts: 18, pos: 2, adj: 0 }), team_id: null },
+      ],
+      [],
+      new Map(),
+    );
+    expect(standings).toHaveLength(1);
+    expect(standings[0].team_id).toBe("t1");
+    expect(standings[0].total_points).toBe(25); // d2's 18 pts never counted anywhere
+  });
 });
 
 // ---------------------------------------------------------------------------

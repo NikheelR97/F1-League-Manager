@@ -22,7 +22,9 @@ export interface QualifyingEntry {
 
 export interface RaceResultEntry {
   driver_id: string;
-  team_id: string;
+  // M4 — null means the driver raced as a free agent (no team); their
+  // points count for them but for no constructor (see buildTeamStandings).
+  team_id: string | null;
   finishing_position: number | null;
   result_status: "classified" | "dnf" | "dns" | "dsq" | "ban";
   fastest_lap: boolean;
@@ -124,18 +126,20 @@ export interface ReserveAssignmentRow {
 // ponytail: only writes a row when the admin named who the reserve covered
 // for (original_driver_id is NOT NULL in the schema); left blank, no
 // assignment is recorded rather than blocking publish over it.
+// M4 — also skipped when the reserve raced as a free agent: team_id is
+// NOT NULL on race_reserve_assignments, and there is no team to record.
 export function buildReserveAssignmentRows(
   results: RaceResultEntry[],
   sessionId: string,
   actorId: string,
 ): ReserveAssignmentRow[] {
   return results
-    .filter((r) => !!r.covering_for_driver_id)
+    .filter((r) => !!r.covering_for_driver_id && !!r.team_id)
     .map((r) => ({
       race_session_id: sessionId,
       original_driver_id: r.covering_for_driver_id!,
       reserve_driver_id: r.driver_id,
-      team_id: r.team_id,
+      team_id: r.team_id!,
       assigned_by: actorId,
     }));
 }

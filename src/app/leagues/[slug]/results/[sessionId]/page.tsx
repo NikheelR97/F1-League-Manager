@@ -259,7 +259,8 @@ export default async function RaceResultPage({
                       <td className="py-2 pr-4">
                         <div className="flex items-center gap-2">
                           <span aria-hidden="true" className="h-3 w-1" style={{ backgroundColor: team?.color_hex ?? "#444" }} />
-                          <span className="text-f1-muted">{team?.name ?? "—"}</span>
+                          {/* M4 — team_id is null for a free-agent result: no constructor, but the driver still scored. */}
+                          <span className="text-f1-muted">{team?.name ?? "Free agent"}</span>
                         </div>
                       </td>
                       <td className="py-2 pr-4 text-right font-mono text-f1-white">{totalPts}</td>

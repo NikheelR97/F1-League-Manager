@@ -253,7 +253,8 @@ export default async function RaceReportPage({
                             className="h-3 w-1 flex-shrink-0"
                             style={{ backgroundColor: team?.color_hex ?? "#444" }}
                           />
-                          <span className="text-f1-muted">{team?.name ?? "—"}</span>
+                          {/* M4 — team_id is null for a free-agent result. */}
+                          <span className="text-f1-muted">{team?.name ?? "Free agent"}</span>
                         </div>
                       </td>
                       <td className="py-2 pr-4 text-right font-mono text-f1-white">
