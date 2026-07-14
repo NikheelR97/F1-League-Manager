@@ -22,6 +22,13 @@ const createTeamSchema = z.object({
   slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
 });
 
+// PATCH .../teams/[teamId] — S13-T3: edit only touches name/slug/colour.
+const updateTeamSchema = z.object({
+  color_hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a hex colour like #FF0000"),
+  name: z.string().trim().min(1).max(100),
+  slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+});
+
 const createDriverSchema = z.object({
   country: z.string().trim().min(2).max(80).nullable().optional(),
   display_name: z.string().trim().min(1).max(80),
@@ -151,6 +158,28 @@ describe("team create schema", () => {
       kind: "factory",
       name: "Test",
       slug: "test",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// S13-T3 — team edit (PATCH .../teams/[teamId]) reuses the same colour/name
+// validation as create, scoped to just the editable fields.
+describe("team update schema", () => {
+  it("accepts a valid name and colour", () => {
+    const result = updateTeamSchema.safeParse({
+      color_hex: "#3671C6",
+      name: "Oracle Red Bull Racing",
+      slug: "oracle-red-bull-racing",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid hex colour", () => {
+    const result = updateTeamSchema.safeParse({
+      color_hex: "blue",
+      name: "Oracle Red Bull Racing",
+      slug: "oracle-red-bull-racing",
     });
     expect(result.success).toBe(false);
   });

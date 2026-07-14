@@ -103,6 +103,8 @@ export default async function LeagueAdjustmentsPage({
       />
       <p className="text-xs text-f1-muted">
         Adjustments are applied to published standings totals; they are not itemized publicly.
+        For a one-off change to a single round, use the &ldquo;Race-day adj&rdquo; field on that
+        round&apos;s result entry instead.
       </p>
       {/* M1 — Driver and Team are separate adjustment targets; clarify that
           a driver adjustment never touches that driver's team total, and

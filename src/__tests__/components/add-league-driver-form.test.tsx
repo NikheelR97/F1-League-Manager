@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom";
 
 import { AddLeagueDriverForm } from "@/components/admin/AddLeagueDriverForm";
 
@@ -33,5 +34,22 @@ describe("AddLeagueDriverForm reserve hint (F4)", () => {
     expect(
       screen.getByText(/a home team is still required/i),
     ).toBeInTheDocument();
+  });
+});
+
+describe("AddLeagueDriverForm create new driver link (S13)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
+    );
+  });
+
+  it("renders a link to create a new driver", () => {
+    render(<AddLeagueDriverForm drivers={drivers} leagueId="league-1" teams={teams} />);
+
+    const link = screen.getByRole("link", { name: /Create a new driver/i });
+    expect(link).toHaveAttribute("href", "/admin/drivers/new");
   });
 });
