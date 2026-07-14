@@ -187,6 +187,10 @@ One focused test per task, named in §4. No new test frameworks or fixtures — 
 | Missing tests T5, T10 | done inline | **Done** | `season-form.test.tsx`, `points-system-form.test.tsx` (haiku falsely reported the `vi.mock` pattern as repo-broken; it isn't — added directly) |
 | Tests for T4 / T6 / T11 | — | **Skipped (ponytail)** | T4 is pure static copy; T6/T11 are on an async server component (awkward to unit-test) — covered by type-check + E2E |
 
-**Round 2 gate (2026-07-14):** `type-check` ✓ · `lint` ✓ · `test` **47 files / 539** ✓.
+**Round 2 gate (2026-07-14):** `type-check` ✓ · `lint` ✓ · `test` **47 files / 539** ✓ · `test:e2e` **48/48** ✓.
+
+**Visual confirmation (rendered GUI, 2026-07-14):** team edit page renders with logo + car-image upload (T3) · stepper race step shows "Fill sequential positions", "Race-day adj" header, and the disambiguation note (T2/T4) · admin hub shows the "Recalculate standings" button (B4), "View public standings" link (T6), and the "Published" session chip (T11). T1 (draft restore/clear) and T8 (mobile no-overflow) covered by their unit test and the passing E2E `T20` respectively.
+
+**Committed:** `7c91a44` on branch `fix/s13-usability` (not pushed — awaiting go-ahead).
 
 **Not built (deliberately):** race time-gap / laps-down / seconds-behind entry, time-penalty (seconds), and qualy-vs-race penalty-point split are **locked product "won't-fix" decisions** in HANDOVER — not overridden. HANDOVER pre-deploy items (real-workbook smoke, Lighthouse, staging Vercel secrets) are blocked on external resources, not code.
