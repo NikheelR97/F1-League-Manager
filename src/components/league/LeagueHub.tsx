@@ -145,7 +145,9 @@ export function LeagueHub({
           <h1>{league.name}</h1>
           <p className="text-sm text-f1-muted">{league.season?.name}</p>
           {seasonComplete ? (
-            <p className="font-mono text-sm text-f1-muted">Season complete</p>
+            // ponytail: "no upcoming races" is what !nextRace actually proves; the
+            // data can't tell us the season is truly over, so don't claim it is.
+            <p className="font-mono text-sm text-f1-muted">No upcoming races</p>
           ) : nextRace && nextRaceIsPast ? (
             <p className="font-mono text-sm text-f1-muted">{formatDate(nextRace.scheduled_at)}</p>
           ) : (

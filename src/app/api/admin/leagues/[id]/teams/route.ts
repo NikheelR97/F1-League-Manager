@@ -5,7 +5,7 @@ import { withAdminGuard, writeAdminAuditLog } from "@/lib/admin/api-guard";
 import { MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
-const createTeamSchema = z.object({
+export const createTeamSchema = z.object({
   color_hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Must be a hex colour like #FF0000"),
   kind: z.enum(["official", "custom"]),
   name: z.string().trim().min(1).max(100),

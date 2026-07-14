@@ -42,7 +42,7 @@ const session: SessionInfo = {
   points_system: { fastest_lap_points: 1, points_by_position: { "1": 25 }, pole_position_points: 1 },
 };
 
-const draftKey = `result-stepper-draft:${session.id}`;
+const draftKey = `f1lm:result-draft:${session.id}`;
 
 const defaultResultRow = {
   covering_for_driver_id: null as string | null,
@@ -58,7 +58,7 @@ const defaultResultRow = {
 describe("ResultStepper full publish flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string) => {
@@ -77,11 +77,11 @@ describe("ResultStepper full publish flow", () => {
       <ResultStepper drivers={drivers} leagueSlug="apex-gp" session={session} teams={teams} />,
     );
 
-    // Qualifying: positions 1 and 2, pole for driver one
+    // Qualifying: positions 1 and 2 — pole for driver one is derived from P1,
+    // no separate control to click (S13-T2).
     const qualiInputs = screen.getAllByPlaceholderText("—");
     await user.type(qualiInputs[0], "1");
     await user.type(qualiInputs[1], "2");
-    await user.click(screen.getAllByRole("checkbox")[0]);
     await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
 
     // Results: finishing positions, fastest lap for driver one, DNF for driver two
@@ -122,7 +122,7 @@ describe("ResultStepper full publish flow", () => {
     );
 
     // Draft cleared, and a success banner (not a silent redirect) is shown
-    expect(sessionStorage.getItem(draftKey)).toBeNull();
+    expect(localStorage.getItem(draftKey)).toBeNull();
     expect(screen.getByRole("status")).toHaveTextContent("Results published.");
     expect(screen.getByRole("link", { name: /view public result/i })).toHaveAttribute(
       "href",
@@ -252,7 +252,7 @@ describe("ResultStepper full publish flow", () => {
 describe("ResultStepper draft persistence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
@@ -262,14 +262,14 @@ describe("ResultStepper draft persistence", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
-  it("writes a draft to sessionStorage when data is entered", async () => {
+  it("writes a draft to localStorage when data is entered", async () => {
     const user = userEvent.setup();
     const drivers = [makeDriver("driver-1", "Driver One")];
     render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
 
     await user.type(screen.getByPlaceholderText("—"), "3");
 
-    const raw = sessionStorage.getItem(draftKey);
+    const raw = localStorage.getItem(draftKey);
     expect(raw).toBeTruthy();
     const parsed = JSON.parse(raw!);
     expect(parsed.qualifyingRows).toContainEqual(
@@ -278,7 +278,7 @@ describe("ResultStepper draft persistence", () => {
   });
 
   it("restores a saved draft on a fresh mount", () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       draftKey,
       JSON.stringify({
         step: "results",
@@ -291,7 +291,7 @@ describe("ResultStepper draft persistence", () => {
     const drivers = [makeDriver("driver-1", "Driver One")];
     render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
 
-    expect(screen.getByText("Draft restored from this browser session.")).toBeInTheDocument();
+    expect(screen.getByText(/Draft saved · \d{2}:\d{2}/)).toBeInTheDocument();
     // Landed on the "results" step (restored from the draft) with the saved note applied.
     expect(screen.getByDisplayValue("restored note")).toBeInTheDocument();
   });
@@ -302,16 +302,16 @@ describe("ResultStepper draft persistence", () => {
     render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
 
     // No input yet — an untouched stepper must not persist a draft, or every
-    // revisit would show a bogus "Draft restored" notice.
-    expect(sessionStorage.getItem(draftKey)).toBeNull();
+    // revisit would show a bogus "Draft saved" indicator.
+    expect(localStorage.getItem(draftKey)).toBeNull();
 
     await user.type(screen.getByPlaceholderText("—"), "3");
-    expect(sessionStorage.getItem(draftKey)).toBeTruthy();
+    expect(localStorage.getItem(draftKey)).toBeTruthy();
   });
 
   it("discarding a restored draft removes it for good", async () => {
     const user = userEvent.setup();
-    sessionStorage.setItem(
+    localStorage.setItem(
       draftKey,
       JSON.stringify({
         step: "qualifying",
@@ -330,16 +330,14 @@ describe("ResultStepper draft persistence", () => {
       "Discard the entire draft? All entered qualifying, race, and penalty data will be lost.",
     );
     // The discard reset must not itself be re-saved as a new draft.
-    expect(sessionStorage.getItem(draftKey)).toBeNull();
-    expect(
-      screen.queryByText("Draft restored from this browser session."),
-    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(draftKey)).toBeNull();
+    expect(screen.queryByText(/Draft saved ·/)).not.toBeInTheDocument();
   });
 
   it("keeps the draft when the discard confirmation is declined", async () => {
     const user = userEvent.setup();
     vi.spyOn(window, "confirm").mockReturnValue(false);
-    sessionStorage.setItem(
+    localStorage.setItem(
       draftKey,
       JSON.stringify({
         step: "qualifying",
@@ -354,12 +352,12 @@ describe("ResultStepper draft persistence", () => {
 
     await user.click(screen.getByRole("button", { name: "Discard draft" }));
 
-    expect(sessionStorage.getItem(draftKey)).toBeTruthy();
-    expect(screen.getByText("Draft restored from this browser session.")).toBeInTheDocument();
+    expect(localStorage.getItem(draftKey)).toBeTruthy();
+    expect(screen.getByText(/Draft saved · \d{2}:\d{2}/)).toBeInTheDocument();
   });
 
   it("does not apply a saved row for a driver no longer in the list", () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       draftKey,
       JSON.stringify({
         step: "qualifying",
@@ -389,7 +387,7 @@ describe("ResultStepper draft persistence", () => {
 describe("ResultStepper row ordering (M1)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
@@ -435,7 +433,7 @@ describe("ResultStepper row ordering (M1)", () => {
 describe("ResultStepper inline result validation (M2)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
@@ -464,7 +462,7 @@ describe("ResultStepper inline result validation (M2)", () => {
   });
 
   it("highlights every row when a restored draft has more than one fastest lap", () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       draftKey,
       JSON.stringify({
         step: "results",
@@ -489,7 +487,7 @@ describe("ResultStepper inline result validation (M2)", () => {
 describe("ResultStepper team-as-of-date note (M7)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
@@ -524,7 +522,7 @@ describe("ResultStepper team-as-of-date note (M7)", () => {
 describe("ResultStepper banned-driver badge (B3)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
@@ -561,7 +559,7 @@ describe("ResultStepper banned-driver badge (B3)", () => {
 describe("ResultStepper departed-driver row (M9 correction mode)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
@@ -587,7 +585,7 @@ describe("ResultStepper departed-driver row (M9 correction mode)", () => {
 describe("ResultStepper correction mode (M9)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string) => {
@@ -612,9 +610,9 @@ describe("ResultStepper correction mode (M9)", () => {
     expect(screen.getByText(/Editing published results/i)).toBeInTheDocument();
   });
 
-  it("prefills from published data and ignores a stale sessionStorage draft", async () => {
+  it("prefills from published data and ignores a stale localStorage draft", async () => {
     const user = userEvent.setup();
-    sessionStorage.setItem(
+    localStorage.setItem(
       draftKey,
       JSON.stringify({
         step: "results",
@@ -637,7 +635,7 @@ describe("ResultStepper correction mode (M9)", () => {
 
     // Lands on the default first step (qualifying), not the draft's "results" step.
     expect(screen.getByRole("heading", { name: "Qualifying" })).toBeInTheDocument();
-    expect(screen.queryByText("Draft restored from this browser session.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Draft saved ·/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
     // Published value (3) wins over the stale draft's value (9).
@@ -699,7 +697,7 @@ describe("ResultStepper correction mode (M9)", () => {
 describe("ResultStepper season projection (M3)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
@@ -814,7 +812,7 @@ describe("ResultStepper season projection (M3)", () => {
 describe("ResultStepper reserve assignment (B7)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string) => {
@@ -885,7 +883,7 @@ describe("ResultStepper reserve assignment (B7)", () => {
 describe("ResultStepper points adjustment (F3)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string) => {
@@ -979,7 +977,7 @@ describe("ResultStepper points adjustment (F3)", () => {
 describe("ResultStepper penalty row removal focus (K2)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     vi.stubGlobal(
       "fetch",
       vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
@@ -1015,5 +1013,103 @@ describe("ResultStepper penalty row removal focus (K2)", () => {
     await user.click(screen.getByRole("button", { name: /Remove penalty for/i }));
 
     expect(screen.getByRole("button", { name: "+ Add Penalty" })).toHaveFocus();
+  });
+});
+
+describe("ResultStepper localStorage draft survives a real unmount (S13-T1)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/csrf") {
+          return Promise.resolve(new Response(JSON.stringify({ token: "test-token" })));
+        }
+        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      }),
+    );
+  });
+
+  it("restores a value after an actual unmount/remount, then clears the draft on publish", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One")];
+    const { unmount } = render(
+      <ResultStepper drivers={drivers} session={session} teams={teams} />,
+    );
+
+    await user.type(screen.getByPlaceholderText("—"), "4");
+    unmount();
+
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+    expect(screen.getByPlaceholderText("—")).toHaveValue(4);
+    expect(screen.getByText(/Draft saved · \d{2}:\d{2}/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+    await user.type(screen.getByPlaceholderText("—"), "1");
+    await user.click(screen.getByRole("button", { name: /Next: Penalties/i }));
+    await user.click(screen.getByRole("button", { name: /Next: Review & Publish/i }));
+    await user.click(screen.getByRole("button", { name: "Publish Results" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Results published.");
+    expect(localStorage.getItem(draftKey)).toBeNull();
+  });
+});
+
+describe("ResultStepper pole derivation (S13-T2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
+    );
+  });
+
+  it("marks only the driver with qualifying position 1 as pole", async () => {
+    const user = userEvent.setup();
+    const drivers = [makeDriver("driver-1", "Driver One"), makeDriver("driver-2", "Driver Two")];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    const qualiInputs = screen.getAllByPlaceholderText("—");
+    await user.type(qualiInputs[0], "3");
+    await user.type(qualiInputs[1], "1");
+
+    expect(screen.getByLabelText("Pole for Driver One")).toHaveTextContent("—");
+    expect(screen.getByLabelText("Pole for Driver Two")).toHaveTextContent("POLE");
+  });
+});
+
+describe("ResultStepper fill sequential positions (S13-T2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ token: "test-token" })))),
+    );
+  });
+
+  it("numbers classified rows 1..N in display order and leaves DNF rows blank", async () => {
+    const user = userEvent.setup();
+    const drivers = [
+      makeDriver("driver-1", "Driver One"),
+      makeDriver("driver-2", "Driver Two"),
+      makeDriver("driver-3", "Driver Three"),
+    ];
+    render(<ResultStepper drivers={drivers} session={session} teams={teams} />);
+
+    await user.click(screen.getByRole("button", { name: /Next: Race Results/i }));
+
+    const statusSelects = screen
+      .getAllByRole("combobox")
+      .filter((el) => (el as HTMLSelectElement).value === "classified");
+    await user.selectOptions(statusSelects[2], "dnf");
+
+    await user.click(screen.getByRole("button", { name: "Fill sequential positions" }));
+
+    expect(screen.getByLabelText("Finishing position for Driver One")).toHaveValue(1);
+    expect(screen.getByLabelText("Finishing position for Driver Two")).toHaveValue(2);
+    expect(screen.getByLabelText("Finishing position for Driver Three")).toHaveValue(null);
   });
 });

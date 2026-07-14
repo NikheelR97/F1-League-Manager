@@ -5,13 +5,19 @@ import { useRef, useState } from "react";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 
 interface LeagueAssetUploadProps {
-  kind: "logo" | "hero_image";
+  kind: "logo" | "hero_image" | "car_image";
   label: string;
   leagueId: string;
+  // When set, uploads to the team assets route instead of the league one —
+  // same upload widget, different endpoint. See teams/[teamId]/assets route.
+  teamId?: string;
 }
 
-export function LeagueAssetUpload({ kind, label, leagueId }: LeagueAssetUploadProps) {
+export function LeagueAssetUpload({ kind, label, leagueId, teamId }: LeagueAssetUploadProps) {
   const csrfToken = useCsrfToken();
+  const uploadUrl = teamId
+    ? `/api/admin/leagues/${leagueId}/teams/${teamId}/assets`
+    : `/api/admin/leagues/${leagueId}/assets`;
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<"idle" | "uploading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -28,7 +34,7 @@ export function LeagueAssetUpload({ kind, label, leagueId }: LeagueAssetUploadPr
     body.append("file", file);
 
     try {
-      const res = await fetch(`/api/admin/leagues/${leagueId}/assets`, {
+      const res = await fetch(uploadUrl, {
         method: "POST",
         headers: { "x-csrf-token": csrfToken },
         body,

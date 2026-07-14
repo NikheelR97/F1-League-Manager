@@ -152,6 +152,12 @@ export function PointsSystemForm({
 
   return (
     <form className="space-y-5" noValidate onSubmit={handleSubmit(onSubmit)}>
+      {isEdit && publishedSessionCount > 0 && (
+        <p className="border border-f1-red/40 bg-f1-red/10 px-3 py-2 text-xs text-f1-red-text">
+          Saving will rescore {publishedSessionCount} published{" "}
+          {publishedSessionCount === 1 ? "round" : "rounds"} — past standings will change.
+        </p>
+      )}
       {/* Name */}
       <div className="space-y-1">
         <Label htmlFor="ps-name">Name</Label>

@@ -10,6 +10,7 @@ import { ApplyBanButton } from "@/components/admin/ApplyBanButton";
 import { CarryOverForm } from "@/components/admin/CarryOverForm";
 import { LeagueAssetUpload } from "@/components/admin/LeagueAssetUpload";
 import { LeagueStatusButton } from "@/components/admin/LeagueStatusButton";
+import { RecalculateStandingsButton } from "@/components/admin/RecalculateStandingsButton";
 import { SeasonActions } from "@/components/admin/SeasonActions";
 import { SeasonForm } from "@/components/admin/SeasonForm";
 import { SeasonSelector } from "@/components/admin/SeasonSelector";
@@ -164,6 +165,15 @@ export default async function LeagueDetailPage({
           </span>
           <SeasonSelector seasons={seasons} selectedSeasonId={effectiveSeasonId ?? ""} />
           <LeagueStatusButton currentStatus={league.status} leagueId={leagueId} />
+          {seasons.length > 0 && (
+            <Link
+              className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              href={`/leagues/${league.slug}/standings/drivers`}
+            >
+              View public standings
+            </Link>
+          )}
+          {currentSeason && <RecalculateStandingsButton leagueId={leagueId} />}
         </div>
       </div>
 
@@ -243,7 +253,7 @@ export default async function LeagueDetailPage({
         <div className="grid gap-6 sm:grid-cols-2">
           <div className="space-y-2">
             <h3 className="text-xs font-bold uppercase text-f1-muted">New Season</h3>
-            <SeasonForm leagueId={leagueId} />
+            <SeasonForm leagueId={leagueId} seasonCount={seasons.length} />
           </div>
           {seasons.length > 1 && (
             <div className="space-y-2">
@@ -348,15 +358,9 @@ export default async function LeagueDetailPage({
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span
-                        className={`border px-2 py-0.5 text-xs font-bold uppercase ${
-                          session.status === "completed"
-                            ? "border-team-sauber text-team-sauber"
-                            : "border-f1-muted text-f1-muted"
-                        }`}
-                      >
-                        {session.status}
-                      </span>
+                      <StatusPill tone={session.status === "completed" ? "green" : "silver"}>
+                        {session.status === "completed" ? "Published" : "Scheduled"}
+                      </StatusPill>
                       {isPublishable && (
                         <Link
                           className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
@@ -435,6 +439,13 @@ export default async function LeagueDetailPage({
                       </p>
                     </div>
                   </div>
+                  <Link
+                    className="p-1 text-f1-muted transition-colors hover:text-f1-white"
+                    href={`/admin/leagues/${leagueId}/teams/${team.id}/edit`}
+                    title="Edit Team"
+                  >
+                    <Pencil aria-hidden="true" size={16} />
+                  </Link>
                 </div>
               </li>
             ))}
