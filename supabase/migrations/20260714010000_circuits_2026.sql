@@ -1,18 +1,16 @@
 -- 2026 F1 calendar for the circuit library (wheel pool + session circuit picker):
---   * Imola drops off the calendar.
 --   * Madrid (Madring) joins as round 16.
 --   * All rounds/dates shift to the 2026 season.
+-- Imola is off the 2026 calendar but is LEFT IN PLACE as an unnumbered circuit
+-- (round_number = null): a circuit can be referenced by league_circuit_pools /
+-- race_sessions / wheel_spins (FK), so deleting it would break those. It simply
+-- carries no 2026 round number.
 -- Idempotent. Existing circuits are matched by slug; only round_number/dates
--- change for them, so any race_sessions already pointing at a circuit stay valid.
+-- change for them, so any race_sessions/pools already pointing at a circuit stay valid.
 
--- Release the unique round_number constraint before renumbering.
+-- Release the unique round_number constraint before renumbering; any circuit not
+-- in the 2026 set below (e.g. Imola) is left unnumbered.
 update public.circuits set round_number = null;
-
--- Imola isn't on the 2026 calendar. Remove it only if no session references it
--- (preserve historical results); otherwise it stays as an unnumbered circuit.
-delete from public.circuits c
- where c.slug = 'imola'
-   and not exists (select 1 from public.race_sessions rs where rs.circuit_id = c.id);
 
 insert into public.circuits (round_number, name, slug, country, venue, grand_prix_name, starts_on, ends_on)
 values
