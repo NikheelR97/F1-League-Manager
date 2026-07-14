@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
 import { z } from "zod";
 
+import { AddOfficialTeamsButton } from "@/components/admin/AddOfficialTeamsButton";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ApplyBanButton } from "@/components/admin/ApplyBanButton";
 import { CarryOverForm } from "@/components/admin/CarryOverForm";
@@ -410,13 +411,16 @@ export default async function LeagueDetailPage({
           <h2 className="text-sm font-bold uppercase text-f1-muted">
             Teams ({teams?.length ?? 0}/{MAX_TEAMS_PER_LEAGUE})
           </h2>
-          <Link
-            className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
-            href={`/admin/leagues/${leagueId}/teams/new`}
-          >
-            <Plus aria-hidden="true" size={12} />
-            Add Team
-          </Link>
+          <div className="flex items-center gap-2">
+            <AddOfficialTeamsButton leagueId={leagueId} />
+            <Link
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+              href={`/admin/leagues/${leagueId}/teams/new`}
+            >
+              <Plus aria-hidden="true" size={12} />
+              Add Team
+            </Link>
+          </div>
         </div>
 
         {!teams?.length ? (
