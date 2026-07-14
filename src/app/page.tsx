@@ -34,7 +34,7 @@ async function buildLeagueSummary(
   league: LeagueRow,
   seasonId: string | null,
 ): Promise<LeagueSummary> {
-  const [{ data: driverLeader }, { data: constructorLeader }, { data: nextRace }] = seasonId
+  const [{ data: driverLeader }, { data: constructorLeader }, { data: nextRace }, { count: publishedRaceCount }] = seasonId
     ? await Promise.all([
         db
           .from("driver_standings")
@@ -61,14 +61,28 @@ async function buildLeagueSummary(
           .order("scheduled_at")
           .limit(1)
           .maybeSingle(),
+        db
+          .from("race_sessions")
+          .select("id", { count: "exact", head: true })
+          .eq("league_id", league.id)
+          .eq("season_id", seasonId)
+          .eq("status", "completed"),
       ])
-    : [{ data: null }, { data: null }, { data: null }];
+    : [{ data: null }, { data: null }, { data: null }, { count: 0 }];
 
   const driver = driverLeader?.drivers as unknown as { display_name: string } | null;
   const constructor = constructorLeader?.teams as unknown as { name: string } | null;
   const circuit = nextRace?.circuits as unknown as { name: string } | null;
+  const hasPublishedRaces = (publishedRaceCount ?? 0) > 0;
 
   const isWheelFormat = league.format === "standard";
+
+  // ponytail: three-state logic—upcoming race, season complete, or awaiting schedule
+  const nextRaceDisplay = nextRace
+    ? circuit?.name ?? nextRace?.name
+    : hasPublishedRaces
+      ? "Season complete"
+      : "TBD";
 
   return {
     constructorLeader: constructor?.name ?? "No results yet",
@@ -87,7 +101,7 @@ async function buildLeagueSummary(
     href: `/leagues/${league.slug}`,
     leader: driver?.display_name ?? "No results yet",
     name: league.name,
-    nextRace: circuit?.name ?? nextRace?.name ?? "TBD",
+    nextRace: nextRaceDisplay,
     slug: league.slug,
     status: league.status.charAt(0).toUpperCase() + league.status.slice(1),
   };

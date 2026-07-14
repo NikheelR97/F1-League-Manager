@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -100,6 +101,12 @@ export function AddLeagueDriverForm({ drivers, leagueId, teams }: AddLeagueDrive
         {errors.driver_id && (
           <p className="text-xs text-destructive">{errors.driver_id.message}</p>
         )}
+        <p className="text-xs text-f1-muted">
+          Not in the list?{" "}
+          <Link className="text-f1-red hover:underline" href="/admin/drivers/new">
+            + Create a new driver
+          </Link>
+        </p>
       </div>
 
       {/* Team */}

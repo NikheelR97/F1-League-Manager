@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FormError } from "@/components/ui/FormError";
+import { StatusPill } from "@/components/ui/StatusPill";
 import { useCsrfToken } from "@/lib/hooks/use-csrf-token";
 import { useFocusOnMount } from "@/lib/hooks/use-focus-on-mount";
 
@@ -29,6 +30,9 @@ export interface SessionDriver {
   // M7 — the driver's present-day team, used only to flag when it differs
   // from `team_id` (which is resolved as of the session's own date).
   present_team_id?: string;
+  // M8 — true when an admin applied a Ban Watch ban for this driver; the
+  // Results step pre-selects Status=BAN and shows a SUSPENDED badge.
+  pending_ban?: boolean;
   racing_number: number | null;
   team_id: string;
   team_name: string;
@@ -49,10 +53,14 @@ export interface SessionInfo {
   points_system: PointsSystemPreview;
 }
 
+// M6 — no "dnf" here: a DNF isn't a meaningful qualifying outcome, only
+// classified/dsq/ban/dns are.
+type QualifyingStatus = "classified" | "dsq" | "ban" | "dns";
+
 export interface QualifyingRow {
   driver_id: string;
-  is_pole: boolean;
   qualifying_position: number | null;
+  qualifying_status: QualifyingStatus;
   team_id: string;
 }
 
@@ -132,7 +140,7 @@ const STEP_LABELS: Record<Step, string> = {
 
 function previewRacePoints(
   row: RaceResultRow,
-  qRow: QualifyingRow | undefined,
+  isPole: boolean,
   ps: PointsSystemPreview,
   fastestLapEnabled: boolean,
   poleEnabled: boolean,
@@ -140,12 +148,26 @@ function previewRacePoints(
   if (row.result_status !== "classified" || row.finishing_position === null) return 0;
   const base = ps.points_by_position[String(row.finishing_position)] ?? 0;
   const fl = fastestLapEnabled && row.fastest_lap ? ps.fastest_lap_points : 0;
-  const pole = poleEnabled && (qRow?.is_pole ?? false) ? ps.pole_position_points : 0;
+  const pole = poleEnabled && isPole ? ps.pole_position_points : 0;
   return base + fl + pole;
 }
 
 function defaultQualifyingRow(d: SessionDriver): QualifyingRow {
-  return { driver_id: d.driver_id, is_pole: false, qualifying_position: null, team_id: d.team_id };
+  return {
+    driver_id: d.driver_id,
+    qualifying_position: null,
+    qualifying_status: "classified",
+    team_id: d.team_id,
+  };
+}
+
+// S13-T2 — pole is derived from qualifying position 1, not a separate manual
+// flag, so it can never drift out of sync with the grid. If two rows somehow
+// both claim P1 (qualifying position isn't duplicate-checked the way race
+// finishing position is), the first in array order wins so at most one
+// driver is ever pole.
+function getPoleDriverId(qualifyingRows: QualifyingRow[]): string | null {
+  return qualifyingRows.find((r) => r.qualifying_position === 1)?.driver_id ?? null;
 }
 
 function defaultResultRow(d: SessionDriver): RaceResultRow {
@@ -156,7 +178,10 @@ function defaultResultRow(d: SessionDriver): RaceResultRow {
     manual_points_adjustment: 0,
     notes: "",
     raw_result: "",
-    result_status: "classified",
+    // M8 — a driver with an applied Ban Watch ban starts pre-selected BAN
+    // instead of the usual default, so publishing the round without
+    // touching their row still records the enforcement.
+    result_status: d.pending_ban ? "ban" : "classified",
     team_id: d.team_id,
     covering_for_driver_id: null,
   };
@@ -193,13 +218,22 @@ function orderByQualifying<T extends { driver_id: string }>(
 }
 
 // ---------------------------------------------------------------------------
-// Draft persistence (sessionStorage)
+// Draft persistence (localStorage)
 // ---------------------------------------------------------------------------
+// ponytail: localStorage, not a server draft table — one admin editing on one
+// machine doesn't need a cross-device draft, and localStorage (unlike
+// sessionStorage) survives a closed tab/browser crash, not just a reload.
+// Upgrade path: if cross-device drafting is ever needed, swap this for a
+// server-side draft row keyed by session id instead.
 
 interface DraftShape {
   penaltyRows: PenaltyRow[];
   qualifyingRows: QualifyingRow[];
   resultRows: RaceResultRow[];
+  // Epoch ms of the last successful save — drives the "Draft saved · HH:MM"
+  // indicator. Optional so a draft written before this field existed still
+  // passes validation (falls back to "now" when displayed).
+  savedAt?: number;
   step: Step;
 }
 
@@ -257,12 +291,19 @@ function mergeRows<T extends { driver_id: string }>(
 
 function readStoredDraft(key: string): DraftShape | null {
   try {
-    const raw = sessionStorage.getItem(key);
+    const raw = localStorage.getItem(key);
     const parsed: unknown = raw ? JSON.parse(raw) : null;
     return isDraftShape(parsed) ? parsed : null;
   } catch {
     return null;
   }
+}
+
+// "HH:MM" in 24-hour local time — kept locale-independent (no AM/PM) so the
+// "Draft saved" indicator reads consistently everywhere.
+function formatSavedTime(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -336,20 +377,31 @@ function QualifyingStep({
     onChange(rows.map((r) => (r.driver_id === driverId ? { ...r, ...field } : r)));
   }
 
-  function setPole(driverId: string) {
-    onChange(rows.map((r) => ({ ...r, is_pole: r.driver_id === driverId })));
+  const poleDriverId = getPoleDriverId(rows);
+
+  // S13-T2 — Enter in a position input jumps focus to the next driver's
+  // position input instead of leaving the admin to click/tab through 20 rows.
+  const posInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  function focusNextPosition(currentDriverId: string) {
+    const idx = rows.findIndex((r) => r.driver_id === currentDriverId);
+    const next = rows[idx + 1];
+    if (next) posInputRefs.current.get(next.driver_id)?.focus();
   }
+
+  const statuses: QualifyingStatus[] = ["classified", "dsq", "ban", "dns"];
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-f1-muted">
-        Enter qualifying positions. Leave blank for drivers who did not qualify (DNS).
+        Enter qualifying positions. Leave blank and status Classified for drivers who did not
+        qualify (DNS) without recording it — or set the status explicitly for a DSQ/BAN/DNS.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-f1-border text-left text-xs text-f1-muted">
               <th className="pb-2 pr-4">Driver</th>
+              <th className="pb-2 pr-4 w-28">Status</th>
               <th className="pb-2 pr-4 w-24">Quali pos</th>
               <th className="pb-2 w-16 text-center">Pole</th>
             </tr>
@@ -384,11 +436,29 @@ function QualifyingStep({
                     </div>
                   </td>
                   <td className="py-2 pr-4">
+                    <select
+                      aria-label={`Qualifying status for ${driver?.display_name ?? row.driver_id}`}
+                      className="w-full border border-f1-border bg-f1-black px-2 py-1 text-xs text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none uppercase"
+                      value={row.qualifying_status}
+                      onChange={(e) =>
+                        update(row.driver_id, { qualifying_status: e.target.value as QualifyingStatus })
+                      }
+                    >
+                      {statuses.map((s) => (
+                        <option key={s} value={s}>{s.toUpperCase()}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-2 pr-4">
                     <input
                       aria-label={`Qualifying position for ${driver?.display_name ?? row.driver_id}`}
                       className="w-20 border border-f1-border bg-f1-black px-2 py-1 text-sm text-f1-white focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
                       min={1}
                       placeholder="—"
+                      ref={(el) => {
+                        if (el) posInputRefs.current.set(row.driver_id, el);
+                        else posInputRefs.current.delete(row.driver_id);
+                      }}
                       type="number"
                       value={row.qualifying_position ?? ""}
                       onChange={(e) =>
@@ -396,17 +466,25 @@ function QualifyingStep({
                           qualifying_position: e.target.value ? Number(e.target.value) : null,
                         })
                       }
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        focusNextPosition(row.driver_id);
+                      }}
                       onWheel={(e) => e.currentTarget.blur()}
                     />
                   </td>
                   <td className="py-2 text-center">
-                    <input
+                    <span
                       aria-label={`Pole for ${driver?.display_name ?? row.driver_id}`}
-                      checked={row.is_pole}
-                      className="accent-f1-red focus-visible:ring-2 focus-visible:ring-f1-red focus-visible:outline-none"
-                      type="checkbox"
-                      onChange={() => setPole(row.driver_id)}
-                    />
+                      className={
+                        row.driver_id === poleDriverId
+                          ? "text-xs font-bold text-yellow-400"
+                          : "text-xs text-f1-muted"
+                      }
+                    >
+                      {row.driver_id === poleDriverId ? "POLE" : "—"}
+                    </span>
                   </td>
                 </tr>
               );
@@ -470,17 +548,64 @@ function ResultsStep({
 
   const nonReserveDrivers = drivers.filter((d) => !d.is_reserve);
 
+  // S13-T2 — Enter in a Pos input jumps to the next classified driver's Pos
+  // input (rendered order, i.e. the qualifying-position order above), same
+  // pattern as the Qualifying step. Non-classified rows have no position
+  // input to focus (it's disabled), so they're skipped over.
+  const posInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  function focusNextPosition(currentDriverId: string) {
+    const idx = orderedRows.findIndex((r) => r.driver_id === currentDriverId);
+    for (let i = idx + 1; i < orderedRows.length; i++) {
+      const candidate = orderedRows[i];
+      if (candidate.result_status === "classified") {
+        posInputRefs.current.get(candidate.driver_id)?.focus();
+        return;
+      }
+    }
+  }
+
+  // S13-T2 — numbers classified rows 1..N in `orderedRows` order (the same
+  // qualifying-derived display order the grid renders and Enter-to-advance
+  // follows), so the button matches what the admin sees on screen. Rows keep
+  // their driver_id keying; non-classified rows are left untouched (still
+  // null, per validateResults).
+  function fillSequentialPositions() {
+    let pos = 1;
+    const posByDriver = new Map<string, number>();
+    for (const row of orderedRows) {
+      if (row.result_status === "classified") posByDriver.set(row.driver_id, pos++);
+    }
+    onChange(
+      rows.map((r) =>
+        posByDriver.has(r.driver_id) ? { ...r, finishing_position: posByDriver.get(r.driver_id)! } : r,
+      ),
+    );
+  }
+
   return (
     <div className="space-y-3">
-      <p className="text-xs text-f1-muted">
-        Enter finishing positions. Non-classified drivers should have no finishing position.
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs text-f1-muted">
+          Enter finishing positions. Non-classified drivers should have no finishing position.
+        </p>
+        <button
+          className="shrink-0 border border-f1-border px-2 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+          type="button"
+          onClick={fillSequentialPositions}
+        >
+          Fill sequential positions
+        </button>
+      </div>
       {drivers.some((d) => d.is_reserve) && (
         <p className="text-xs text-f1-muted">
           Reserve drivers: set Team to the team they raced for — constructor points go to that
           team; the driver keeps their personal points.
         </p>
       )}
+      <p className="text-xs text-f1-muted">
+        &ldquo;Race-day adj&rdquo; changes this round&apos;s championship points only. For
+        season-wide corrections, use the league Adjustments page.
+      </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -490,7 +615,7 @@ function ResultsStep({
               <th className="pb-2 pr-3 w-28">Status</th>
               <th className="pb-2 pr-3 w-16">Pos</th>
               <th className="pb-2 pr-3 w-10 text-center">FL</th>
-              <th className="pb-2 pr-3 w-20">Adj pts</th>
+              <th className="pb-2 pr-3 w-20">Race-day adj</th>
               <th className="pb-2 w-32">Notes</th>
             </tr>
           </thead>
@@ -522,6 +647,9 @@ function ResultsStep({
                       )}
                       {driver?.left_roster && (
                         <span className="text-xs text-f1-muted uppercase">Left roster</span>
+                      )}
+                      {driver?.pending_ban && (
+                        <StatusPill tone="red">Suspended</StatusPill>
                       )}
                       {bannedByDriver.has(row.driver_id) && (
                         <span
@@ -555,10 +683,11 @@ function ResultsStep({
                       value={row.team_id}
                       onChange={(e) => update(row.driver_id, { team_id: e.target.value })}
                     >
+                      <option value="">No team / free agent</option>
                       {teams.map((t) => (
                         <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
-                      {!teams.find((t) => t.id === row.team_id) && (
+                      {row.team_id && !teams.find((t) => t.id === row.team_id) && (
                         <option value={row.team_id}>{driver?.team_name ?? "Unknown"}</option>
                       )}
                     </select>
@@ -598,6 +727,10 @@ function ResultsStep({
                       disabled={isNonClassified}
                       min={1}
                       placeholder="—"
+                      ref={(el) => {
+                        if (el) posInputRefs.current.set(row.driver_id, el);
+                        else posInputRefs.current.delete(row.driver_id);
+                      }}
                       type="number"
                       value={row.finishing_position ?? ""}
                       onChange={(e) =>
@@ -605,12 +738,25 @@ function ResultsStep({
                           finishing_position: e.target.value ? Number(e.target.value) : null,
                         })
                       }
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        focusNextPosition(row.driver_id);
+                      }}
                       onWheel={(e) => e.currentTarget.blur()}
                     />
                     {posConflict && (
                       <p className="mt-1 w-32 text-xs text-destructive" id={posErrorId}>
                         P{posConflict.position} assigned to{" "}
                         {posConflict.driverIds.map((id) => driverName(id)).join(" and ")}
+                      </p>
+                    )}
+                    {/* M11 — a classified driver with no position silently
+                        never appears in the published result (see
+                        filterPublishedResults); nudge rather than block. */}
+                    {!posConflict && row.result_status === "classified" && row.finishing_position === null && (
+                      <p className="mt-1 w-32 text-xs text-yellow-400">
+                        No position set &mdash; add one or change Status to DNS.
                       </p>
                     )}
                   </td>
@@ -890,6 +1036,8 @@ function ReviewStep({
   );
   const ordered = [...classified, ...nonClassified];
 
+  const poleDriverId = getPoleDriverId(qualifyingRows);
+
   const penaltyPtsByDriver = new Map<string, number>();
   for (const p of penalties) {
     if (p.status !== "rescinded") {
@@ -918,11 +1066,10 @@ function ReviewStep({
   ]);
   for (const driverId of allProjectedDriverIds) {
     const row = results.find((r) => r.driver_id === driverId);
-    const qRow = qualifyingRows.find((q) => q.driver_id === driverId);
     const sessionPts = row
       ? previewRacePoints(
           row,
-          qRow,
+          driverId === poleDriverId,
           session.points_system,
           session.fastest_lap_enabled,
           session.pole_position_enabled,
@@ -997,10 +1144,10 @@ function ReviewStep({
             <tbody className="divide-y divide-f1-border">
               {ordered.map((row) => {
                 const driver = drivers.find((d) => d.driver_id === row.driver_id);
-                const qRow = qualifyingRows.find((q) => q.driver_id === row.driver_id);
+                const isPole = row.driver_id === poleDriverId;
                 const racePts = previewRacePoints(
                   row,
-                  qRow,
+                  isPole,
                   session.points_system,
                   session.fastest_lap_enabled,
                   session.pole_position_enabled,
@@ -1029,12 +1176,12 @@ function ReviewStep({
                         />
                         <span className="text-f1-white">{driver?.display_name ?? row.driver_id}</span>
                         {row.fastest_lap && <span className="text-xs text-purple-400">FL</span>}
-                        {qRow?.is_pole && <span className="text-xs text-yellow-400">PP</span>}
+                        {isPole && <span className="text-xs text-yellow-400">PP</span>}
                         {isBan && <span className="text-xs text-destructive uppercase">Ban</span>}
                         {isThresholdAlert && (
                           <span
                             className="text-xs text-destructive uppercase"
-                            title="Alert only — admin decision required"
+                            title="Preview only, before publish — admin decision required. The league page's Ban Watch reflects the same threshold once published."
                           >
                             Threshold alert
                           </span>
@@ -1119,7 +1266,7 @@ interface ResultStepperProps {
   bannedDrivers?: BannedDriverInfo[];
   // M9 — true when correcting an already-published session. Prefills from
   // published data (initial*Rows below) instead of blank rows, bypasses the
-  // sessionStorage draft entirely, and republishes rather than blocking.
+  // localStorage draft entirely, and republishes rather than blocking.
   correctionMode?: boolean;
   // M3 — current season standings, used to preview the championship
   // consequence of publishing on the Review step.
@@ -1179,12 +1326,16 @@ export function ResultStepper({
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishSuccess, setPublishSuccess] = useState(false);
-  const [draftRestored, setDraftRestored] = useState(false);
+  // Epoch ms of the last successful draft save; null means no draft exists.
+  // Drives both the "Draft saved · HH:MM" indicator and its Discard control —
+  // both are shown only while this is non-null (see requirement: "only show
+  // when a draft exists").
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   // K1 — the success banner replaces the whole stepper subtree; without this
   // focus would fall back to <body> instead of landing on the banner.
   const publishSuccessRef = useFocusOnMount<HTMLDivElement>(publishSuccess);
 
-  const draftKey = `result-stepper-draft:${session.id}`;
+  const draftKey = `f1lm:result-draft:${session.id}`;
   const draftRef = useRef<DraftShape | "pending" | null>("pending");
 
   // Serialized untouched state — used to avoid persisting (or announcing) a
@@ -1200,12 +1351,12 @@ export function ResultStepper({
     [drivers, qualifyingDrivers],
   );
 
-  // Restore a saved draft after mount only — reading sessionStorage during
+  // Restore a saved draft after mount only — reading localStorage during
   // the initial render (e.g. in a useState initializer) would produce a
   // client/server markup mismatch since this component is server-rendered.
   useEffect(() => {
     // M9 — published data must win over a stale draft; correction mode never
-    // reads (or writes, below) the sessionStorage draft for this session.
+    // reads (or writes, below) the localStorage draft for this session.
     if (correctionMode) return;
     if (draftRef.current !== "pending") return;
     draftRef.current = readStoredDraft(draftKey);
@@ -1213,28 +1364,35 @@ export function ResultStepper({
     const draft = draftRef.current;
     if (draft === null) return;
     // A draft identical to untouched state carries no work — skip the notice.
-    if (JSON.stringify(draft) === pristineJson) return;
+    const { savedAt, ...draftData } = draft;
+    if (JSON.stringify(draftData) === pristineJson) return;
 
     setStep(draft.step);
     setQualifyingRows(mergeRows(draft.qualifyingRows, qualifyingDrivers, defaultQualifyingRow));
     setResultRows(mergeRows(draft.resultRows, drivers, defaultResultRow));
     setPenaltyRows(draft.penaltyRows.filter((p) => drivers.some((d) => d.driver_id === p.driver_id)));
-    setDraftRestored(true);
+    setLastSavedAt(savedAt ?? Date.now());
   }, [correctionMode, draftKey, drivers, pristineJson, qualifyingDrivers]);
 
   // Persist on change. Skipping the pristine state means an untouched (or
-  // just-discarded) stepper never writes a draft, so the restore notice only
-  // ever appears when there is real work to restore. A quota or privacy-mode
+  // just-discarded) stepper never writes a draft, so the indicator only ever
+  // appears when there is real work to restore. A quota or privacy-mode
   // failure must never interrupt data entry, so setItem is best-effort.
   useEffect(() => {
     if (correctionMode) return;
     const json = JSON.stringify({ penaltyRows, qualifyingRows, resultRows, step });
     if (json === pristineJson) return;
+    const now = Date.now();
     try {
-      sessionStorage.setItem(draftKey, json);
+      localStorage.setItem(draftKey, JSON.stringify({ penaltyRows, qualifyingRows, resultRows, savedAt: now, step }));
     } catch {
-      // Ignore storage errors (quota exceeded, private browsing, etc.).
+      // Ignore storage errors (quota exceeded, private browsing, etc.); the
+      // indicator only reflects a save that actually landed, so skip it too.
+      return;
     }
+    // Deferred rather than a direct synchronous call, matching the .then()
+    // pattern useCsrfToken already uses (react-hooks/set-state-in-effect).
+    Promise.resolve().then(() => setLastSavedAt(now));
   }, [correctionMode, draftKey, penaltyRows, pristineJson, qualifyingRows, resultRows, step]);
 
   function discardDraft() {
@@ -1246,7 +1404,7 @@ export function ResultStepper({
       return;
     }
     try {
-      sessionStorage.removeItem(draftKey);
+      localStorage.removeItem(draftKey);
     } catch {
       // Ignore storage errors.
     }
@@ -1254,7 +1412,7 @@ export function ResultStepper({
     setQualifyingRows(qualifyingDrivers.map(defaultQualifyingRow));
     setResultRows(drivers.map(defaultResultRow));
     setPenaltyRows([]);
-    setDraftRestored(false);
+    setLastSavedAt(null);
   }
 
   const stepIdx = STEPS.indexOf(step);
@@ -1282,12 +1440,21 @@ export function ResultStepper({
     setPublishError(null);
     setPublishing(true);
     try {
+      const poleDriverId = getPoleDriverId(qualifyingRows);
       const qualifying = qualifyingRows
-        .filter((q) => q.qualifying_position !== null)
+        // M6 — an untouched default row (classified, no position) carries no
+        // participation signal and is dropped, same as before. A row with an
+        // explicit non-classified status is kept even with no position, so a
+        // DSQ/BAN/DNS is recorded rather than silently omitted.
+        .filter((q) => q.qualifying_position !== null || q.qualifying_status !== "classified")
         .map((q) => ({
           driver_id: q.driver_id,
-          is_pole: q.is_pole,
-          qualifying_position: q.qualifying_position!,
+          // S13-T2 — is_pole is derived from qualifying_position === 1, not
+          // stored separately (see getPoleDriverId).
+          is_pole: q.driver_id === poleDriverId,
+          qualifying_position: q.qualifying_position,
+          // Restored drafts saved before this field existed won't have it.
+          qualifying_status: q.qualifying_status ?? "classified",
           team_id: q.team_id,
         }));
 
@@ -1299,7 +1466,9 @@ export function ResultStepper({
         notes: r.notes || null,
         raw_result: r.raw_result || null,
         result_status: r.result_status,
-        team_id: r.team_id,
+        // M4 — "" is the UI sentinel for "No team / free agent" (a select
+        // can't hold null); convert to null at the wire boundary.
+        team_id: r.team_id || null,
         // Restored drafts saved before this field existed won't have it.
         covering_for_driver_id: r.covering_for_driver_id ?? null,
       }));
@@ -1348,10 +1517,11 @@ export function ResultStepper({
       }
 
       try {
-        sessionStorage.removeItem(draftKey);
+        localStorage.removeItem(draftKey);
       } catch {
         // Ignore storage errors.
       }
+      setLastSavedAt(null);
 
       // P1 — stay put and show a success banner instead of an unannounced
       // redirect; the banner links out to the public result and back to the
@@ -1425,10 +1595,10 @@ export function ResultStepper({
         </div>
       )}
 
-      {/* Draft restored notice */}
-      {draftRestored && (
+      {/* Draft saved indicator — only rendered while a draft exists */}
+      {lastSavedAt !== null && (
         <div className="flex items-center justify-between gap-4 border border-f1-border bg-f1-dark px-4 py-2 text-xs text-f1-muted">
-          <span>Draft restored from this browser session.</span>
+          <span>Draft saved · {formatSavedTime(lastSavedAt)}</span>
           <button
             className="font-bold uppercase text-f1-muted transition-colors hover:text-f1-white"
             type="button"

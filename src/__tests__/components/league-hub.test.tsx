@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom";
 
 import { LeagueHub } from "@/components/league/LeagueHub";
 import { RaceCountdown } from "@/components/league/RaceCountdown";
@@ -247,5 +248,11 @@ describe("LeagueHub", () => {
   it("omits the wheel section for a non-wheel-format league", () => {
     render(<LeagueHub {...baseProps} />);
     expect(screen.queryByText("Wheel")).not.toBeInTheDocument();
+  });
+
+  it("shows 'No upcoming races' when there is no next race but races have been published (S13)", () => {
+    render(<LeagueHub {...baseProps} publishedRaceCount={1} />);
+    expect(screen.getByText("No upcoming races")).toBeInTheDocument();
+    expect(screen.queryByText("Season complete")).not.toBeInTheDocument();
   });
 });

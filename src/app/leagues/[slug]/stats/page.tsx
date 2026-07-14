@@ -353,7 +353,7 @@ export default async function LeagueStatsPage({
                       <span className="w-4 font-mono text-xs text-f1-muted">{i + 1}</span>
                       <span className="text-f1-white">{row.name}</span>
                     </div>
-                    <span className="font-mono font-bold text-team-sauber">+{row.gained}</span>
+                    <span className="font-mono font-bold text-team-sauber">+{row.gained} positions</span>
                   </li>
                 ))}
               </ul>

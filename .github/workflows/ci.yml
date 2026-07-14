@@ -36,8 +36,24 @@ jobs:
           echo "NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000" >> "$GITHUB_ENV"
           echo "E2E_SECRET=ci-e2e-secret" >> "$GITHUB_ENV"
 
+      - name: Get installed Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright OS dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       - name: Type check
         run: npm run type-check
@@ -45,10 +61,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Unit and component tests
-        run: npm run test
-
-      - name: Coverage
+      # Coverage runs the same suite as `npm run test` (vitest run --coverage
+      # is a superset of vitest run) — no separate plain test step needed.
+      - name: Unit and component tests with coverage
         run: npm run test:coverage
 
       - name: Build

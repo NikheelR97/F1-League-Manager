@@ -273,6 +273,9 @@ export default async function DriverStandingsPage({
               );
             })}
           </ul>
+
+          {/* Tiebreak note */}
+          <p className="text-xs text-f1-muted">Ties broken by wins, then podiums.</p>
         </>
       )}
     </div>

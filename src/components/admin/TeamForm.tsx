@@ -32,15 +32,25 @@ interface OfficialTemplate {
   slug: string;
 }
 
-interface TeamFormProps {
-  leagueId: string;
-  officialTemplates: OfficialTemplate[];
+interface InitialTeam {
+  color_hex: string;
+  id: string;
+  kind: "custom" | "official";
+  name: string;
+  slug: string;
 }
 
-export function TeamForm({ leagueId, officialTemplates }: TeamFormProps) {
+interface TeamFormProps {
+  initialTeam?: InitialTeam;
+  leagueId: string;
+  officialTemplates?: OfficialTemplate[];
+}
+
+export function TeamForm({ initialTeam, leagueId, officialTemplates = [] }: TeamFormProps) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
-  const [kind, setKind] = useState<"custom" | "official">("custom");
+  const isEdit = Boolean(initialTeam);
+  const [kind, setKind] = useState<"custom" | "official">(initialTeam?.kind ?? "custom");
   const {
     formState: { errors, isSubmitting },
     handleSubmit,
@@ -48,11 +58,13 @@ export function TeamForm({ leagueId, officialTemplates }: TeamFormProps) {
     setError,
     setValue,
   } = useForm<TeamFields>({
-    defaultValues: {
-      color_hex: "#E8002D",
-      kind: "custom",
-      official_template_id: null,
-    },
+    defaultValues: initialTeam
+      ? { ...initialTeam, official_template_id: null }
+      : {
+          color_hex: "#E8002D",
+          kind: "custom",
+          official_template_id: null,
+        },
     resolver: zodResolver(teamSchema),
   });
 
@@ -84,19 +96,28 @@ export function TeamForm({ leagueId, officialTemplates }: TeamFormProps) {
   }
 
   async function onSubmit(values: TeamFields) {
-    const res = await fetch(`/api/admin/leagues/${leagueId}/teams`, {
-      body: JSON.stringify(values),
+    const url = isEdit
+      ? `/api/admin/leagues/${leagueId}/teams/${initialTeam!.id}`
+      : `/api/admin/leagues/${leagueId}/teams`;
+    // PATCH only accepts name/slug/colour — kind is fixed after creation.
+    const body = isEdit
+      ? { color_hex: values.color_hex, name: values.name, slug: values.slug }
+      : values;
+    const res = await fetch(url, {
+      body: JSON.stringify(body),
       headers: {
         "content-type": "application/json",
         "x-csrf-token": csrfToken,
       },
-      method: "POST",
+      method: isEdit ? "PATCH" : "POST",
     });
 
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
+      const resBody = await res.json().catch(() => ({}));
       setError("root", {
-        message: (body as { error?: string }).error ?? "Failed to create team",
+        message:
+          (resBody as { error?: string }).error ??
+          `Failed to ${isEdit ? "save" : "create"} team`,
       });
       return;
     }
@@ -107,26 +128,28 @@ export function TeamForm({ leagueId, officialTemplates }: TeamFormProps) {
 
   return (
     <form className="space-y-5" noValidate onSubmit={handleSubmit(onSubmit)}>
-      {/* Kind */}
-      <div className="space-y-1">
-        <Label>Team type</Label>
-        <div className="flex gap-4">
-          {(["custom", "official"] as const).map((k) => (
-            <label className="flex items-center gap-2 text-sm text-f1-white" key={k}>
-              <input
-                className="accent-f1-red"
-                type="radio"
-                value={k}
-                {...register("kind", { onChange: handleKindChange })}
-              />
-              {k === "official" ? "Official F1 team" : "Custom team"}
-            </label>
-          ))}
+      {/* Kind — fixed after creation, not editable */}
+      {!isEdit && (
+        <div className="space-y-1">
+          <Label>Team type</Label>
+          <div className="flex gap-4">
+            {(["custom", "official"] as const).map((k) => (
+              <label className="flex items-center gap-2 text-sm text-f1-white" key={k}>
+                <input
+                  className="accent-f1-red"
+                  type="radio"
+                  value={k}
+                  {...register("kind", { onChange: handleKindChange })}
+                />
+                {k === "official" ? "Official F1 team" : "Custom team"}
+              </label>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Official template picker */}
-      {kind === "official" && (
+      {!isEdit && kind === "official" && (
         <div className="space-y-1">
           <Label htmlFor="team-template">Official template</Label>
           <select
@@ -150,7 +173,7 @@ export function TeamForm({ leagueId, officialTemplates }: TeamFormProps) {
         <Input
           id="team-name"
           placeholder="Red Bull Racing"
-          {...register("name", { onChange: handleNameChange })}
+          {...register("name", isEdit ? {} : { onChange: handleNameChange })}
           className="bg-f1-dark text-f1-white placeholder:text-f1-muted"
         />
         {errors.name && (
@@ -201,7 +224,13 @@ export function TeamForm({ leagueId, officialTemplates }: TeamFormProps) {
         disabled={isSubmitting}
         type="submit"
       >
-        {isSubmitting ? "Creating…" : "Create Team"}
+        {isSubmitting
+          ? isEdit
+            ? "Saving…"
+            : "Creating…"
+          : isEdit
+            ? "Save Changes"
+            : "Create Team"}
       </button>
     </form>
   );

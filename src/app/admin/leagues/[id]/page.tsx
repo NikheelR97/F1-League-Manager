@@ -6,15 +6,18 @@ import { Pencil, Plus } from "lucide-react";
 import { z } from "zod";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { ApplyBanButton } from "@/components/admin/ApplyBanButton";
 import { CarryOverForm } from "@/components/admin/CarryOverForm";
 import { LeagueAssetUpload } from "@/components/admin/LeagueAssetUpload";
 import { LeagueStatusButton } from "@/components/admin/LeagueStatusButton";
+import { RecalculateStandingsButton } from "@/components/admin/RecalculateStandingsButton";
 import { SeasonActions } from "@/components/admin/SeasonActions";
 import { SeasonForm } from "@/components/admin/SeasonForm";
 import { SeasonSelector } from "@/components/admin/SeasonSelector";
 import { SessionDeleteButton } from "@/components/admin/SessionDeleteButton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { StatusPill } from "@/components/ui/StatusPill";
 import { MAX_DRIVERS_LIST, MAX_SEASONS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -123,6 +126,23 @@ export default async function LeagueDetailPage({
     return <ErrorState message="Failed to load league management data." />;
   }
 
+  // M8 — one extra query (never per-row) to know which Ban Watch rows already
+  // have a ban applied, so the panel can show "Ban applied" instead of the
+  // action button once set.
+  const banWatchDriverIds = (banWatch ?? []).map((r) => r.driver_id);
+  const { data: pendingBanEntries } =
+    banWatchDriverIds.length && effectiveSeasonId
+      ? await db
+          .from("league_driver_entries")
+          .select("driver_id, pending_ban")
+          .eq("league_id", leagueId)
+          .eq("season_id", effectiveSeasonId)
+          .in("driver_id", banWatchDriverIds)
+      : { data: [] };
+  const pendingBanByDriver = new Map(
+    (pendingBanEntries ?? []).map((e) => [e.driver_id, e.pending_ban]),
+  );
+
   const effectiveSeasonName =
     seasons.find((s) => s.id === effectiveSeasonId)?.name ?? "No season yet";
 
@@ -145,6 +165,15 @@ export default async function LeagueDetailPage({
           </span>
           <SeasonSelector seasons={seasons} selectedSeasonId={effectiveSeasonId ?? ""} />
           <LeagueStatusButton currentStatus={league.status} leagueId={leagueId} />
+          {seasons.length > 0 && (
+            <Link
+              className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              href={`/leagues/${league.slug}/standings/drivers`}
+            >
+              View public standings
+            </Link>
+          )}
+          {currentSeason && <RecalculateStandingsButton leagueId={leagueId} />}
         </div>
       </div>
 
@@ -224,7 +253,7 @@ export default async function LeagueDetailPage({
         <div className="grid gap-6 sm:grid-cols-2">
           <div className="space-y-2">
             <h3 className="text-xs font-bold uppercase text-f1-muted">New Season</h3>
-            <SeasonForm leagueId={leagueId} />
+            <SeasonForm leagueId={leagueId} seasonCount={seasons.length} />
           </div>
           {seasons.length > 1 && (
             <div className="space-y-2">
@@ -264,11 +293,20 @@ export default async function LeagueDetailPage({
           <ul className="space-y-2">
             {pointsSystems.map((ps) => (
               <li key={ps.id}>
-                <div className="border border-f1-border bg-f1-dark p-4">
-                  <p className="font-bold text-f1-white">{ps.name}</p>
-                  <p className="font-mono text-xs text-f1-muted">
-                    Top {ps.max_positions} · FL +{ps.fastest_lap_points} · Pole +{ps.pole_position_points}
-                  </p>
+                <div className="flex items-center justify-between border border-f1-border bg-f1-dark p-4">
+                  <div>
+                    <p className="font-bold text-f1-white">{ps.name}</p>
+                    <p className="font-mono text-xs text-f1-muted">
+                      Top {ps.max_positions} · FL +{ps.fastest_lap_points} · Pole +{ps.pole_position_points}
+                    </p>
+                  </div>
+                  <Link
+                    className="p-1 text-f1-muted transition-colors hover:text-f1-white"
+                    href={`/admin/leagues/${leagueId}/points-systems/${ps.id}/edit`}
+                    title="Edit Points System"
+                  >
+                    <Pencil aria-hidden="true" size={16} />
+                  </Link>
                 </div>
               </li>
             ))}
@@ -320,15 +358,9 @@ export default async function LeagueDetailPage({
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span
-                        className={`border px-2 py-0.5 text-xs font-bold uppercase ${
-                          session.status === "completed"
-                            ? "border-team-sauber text-team-sauber"
-                            : "border-f1-muted text-f1-muted"
-                        }`}
-                      >
-                        {session.status}
-                      </span>
+                      <StatusPill tone={session.status === "completed" ? "green" : "silver"}>
+                        {session.status === "completed" ? "Published" : "Scheduled"}
+                      </StatusPill>
                       {isPublishable && (
                         <Link
                           className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
@@ -407,6 +439,13 @@ export default async function LeagueDetailPage({
                       </p>
                     </div>
                   </div>
+                  <Link
+                    className="p-1 text-f1-muted transition-colors hover:text-f1-white"
+                    href={`/admin/leagues/${leagueId}/teams/${team.id}/edit`}
+                    title="Edit Team"
+                  >
+                    <Pencil aria-hidden="true" size={16} />
+                  </Link>
                 </div>
               </li>
             ))}
@@ -420,16 +459,41 @@ export default async function LeagueDetailPage({
           <h2 className="text-sm font-bold uppercase text-f1-muted">
             Ban Watch ({banWatch.length})
           </h2>
+          {/* P5 — this list reflects committed data: driver_penalty_totals,
+              updated only once a session is published. The wizard's
+              "Threshold alert" (seen on the Review step) checks the same
+              threshold but against a live, not-yet-published preview, so the
+              two can disagree until the session is published. */}
+          <p className="text-xs text-f1-muted">
+            Drivers at or above the penalty threshold, based on published sessions. (The
+            wizard&apos;s Threshold Alert previews the same threshold before publish.)
+          </p>
           <ul className="space-y-2">
             {banWatch.map((row) => {
               const driver = row.drivers as unknown as { display_name: string } | null;
+              const driverName = driver?.display_name ?? "Unknown";
+              const applied = pendingBanByDriver.get(row.driver_id) ?? false;
               return (
                 <li key={row.driver_id}>
                   <div className="flex items-center justify-between border border-f1-red/30 bg-f1-dark px-4 py-2 text-sm">
-                    <span className="text-f1-white">{driver?.display_name ?? "Unknown"}</span>
-                    <span className="font-mono text-xs text-f1-red-text">
-                      {row.penalty_points} pts &middot; Alert only &mdash; pending admin decision.
-                    </span>
+                    <span className="text-f1-white">{driverName}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs text-f1-red-text">
+                        {row.penalty_points} pts
+                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        {applied && <StatusPill tone="red">Ban applied &mdash; next round</StatusPill>}
+                        {effectiveSeasonId && (
+                          <ApplyBanButton
+                            applied={applied}
+                            driverId={row.driver_id}
+                            driverName={driverName}
+                            leagueId={leagueId}
+                            seasonId={effectiveSeasonId}
+                          />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </li>
               );

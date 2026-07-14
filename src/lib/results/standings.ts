@@ -3,7 +3,10 @@
 
 export interface ResultForStandings {
   driver_id: string;
-  team_id: string;
+  // M4 — null means the driver raced as a free agent (no team); their points
+  // still count toward the driver total but must never roll up into any
+  // constructor's total. See buildTeamStandings below.
+  team_id: string | null;
   finishing_position: number | null;
   result_status: string;
   points_awarded: number;
@@ -115,6 +118,10 @@ export function buildTeamStandings(
   };
 
   for (const r of results) {
+    // M4 — a free-agent result (team_id null) contributes no constructor
+    // points to anyone; skip it entirely rather than creating a bogus
+    // standings row keyed by null.
+    if (!r.team_id) continue;
     const t = ensure(r.team_id);
     t.points += r.points_awarded;
     if (r.result_status === "classified" && r.finishing_position === 1) t.wins++;

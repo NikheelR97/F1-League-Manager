@@ -20,9 +20,10 @@ type SeasonFields = z.infer<typeof seasonSchema>;
 
 interface SeasonFormProps {
   leagueId: string;
+  seasonCount?: number;
 }
 
-export function SeasonForm({ leagueId }: SeasonFormProps) {
+export function SeasonForm({ leagueId, seasonCount = 0 }: SeasonFormProps) {
   const router = useRouter();
   const csrfToken = useCsrfToken();
   const {
@@ -64,7 +65,7 @@ export function SeasonForm({ leagueId }: SeasonFormProps) {
         <Label htmlFor="season-name">Name</Label>
         <Input
           id="season-name"
-          placeholder="Season 3"
+          placeholder={`Season ${seasonCount + 1}`}
           {...register("name")}
           aria-describedby={errors.name ? "season-name-error" : undefined}
           className="bg-f1-dark text-f1-white placeholder:text-f1-muted"
