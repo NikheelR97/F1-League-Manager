@@ -9,12 +9,49 @@ on:
       - prod
 
 jobs:
-  verify:
+  # Fast static checks + unit/component tests. No Supabase, Docker, or Playwright,
+  # so this finishes well before the e2e job and surfaces most failures early.
+  static:
+    name: Static checks & unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      # Coverage runs the same suite as `npm run test` (vitest run --coverage
+      # is a superset of vitest run) — no separate plain test step needed.
+      - name: Unit and component tests with coverage
+        run: npm run test:coverage
+
+      - name: Dependency audit
+        run: npm run audit:security
+
+      - name: Secret scan
+        run: npm run audit:secrets
+
+  # Heavy job: build + Playwright E2E against a local Supabase stack. Runs in
+  # parallel with `static`, so overall wall-clock is this job alone, not the sum.
+  e2e:
+    name: Build & E2E
     runs-on: ubuntu-latest
     # Exposed at job level so the Docker Hub login step can gate on it.
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,8 +69,7 @@ jobs:
         # `npx supabase start` (next step) pulls its container images from Docker
         # Hub, whose anonymous pull limit intermittently fails CI with
         # "toomanyrequests: Rate exceeded". Authenticating lifts that limit.
-        # Skips gracefully until the DOCKERHUB_* repo secrets are set, so CI
-        # still runs (anonymously) without them.
+        # Skips gracefully until the DOCKERHUB_* repo secrets are set.
         if: env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@v3
         with:
@@ -70,16 +106,13 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      - name: Type check
-        run: npm run type-check
-
-      - name: Lint
-        run: npm run lint
-
-      # Coverage runs the same suite as `npm run test` (vitest run --coverage
-      # is a superset of vitest run) — no separate plain test step needed.
-      - name: Unit and component tests with coverage
-        run: npm run test:coverage
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
 
       - name: Build
         run: npm run build
@@ -89,9 +122,3 @@ jobs:
 
       - name: E2E tests
         run: npm run test:e2e:run
-
-      - name: Dependency audit
-        run: npm run audit:security
-
-      - name: Secret scan
-        run: npm run audit:secrets
