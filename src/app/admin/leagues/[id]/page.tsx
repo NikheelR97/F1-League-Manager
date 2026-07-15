@@ -525,6 +525,14 @@ export default async function LeagueDetailPage({
             >
               Adjustments
             </Link>
+            {effectiveSeasonId && (
+              <Link
+                className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                href={`/admin/leagues/${leagueId}/drivers/bulk`}
+              >
+                Add multiple
+              </Link>
+            )}
             <Link
               className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
               href={`/admin/leagues/${leagueId}/drivers/new`}
