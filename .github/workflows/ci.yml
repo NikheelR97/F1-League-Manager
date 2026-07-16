@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - staging
+      - prod
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start Supabase
+        run: |
+          npx supabase start
+          STATUS=$(npx supabase status -o env)
+          echo "NEXT_PUBLIC_SUPABASE_URL=$(echo "$STATUS" | grep '^API_URL=' | cut -d= -f2- | tr -d '"')" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(echo "$STATUS" | grep '^PUBLISHABLE_KEY=' | cut -d= -f2- | tr -d '"')" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(echo "$STATUS" | grep '^SECRET_KEY=' | cut -d= -f2- | tr -d '"')" >> "$GITHUB_ENV"
+          echo "CSRF_SECRET=ec1bd6a4c2bbf2fd9942774473b838218e8809759fa0603045207c66796e85e0" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000" >> "$GITHUB_ENV"
+          echo "E2E_SECRET=ci-e2e-secret" >> "$GITHUB_ENV"
+
+      - name: Get installed Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright OS dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      # Coverage runs the same suite as `npm run test` (vitest run --coverage
+      # is a superset of vitest run) — no separate plain test step needed.
+      - name: Unit and component tests with coverage
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Seed E2E test data
+        run: node scripts/seed-e2e.mjs
+
+      - name: E2E tests
+        run: npm run test:e2e:run
+
+      - name: Dependency audit
+        run: npm run audit:security
+
+      - name: Secret scan
+        run: npm run audit:secrets

@@ -1,0 +1,210 @@
+// Pure standings calculation — no DB dependency.
+// Receives already-fetched rows; the DB service layer calls these after fetching.
+
+export interface ResultForStandings {
+  driver_id: string;
+  // M4 — null means the driver raced as a free agent (no team); their points
+  // still count toward the driver total but must never roll up into any
+  // constructor's total. See buildTeamStandings below.
+  team_id: string | null;
+  finishing_position: number | null;
+  result_status: string;
+  points_awarded: number;
+  manual_points_adjustment: number;
+  fastest_lap: boolean;
+}
+
+export interface AdjustmentForStandings {
+  driver_id: string | null;
+  team_id: string | null;
+  points_delta: number;
+}
+
+export interface DriverStandingResult {
+  driver_id: string;
+  position: number;
+  previous_position: number | null;
+  total_points: number;
+  wins: number;
+  podiums: number;
+  fastest_laps: number;
+}
+
+export interface TeamStandingResult {
+  team_id: string;
+  position: number;
+  previous_position: number | null;
+  total_points: number;
+  wins: number;
+  podiums: number;
+}
+
+export interface PenaltyTotalResult {
+  driver_id: string;
+  penalty_points: number;
+  ban_threshold_reached: boolean;
+}
+
+// Tie-break order: total_points → wins → podiums → fastest_laps
+export function buildDriverStandings(
+  results: ResultForStandings[],
+  adjustments: AdjustmentForStandings[],
+  previousPositions: Map<string, number>,
+): DriverStandingResult[] {
+  type Tally = {
+    points: number;
+    wins: number;
+    podiums: number;
+    fastest_laps: number;
+  };
+  const byDriver = new Map<string, Tally>();
+
+  const ensure = (id: string): Tally => {
+    if (!byDriver.has(id)) {
+      byDriver.set(id, { points: 0, wins: 0, podiums: 0, fastest_laps: 0 });
+    }
+    return byDriver.get(id)!;
+  };
+
+  for (const r of results) {
+    const t = ensure(r.driver_id);
+    // Championship total = points_awarded + manual_points_adjustment (not penalty_points)
+    t.points += r.points_awarded + r.manual_points_adjustment;
+    if (r.result_status === "classified" && r.finishing_position === 1) t.wins++;
+    if (
+      r.result_status === "classified" &&
+      r.finishing_position !== null &&
+      r.finishing_position <= 3
+    )
+      t.podiums++;
+    if (r.fastest_lap) t.fastest_laps++;
+  }
+
+  for (const adj of adjustments) {
+    if (adj.driver_id) ensure(adj.driver_id).points += adj.points_delta;
+  }
+
+  const sorted = [...byDriver.entries()].sort(([, a], [, b]) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    if (b.podiums !== a.podiums) return b.podiums - a.podiums;
+    return b.fastest_laps - a.fastest_laps;
+  });
+
+  return sorted.map(([driver_id, t], i) => ({
+    driver_id,
+    position: i + 1,
+    previous_position: previousPositions.get(driver_id) ?? null,
+    total_points: t.points,
+    wins: t.wins,
+    podiums: t.podiums,
+    fastest_laps: t.fastest_laps,
+  }));
+}
+
+// Constructor points use only points_awarded (not manual_points_adjustment).
+// Tie-break order: total_points → wins → podiums
+export function buildTeamStandings(
+  results: ResultForStandings[],
+  adjustments: AdjustmentForStandings[],
+  previousPositions: Map<string, number>,
+): TeamStandingResult[] {
+  type Tally = { points: number; wins: number; podiums: number };
+  const byTeam = new Map<string, Tally>();
+
+  const ensure = (id: string): Tally => {
+    if (!byTeam.has(id)) byTeam.set(id, { points: 0, wins: 0, podiums: 0 });
+    return byTeam.get(id)!;
+  };
+
+  for (const r of results) {
+    // M4 — a free-agent result (team_id null) contributes no constructor
+    // points to anyone; skip it entirely rather than creating a bogus
+    // standings row keyed by null.
+    if (!r.team_id) continue;
+    const t = ensure(r.team_id);
+    t.points += r.points_awarded;
+    if (r.result_status === "classified" && r.finishing_position === 1) t.wins++;
+    if (
+      r.result_status === "classified" &&
+      r.finishing_position !== null &&
+      r.finishing_position <= 3
+    )
+      t.podiums++;
+  }
+
+  for (const adj of adjustments) {
+    if (adj.team_id) ensure(adj.team_id).points += adj.points_delta;
+  }
+
+  const sorted = [...byTeam.entries()].sort(([, a], [, b]) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    return b.podiums - a.podiums;
+  });
+
+  return sorted.map(([team_id, t], i) => ({
+    team_id,
+    position: i + 1,
+    previous_position: previousPositions.get(team_id) ?? null,
+    total_points: t.points,
+    wins: t.wins,
+    podiums: t.podiums,
+  }));
+}
+
+// F1 — a team page's per-driver points breakdown must reconcile with the
+// header's constructor total (buildTeamStandings above), which sums
+// points_awarded only. This intentionally ignores manual_points_adjustment
+// even though the input rows carry it, so a caller can pass full race-result
+// rows without a separate DTO — and can't silently reintroduce the
+// adjustment by tweaking this function's inputs.
+export interface DriverPointsBreakdownRow {
+  driver_id: string;
+  driver_name: string;
+  points_awarded: number;
+  manual_points_adjustment: number;
+}
+
+export interface DriverPointsBreakdownResult {
+  driver_id: string;
+  name: string;
+  points: number;
+}
+
+export function buildDriverPointsBreakdown(
+  rows: DriverPointsBreakdownRow[],
+): DriverPointsBreakdownResult[] {
+  const byDriver = new Map<string, DriverPointsBreakdownResult>();
+  for (const r of rows) {
+    const existing = byDriver.get(r.driver_id);
+    byDriver.set(r.driver_id, {
+      driver_id: r.driver_id,
+      name: r.driver_name,
+      points: (existing?.points ?? 0) + r.points_awarded,
+    });
+  }
+  return [...byDriver.values()].sort((a, b) => b.points - a.points);
+}
+
+export function buildPenaltyTotals(
+  penaltyRows: Array<{ driver_id: string; penalty_points: number }>,
+  carryOverByDriver: Map<string, number>,
+  threshold: number,
+): PenaltyTotalResult[] {
+  const byDriver = new Map<string, number>();
+
+  for (const [driverId, carryOver] of carryOverByDriver) {
+    byDriver.set(driverId, (byDriver.get(driverId) ?? 0) + carryOver);
+  }
+
+  for (const p of penaltyRows) {
+    byDriver.set(p.driver_id, (byDriver.get(p.driver_id) ?? 0) + p.penalty_points);
+  }
+
+  return [...byDriver.entries()].map(([driver_id, penalty_points]) => ({
+    driver_id,
+    penalty_points,
+    ban_threshold_reached: penalty_points >= threshold,
+  }));
+}

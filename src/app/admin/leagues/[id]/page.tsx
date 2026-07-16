@@ -1,0 +1,593 @@
+import "server-only";
+
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Pencil, Plus } from "lucide-react";
+import { z } from "zod";
+
+import { AddOfficialTeamsButton } from "@/components/admin/AddOfficialTeamsButton";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { ApplyBanButton } from "@/components/admin/ApplyBanButton";
+import { CarryOverForm } from "@/components/admin/CarryOverForm";
+import { LeagueAssetUpload } from "@/components/admin/LeagueAssetUpload";
+import { LeagueStatusButton } from "@/components/admin/LeagueStatusButton";
+import { RecalculateStandingsButton } from "@/components/admin/RecalculateStandingsButton";
+import { SeasonActions } from "@/components/admin/SeasonActions";
+import { SeasonForm } from "@/components/admin/SeasonForm";
+import { SeasonSelector } from "@/components/admin/SeasonSelector";
+import { SessionDeleteButton } from "@/components/admin/SessionDeleteButton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { MAX_DRIVERS_LIST, MAX_SEASONS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
+
+const MAX_SESSIONS_LIST = 20;
+
+const searchParamsSchema = z.object({
+  season_id: z.string().uuid().optional(),
+});
+
+export default async function LeagueDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { id: leagueId } = await params;
+  const rawSearch = await searchParams;
+  const parsedSearch = searchParamsSchema.safeParse(rawSearch);
+  const seasonIdParam = parsedSearch.success ? parsedSearch.data.season_id : undefined;
+
+  const db = createSupabaseServiceRoleClient();
+
+  const [
+    { data: league, error: leagueError },
+    { data: allSeasons, error: seasonsError },
+    { data: teams, error: teamsError },
+    { data: pointsSystems, error: pointsSystemsError },
+  ] = await Promise.all([
+    db
+      .from("leagues")
+      .select("id, name, slug, format, status, fastest_lap_enabled, pole_position_enabled, constructor_championship_enabled, penalty_threshold")
+      .eq("id", leagueId)
+      .single(),
+    db
+      .from("seasons")
+      .select("id, name, starts_on, ends_on, is_current, is_archived")
+      .eq("league_id", leagueId)
+      .order("starts_on", { ascending: false })
+      .limit(MAX_SEASONS_LIST),
+    db
+      .from("teams")
+      .select("id, name, slug, kind, color_hex")
+      .eq("league_id", leagueId)
+      .order("name")
+      .limit(MAX_TEAMS_PER_LEAGUE),
+    db
+      .from("points_systems")
+      .select("id, name, fastest_lap_points, pole_position_points, max_positions")
+      .eq("league_id", leagueId)
+      .order("name"),
+  ]);
+
+  if (leagueError && leagueError.code !== "PGRST116") {
+    return <ErrorState message="Failed to load league." />;
+  }
+  if (seasonsError || teamsError || pointsSystemsError) {
+    return <ErrorState message="Failed to load league management data." />;
+  }
+  if (!league) notFound();
+
+  // Resolve which season to display. Priority:
+  // 1. Valid season_id from URL param (must belong to this league)
+  // 2. The league's current season (is_current = true)
+  // A brand-new league has zero seasons — effectiveSeasonId is then null and
+  // season-scoped sections below degrade to their empty states.
+  const seasons = allSeasons ?? [];
+  const currentSeason = seasons.find((s) => s.is_current);
+  const effectiveSeasonId =
+    (seasonIdParam && seasons.some((s) => s.id === seasonIdParam) ? seasonIdParam : null) ??
+    currentSeason?.id ??
+    null;
+
+  const [{ data: entries, error: entriesError }, { data: sessions }, { data: banWatch }] =
+    effectiveSeasonId
+      ? await Promise.all([
+          db
+            .from("league_driver_entries")
+            .select("id, is_reserve, drivers(display_name, racing_number), driver_team_stints(team_id, ends_on, teams(name, color_hex))")
+            .eq("league_id", leagueId)
+            .eq("season_id", effectiveSeasonId)
+            .is("left_on", null)
+            .order("joined_on")
+            .limit(MAX_DRIVERS_LIST),
+          db
+            .from("race_sessions")
+            .select("id, name, session_code, scheduled_at, status, circuits(name, country)")
+            .eq("league_id", leagueId)
+            .eq("season_id", effectiveSeasonId)
+            .order("scheduled_at", { ascending: false })
+            .limit(MAX_SESSIONS_LIST),
+          // Mirrors the public hub's penalty-watch query (driver_penalty_totals,
+          // ban_threshold_reached) so admin and public never disagree — see B2/B12.
+          db
+            .from("driver_penalty_totals")
+            .select("driver_id, penalty_points, drivers(display_name)")
+            .eq("league_id", leagueId)
+            .eq("season_id", effectiveSeasonId)
+            .eq("ban_threshold_reached", true)
+            .order("penalty_points", { ascending: false })
+            .limit(10),
+        ])
+      : [{ data: [], error: null }, { data: [] }, { data: [] }];
+
+  if (entriesError) {
+    return <ErrorState message="Failed to load league management data." />;
+  }
+
+  // M8 — one extra query (never per-row) to know which Ban Watch rows already
+  // have a ban applied, so the panel can show "Ban applied" instead of the
+  // action button once set.
+  const banWatchDriverIds = (banWatch ?? []).map((r) => r.driver_id);
+  const { data: pendingBanEntries } =
+    banWatchDriverIds.length && effectiveSeasonId
+      ? await db
+          .from("league_driver_entries")
+          .select("driver_id, pending_ban")
+          .eq("league_id", leagueId)
+          .eq("season_id", effectiveSeasonId)
+          .in("driver_id", banWatchDriverIds)
+      : { data: [] };
+  const pendingBanByDriver = new Map(
+    (pendingBanEntries ?? []).map((e) => [e.driver_id, e.pending_ban]),
+  );
+
+  const effectiveSeasonName =
+    seasons.find((s) => s.id === effectiveSeasonId)?.name ?? "No season yet";
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-start justify-between gap-4">
+        <AdminPageHeader
+          description={`${league.format} · ${effectiveSeasonName}`}
+          title={league.name}
+        />
+        <div className="flex flex-col items-end gap-2 pt-1 shrink-0">
+          <span
+            className={`border px-2 py-0.5 text-xs font-bold uppercase ${
+              league.status === "active"
+                ? "border-team-sauber text-team-sauber"
+                : "border-f1-muted text-f1-muted"
+            }`}
+          >
+            {league.status}
+          </span>
+          <SeasonSelector seasons={seasons} selectedSeasonId={effectiveSeasonId ?? ""} />
+          <LeagueStatusButton currentStatus={league.status} leagueId={leagueId} />
+          {seasons.length > 0 && (
+            <Link
+              className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              href={`/leagues/${league.slug}/standings/drivers`}
+            >
+              View public standings
+            </Link>
+          )}
+          {currentSeason && <RecalculateStandingsButton leagueId={leagueId} />}
+        </div>
+      </div>
+
+      {/* Meta */}
+      <section className="grid grid-cols-2 gap-4 border border-f1-border bg-f1-dark p-4 text-sm sm:grid-cols-4">
+        <div>
+          <p className="text-xs text-f1-muted">Slug</p>
+          <p className="font-mono text-f1-white">{league.slug}</p>
+        </div>
+        <div>
+          <p className="text-xs text-f1-muted">Penalty threshold</p>
+          <p className="text-f1-white">{league.penalty_threshold} pts</p>
+        </div>
+        <div className="col-span-2">
+          <p className="text-xs text-f1-muted">Scoring options</p>
+          <p className="text-f1-white">
+            {[
+              league.fastest_lap_enabled && "Fastest lap",
+              league.pole_position_enabled && "Pole position",
+              league.constructor_championship_enabled && "Constructors",
+            ]
+              .filter(Boolean)
+              .join(" · ") || "None"}
+          </p>
+        </div>
+      </section>
+
+      {/* Seasons */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-bold uppercase text-f1-muted">
+          Seasons ({seasons.length})
+        </h2>
+
+        {!seasons.length ? (
+          <EmptyState
+            message="Create the first season below to start adding drivers, teams, and race results."
+            title="Create the First Season"
+          />
+        ) : (
+          <ul className="space-y-2">
+            {seasons.map((season) => (
+              <li key={season.id}>
+                <div className="space-y-3 border border-f1-border bg-f1-dark p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-bold text-f1-white">{season.name}</p>
+                      <p className="font-mono text-xs text-f1-muted">
+                        {season.starts_on}
+                        {season.ends_on ? ` → ${season.ends_on}` : " → ongoing"}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {season.is_current && (
+                        <span className="border border-f1-red px-2 py-0.5 text-xs font-bold uppercase text-f1-red-text">
+                          Current
+                        </span>
+                      )}
+                      {season.is_archived && (
+                        <span className="border border-f1-border px-2 py-0.5 text-xs font-bold uppercase text-f1-muted">
+                          Archived
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <SeasonActions
+                    isArchived={season.is_archived}
+                    isCurrent={season.is_current}
+                    leagueId={leagueId}
+                    seasonId={season.id}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold uppercase text-f1-muted">New Season</h3>
+            <SeasonForm leagueId={leagueId} seasonCount={seasons.length} />
+          </div>
+          {seasons.length > 1 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase text-f1-muted">Carry-Over</h3>
+              <CarryOverForm leagueId={leagueId} seasons={seasons} />
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Assets */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-bold uppercase text-f1-muted">Assets</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <LeagueAssetUpload kind="logo" label="League Logo" leagueId={leagueId} />
+          <LeagueAssetUpload kind="hero_image" label="Hero Image" leagueId={leagueId} />
+        </div>
+      </section>
+
+      {/* Points Systems */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase text-f1-muted">Points Systems</h2>
+          <Link
+            className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+            href={`/admin/leagues/${leagueId}/points-systems/new`}
+          >
+            <Plus aria-hidden="true" size={12} />
+            Add Points System
+          </Link>
+        </div>
+        {!pointsSystems?.length ? (
+          <p className="text-sm text-f1-muted">
+            No points systems yet. Add one before scheduling race sessions.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {pointsSystems.map((ps) => (
+              <li key={ps.id}>
+                <div className="flex items-center justify-between border border-f1-border bg-f1-dark p-4">
+                  <div>
+                    <p className="font-bold text-f1-white">{ps.name}</p>
+                    <p className="font-mono text-xs text-f1-muted">
+                      Top {ps.max_positions} · FL +{ps.fastest_lap_points} · Pole +{ps.pole_position_points}
+                    </p>
+                  </div>
+                  <Link
+                    className="p-1 text-f1-muted transition-colors hover:text-f1-white"
+                    href={`/admin/leagues/${leagueId}/points-systems/${ps.id}/edit`}
+                    title="Edit Points System"
+                  >
+                    <Pencil aria-hidden="true" size={16} />
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Sessions */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase text-f1-muted">
+            Race Sessions ({sessions?.length ?? 0})
+          </h2>
+          <div className="flex gap-2">
+            <Link
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              href={`/admin/leagues/${leagueId}/wheel`}
+            >
+              Digital Wheel
+            </Link>
+            <Link
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+              href={`/admin/leagues/${leagueId}/sessions/new`}
+            >
+              <Plus aria-hidden="true" size={12} />
+              Add Session
+            </Link>
+          </div>
+        </div>
+        {!effectiveSeasonId ? (
+          <p className="text-sm text-f1-muted">Create a season first to schedule race sessions.</p>
+        ) : !sessions?.length ? (
+          <p className="text-sm text-f1-muted">No sessions yet. Add one to start entering results.</p>
+        ) : (
+          <ul className="space-y-2">
+            {sessions.map((session) => {
+              const circuit = session.circuits as unknown as { country: string; name: string } | null;
+              const isPublishable = session.status !== "completed";
+              return (
+                <li key={session.id}>
+                  <div className="flex items-center justify-between border border-f1-border bg-f1-dark p-4">
+                    <div>
+                      <p className="font-bold text-f1-white">{session.name}</p>
+                      <p className="font-mono text-xs text-f1-muted">
+                        {session.session_code}
+                        {circuit ? ` · ${circuit.name}, ${circuit.country}` : ""}
+                        {" · "}
+                        {new Date(session.scheduled_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <StatusPill tone={session.status === "completed" ? "green" : "silver"}>
+                        {session.status === "completed" ? "Published" : "Scheduled"}
+                      </StatusPill>
+                      {isPublishable && (
+                        <Link
+                          className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                          href={`/admin/leagues/${leagueId}/sessions/${session.id}/publish`}
+                        >
+                          Enter Results
+                        </Link>
+                      )}
+                      {!isPublishable && (
+                        <Link
+                          className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                          href={`/admin/leagues/${leagueId}/sessions/${session.id}/penalties`}
+                        >
+                          Penalties
+                        </Link>
+                      )}
+                      {/* M9 — published results are no longer uncorrectable; the
+                          publish page reopens pre-filled for a republish. */}
+                      {!isPublishable && (
+                        <Link
+                          className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                          href={`/admin/leagues/${leagueId}/sessions/${session.id}/publish`}
+                        >
+                          Correct results
+                        </Link>
+                      )}
+                      <Link
+                        className="p-1 text-f1-muted transition-colors hover:text-f1-white"
+                        href={`/admin/leagues/${leagueId}/sessions/${session.id}/edit`}
+                        title="Edit Session"
+                      >
+                        <Pencil aria-hidden="true" size={16} />
+                      </Link>
+                      {isPublishable && <SessionDeleteButton sessionId={session.id} />}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* Teams */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase text-f1-muted">
+            Teams ({teams?.length ?? 0}/{MAX_TEAMS_PER_LEAGUE})
+          </h2>
+          <div className="flex items-center gap-2">
+            <AddOfficialTeamsButton leagueId={leagueId} />
+            <Link
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+              href={`/admin/leagues/${leagueId}/teams/new`}
+            >
+              <Plus aria-hidden="true" size={12} />
+              Add Team
+            </Link>
+          </div>
+        </div>
+
+        {!teams?.length ? (
+          <p className="text-sm text-f1-muted">No teams yet. Add one to get started.</p>
+        ) : (
+          <ul className="space-y-2">
+            {teams.map((team) => (
+              <li key={team.id}>
+                <div className="flex items-center justify-between border border-f1-border bg-f1-dark p-4">
+                  <div className="flex items-center gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="h-4 w-1 shrink-0"
+                      style={{ backgroundColor: team.color_hex }}
+                    />
+                    <div>
+                      <p className="font-bold text-f1-white">{team.name}</p>
+                      <p className="font-mono text-xs text-f1-muted">
+                        {team.slug} · {team.kind}
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    className="p-1 text-f1-muted transition-colors hover:text-f1-white"
+                    href={`/admin/leagues/${leagueId}/teams/${team.id}/edit`}
+                    title="Edit Team"
+                  >
+                    <Pencil aria-hidden="true" size={16} />
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Ban Watch */}
+      {!!banWatch?.length && (
+        <section className="space-y-4">
+          <h2 className="text-sm font-bold uppercase text-f1-muted">
+            Ban Watch ({banWatch.length})
+          </h2>
+          {/* P5 — this list reflects committed data: driver_penalty_totals,
+              updated only once a session is published. The wizard's
+              "Threshold alert" (seen on the Review step) checks the same
+              threshold but against a live, not-yet-published preview, so the
+              two can disagree until the session is published. */}
+          <p className="text-xs text-f1-muted">
+            Drivers at or above the penalty threshold, based on published sessions. (The
+            wizard&apos;s Threshold Alert previews the same threshold before publish.)
+          </p>
+          <ul className="space-y-2">
+            {banWatch.map((row) => {
+              const driver = row.drivers as unknown as { display_name: string } | null;
+              const driverName = driver?.display_name ?? "Unknown";
+              const applied = pendingBanByDriver.get(row.driver_id) ?? false;
+              return (
+                <li key={row.driver_id}>
+                  <div className="flex items-center justify-between border border-f1-red/30 bg-f1-dark px-4 py-2 text-sm">
+                    <span className="text-f1-white">{driverName}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs text-f1-red-text">
+                        {row.penalty_points} pts
+                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        {applied && <StatusPill tone="red">Ban applied &mdash; next round</StatusPill>}
+                        {effectiveSeasonId && (
+                          <ApplyBanButton
+                            applied={applied}
+                            driverId={row.driver_id}
+                            driverName={driverName}
+                            leagueId={leagueId}
+                            seasonId={effectiveSeasonId}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {/* Drivers */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase text-f1-muted">
+            Drivers ({entries?.length ?? 0})
+          </h2>
+          <div className="flex items-center gap-2">
+            <Link
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              href={`/admin/leagues/${leagueId}/transfers/new`}
+            >
+              Record Transfer
+            </Link>
+            <Link
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+              href={`/admin/leagues/${leagueId}/adjustments`}
+            >
+              Adjustments
+            </Link>
+            {effectiveSeasonId && (
+              <Link
+                className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
+                href={`/admin/leagues/${leagueId}/drivers/bulk`}
+              >
+                Add multiple
+              </Link>
+            )}
+            <Link
+              className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
+              href={`/admin/leagues/${leagueId}/drivers/new`}
+            >
+              <Plus aria-hidden="true" size={12} />
+              Add Driver
+            </Link>
+          </div>
+        </div>
+
+        {!effectiveSeasonId ? (
+          <p className="text-sm text-f1-muted">Create a season first to add drivers.</p>
+        ) : !entries?.length ? (
+          <p className="text-sm text-f1-muted">No drivers assigned yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {entries.map((entry) => {
+              const driver = entry.drivers as unknown as { display_name: string; racing_number: number | null } | null;
+              const stints = entry.driver_team_stints as unknown as Array<{ ends_on: string | null; teams: { color_hex: string; name: string } | null }> | null;
+              const activeStint = stints?.find((s) => s.ends_on === null);
+              const teamName = activeStint?.teams?.name ?? "Unassigned";
+              const teamColor = activeStint?.teams?.color_hex ?? "#444444";
+              return (
+                <li key={entry.id}>
+                  <div className="flex items-center justify-between border border-f1-border bg-f1-dark p-4">
+                    <div className="flex items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="h-4 w-1 shrink-0"
+                        style={{ backgroundColor: teamColor }}
+                      />
+                      <div>
+                        <p className="font-bold text-f1-white">
+                          {driver?.display_name ?? "Unknown"}
+                          {driver?.racing_number ? (
+                            <span className="ml-2 font-mono text-xs text-f1-muted">
+                              #{driver.racing_number}
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="text-xs text-f1-muted">{teamName}</p>
+                      </div>
+                    </div>
+                    {entry.is_reserve && (
+                      <span className="border border-f1-muted px-2 py-0.5 text-xs font-bold uppercase text-f1-muted">
+                        Reserve
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
