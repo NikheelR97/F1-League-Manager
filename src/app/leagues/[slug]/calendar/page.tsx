@@ -7,7 +7,7 @@ import { Calendar, MapPin } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { formatDate } from "@/lib/format-date";
+import { formatDate, formatTime } from "@/lib/format-date";
 import { pageTitle } from "@/lib/public/page-title";
 import { roundPrefix } from "@/lib/public/round-prefix";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
@@ -107,9 +107,7 @@ export default async function LeagueCalendarPage({
                           {formatDate(session.scheduled_at)}
                         </p>
                         <p className="text-sm text-f1-muted">
-                          {new Date(session.scheduled_at).toLocaleTimeString(undefined, {
-                            hour: '2-digit', minute: '2-digit'
-                          })}
+                          {formatTime(session.scheduled_at)} SAST
                         </p>
                       </div>
                       <div className="flex items-center justify-between mt-auto pt-4 border-t border-f1-border">
