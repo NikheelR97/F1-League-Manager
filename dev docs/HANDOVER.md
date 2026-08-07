@@ -8,14 +8,16 @@
 
 ## Current Handover Notes
 
-Last updated: July 13, 2026.
+Last updated: August 7, 2026.
 
 Current branch state:
 
 | Item | Current state |
 |------|---------------|
 | Integration branch | `dev` — all feature work merges here via PR. |
-| Latest merged PR | PR #50, `Fix all findings from the full-season GUI/UAT` on `dev` |
+| Production | **Live** at `league-manager.nikheelr.com` (← `prod`); staging at `staging.nikheelr.com` (← `staging`). Flow: feature → `dev` → `staging` → `prod`. |
+| Pending PRs | #63 `render race times in SAST` → `dev`; this docs update → `dev`. |
+| Prior "latest merged PR" (may be stale) | PR #50, `Fix all findings from the full-season GUI/UAT` on `dev` |
 | Merge commit | `da4c56f` (squash) |
 | Local Supabase target | Docker local project at `http://127.0.0.1:54321` |
 | Latest migration applied locally | `20260713020000_pending_ban_and_reserve_nullable.sql` |
@@ -23,6 +25,80 @@ Current branch state:
 > Local dev origin note: the app's admin-guard origin check is bound to the configured
 > `NEXT_PUBLIC_SITE_URL` (`http://localhost:3000` in `.env.local`). Browse the admin UI at
 > **`localhost:3000`**, not `127.0.0.1:3000` — the latter fails the origin check with a bare 403.
+
+### Production Launch + Live Season Ops (August 2026)
+
+Production is **live** at **https://league-manager.nikheelr.com** (Vercel production ← `prod` branch,
+prod Supabase project `piqhmsmagahalxbwwuea`). Staging is **https://staging.nikheelr.com** (← `staging`).
+Branch flow unchanged: feature → PR to `dev` → `staging` → `prod`.
+
+The first live season (the "Thursday League") was scored end-to-end through the admin API — Australia,
+Canada (sprint + feature), Netherlands (sprint + feature), Singapore (sprint + feature), and Mexico.
+Several operational gotchas surfaced that every future admin/dev must know:
+
+**Sprint vs feature use different points systems.** A race weekend's sprint and feature race point to
+*different* `points_systems`: "F1 Sprint Points" (8-7-6-5-4-3-2-1, P1–P8) vs "Standard F1 Points"
+(25-18-15-…-1, P1–P10, no fastest-lap point). A session's points system is chosen at **creation**
+(`race_sessions.points_system_id`). Pick the right one up front — see the lock below.
+
+**⚠️ The "can't change points" trap — a PUBLISHED session's points system is LOCKED.** The session
+PATCH route hard-blocks it:
+
+```text
+"Cannot change the points system of a published session. Unpublish or delete and re-enter to rescore."
+```
+
+`DELETE` also refuses a `completed` session, and there is **no in-app unpublish / rescore button**. So if
+a session is published with the wrong points system (we did this once — published a sprint with Standard
+points), the only fixes are manual DB operations against prod:
+1. Un-publish via raw SQL (clear `published_at`, set `status` back), then re-enter/re-publish; **or**
+2. Delete the row via SQL and recreate the session.
+
+Safe habit: `SELECT points_system_id` on the session and verify it against the intended system **before**
+publishing — it's expensive to undo after. A proper in-app "Unpublish / change points system + rescore"
+feature is still unbuilt and would remove this whole class of pain.
+
+**⚠️ Public standings are snapshot tables — direct DB edits don't refresh them.** Driver and constructor
+standings render from the precomputed `driver_standings` / `team_standings` tables, rebuilt by
+`recalculateStandings()` only on: publish, manual adjustment, points-system edit, penalty-status change,
+or the dedicated **`POST /api/admin/leagues/[id]/recalculate`**. Editing `race_results` directly in the DB
+leaves the standings stale until you call `/recalculate` (this bit us on the team move below). Note the
+5-minute `unstable_cache` on the public pages is a *separate* layer — an in-app write busts its tag; a raw
+DB write does not.
+
+**Two different "adjustment" mechanisms — don't confuse them.**
+- `race_results.manual_points_adjustment` — a per-result delta baked into one race. Affects that driver's
+  *championship* total but **not** constructor points. Used for a driver's race penalties (e.g. APX BigT's
+  −7 / −10 lines showing as `25 → 18` on the result).
+- `championship_adjustments` via `POST /api/admin/leagues/[id]/adjustments` — a season-level delta (driver
+  or team, kind, points_delta, reason). Use this when the race is already published and you can't safely
+  re-publish it (e.g. APX BigT's Australia −7 went here, because re-publishing a completed race needs its
+  full qualifying/grid payload, which we no longer had).
+
+**Free agents, transfers, and retroactive team moves.**
+- A driver with no open `driver_team_stints` row is a *free agent*; `race_results.team_id` is nullable and
+  free-agent results give championship points but no constructor points. The bulk-enroll route accepts a
+  team-less row — that's how a new driver (OsmanSeedat) was added mid-season.
+- The transfers route (`POST /api/admin/leagues/[id]/transfers`) moves a driver between teams going forward
+  and **never rewrites old result rows** (constructor history is preserved). We used it to move OsmanSeedat
+  into Aston Martin in place of the departing SensorFault, freeing the seat first.
+- **Combining a driver's *past* points under a new team has no app path.** To merge Paul2us + TAC_Jacods
+  under Racing Bulls (and strip Paul2us's points from Haas) we directly updated `race_results.team_id`
+  (+ `qualifying_results.team_id` + the open stint) Haas → Racing Bulls, then called `/recalculate`.
+  Because constructor points key off `race_results.team_id` at race time, a raw DB edit + recalc is the
+  only way to move historical constructor points.
+
+**Timezone → SAST (PR #63).** The app rendered times in UTC (server tz). All date/time helpers are now
+pinned to `Africa/Johannesburg` and the calendar uses a `formatTime` helper, so races display in SAST.
+Stored `scheduled_at` for every race was corrected to `19:00 UTC` = **21:00 SAST (9 PM)** on the right date
+(this also fixed two rounds whose odd stored offsets had spilled to the next calendar day).
+
+**Ops tooling reminder.** Live scoring this cycle drove the admin JSON API through a Playwright session
+(`scripts/uat-harness.mjs` for login/observe; throwaway `.uat-artifacts/*.mjs` for create/publish/PATCH
+calls — deleted after use). Raw prod SQL goes through the Supabase Management API `/database/query`
+endpoint and is gated by the safety classifier: **writes require the user's explicit Bash allow-rule** and
+only match a plain inline `curl … /database/query` command (function-wrapped or heredoc forms are blocked).
+The admin API rate-limit is ~5 writes / 10s — batch PATCHes hit 429 and need a brief pause/retry.
 
 ### PR #50 — Full-season GUI/UAT fix cycle (July 2026)
 
@@ -902,6 +978,15 @@ Important:
 
 ```text
 Publish is only allowed after the review step passes validation.
+
+A published session's points system is LOCKED — there is no in-app unpublish /
+rescore. Verify race_sessions.points_system_id against the intended system
+BEFORE publishing (sprint vs standard). Fixing it after means un-publishing via
+raw SQL or delete + recreate. See "Production Launch + Live Season Ops" notes.
+
+Public standings come from snapshot tables (driver_standings / team_standings)
+rebuilt by recalculateStandings. A direct DB edit to race_results does NOT
+refresh them — call POST /api/admin/leagues/[id]/recalculate afterward.
 ```
 
 ### 8.3 Transfers
@@ -1048,6 +1133,9 @@ Storage buckets:
 | Reserve constructor points go to `reserve_team_id` | Points go to the team represented in that race. |
 | Penalty points do not alter standings | They are discipline-only. |
 | Manual championship adjustments do alter standings | Used for championship penalties/corrections. |
+| A published session's points system is locked | Cannot be changed in-app (no unpublish/rescore button); fix via raw-SQL un-publish or delete + recreate. Verify `points_system_id` before publishing. |
+| Standings are snapshot tables | `driver_standings`/`team_standings` rebuild via `recalculateStandings` on publish/adjustment/etc.; after a **direct** `race_results` DB edit call `POST /api/admin/leagues/[id]/recalculate`. |
+| Retroactive team moves are manual | Constructor points key off `race_results.team_id` at race time; moving a driver's *past* points to a new team = DB edit of `race_results`/`qualifying_results`/stint, then recalc. |
 | One confirmed workbook migration per season | Prevents accidental re-import. |
 | Audit metadata is bounded | Prevents large or secret logs. |
 
