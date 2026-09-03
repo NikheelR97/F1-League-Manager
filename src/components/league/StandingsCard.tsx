@@ -6,7 +6,12 @@ interface StandingsCardProps {
   lastRound: string | null;
   leagueName: string;
   seasonName: string;
-  siteLabel: string;
+  /**
+   * Host shown in the footer so a shared screenshot says where to find the
+   * standings. Long auto-generated hosts (Vercel preview URLs) are dropped
+   * rather than cluttering the card — only a short real domain earns the space.
+   */
+  siteLabel?: string;
   title: string;
   updatedAt: string | null;
 }
@@ -57,9 +62,11 @@ export function StandingsCard({
 
       <footer className="flex items-center justify-between gap-3 border-t border-f1-border bg-black/25 px-4 py-2.5 sm:px-5">
         <span className="text-[10px] text-f1-muted sm:text-[10.5px]">{footerNote}</span>
-        <span className="hidden font-mono text-[10px] text-f1-muted sm:inline sm:text-[10.5px]">
-          {siteLabel}
-        </span>
+        {siteLabel && siteLabel.length <= 32 ? (
+          <span className="hidden font-mono text-[10px] text-f1-muted sm:inline sm:text-[10.5px]">
+            {siteLabel}
+          </span>
+        ) : null}
       </footer>
     </section>
   );
