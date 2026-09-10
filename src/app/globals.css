@@ -28,6 +28,10 @@
   --team-williams: #005aff;
   --team-rb: #6692ff;
   --team-sauber: #52e252;
+  /* Podium accents for standings positions 1-3. All clear AA on --f1-dark. */
+  --podium-gold: #f5c451;
+  --podium-silver: #cfd3dc;
+  --podium-bronze: #d18a49;
   /* shadcn semantic tokens mapped to F1 dark palette — app is always dark */
   --background: var(--f1-black);
   --foreground: var(--f1-white);
@@ -72,6 +76,9 @@
   --color-f1-silver: var(--f1-silver);
   --color-f1-white: var(--f1-white);
   --color-team-sauber: var(--team-sauber);
+  --color-podium-gold: var(--podium-gold);
+  --color-podium-silver: var(--podium-silver);
+  --color-podium-bronze: var(--podium-bronze);
   --font-mono: var(--font-jetbrains-mono);
   --font-sans: var(--font-titillium);
   --font-heading: var(--font-titillium);
