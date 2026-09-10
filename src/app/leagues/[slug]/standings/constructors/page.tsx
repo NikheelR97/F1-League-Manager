@@ -5,8 +5,8 @@ import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { SeasonSelector } from "@/components/league/SeasonSelector";
+import { StandingsCard } from "@/components/league/StandingsCard";
 import { StandingsSearch } from "@/components/league/StandingsSearch";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
@@ -132,17 +132,27 @@ export default async function ConstructorStandingsPage({
 
   type TeamRow = { id: string; name: string; color_hex: string };
 
-  return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <PublicPageHeader
-        format={league.format}
-        lastRound={lastSession?.name ?? null}
-        leagueName={league.name}
-        seasonName={displaySeason}
-        title="Constructor Standings"
-        updatedAt={updatedAt}
-      />
 
+  const siteLabel = (process.env.NEXT_PUBLIC_SITE_URL ?? "")
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+
+  // Positions 1-3 get the podium ramp. It is the fastest read in the table and
+  // survives the heavy recompression Discord/WhatsApp apply to screenshots.
+  const podiumClass = (position: number) =>
+    position === 1
+      ? "text-podium-gold"
+      : position === 2
+        ? "text-podium-silver"
+        : position === 3
+          ? "text-podium-bronze"
+          : "text-f1-silver";
+
+  // Zeros are the common case; dimming them lets real achievements carry the eye.
+  const statClass = (value: number) => (value > 0 ? "font-bold text-f1-white" : "text-f1-mid");
+
+  return (
+    <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-8 sm:px-6 lg:px-8">
       <SeasonSelector
         currentSeasonId={seasonId}
         pathname={`/leagues/${slug}/standings/constructors`}
@@ -150,77 +160,122 @@ export default async function ConstructorStandingsPage({
       />
 
       {standings.length === 0 ? (
-        <EmptyState message="Constructor standings will appear once results are published." title="No standings yet" />
+        <EmptyState
+          message="Constructor standings will appear once results are published."
+          title="No standings yet"
+        />
       ) : (
         <>
           <StandingsSearch label="Find a constructor..." />
-          <table className="hidden w-full text-sm md:table">
-            <thead>
-              <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
-                <th className="w-10 pb-2 pr-4" scope="col">Pos</th>
-                <th className="w-6 pb-2 pr-4" aria-label="Change" scope="col" />
-                <th className="pb-2 pr-4" scope="col">Constructor</th>
-                <th className="pb-2 pr-4 text-right" scope="col">Pts</th>
-                <th className="pb-2 pr-4 text-right" scope="col">Gap</th>
-                <th className="pb-2 pr-4 text-right" scope="col">W</th>
-                <th className="pb-2 text-right" scope="col">Pod</th>
-              </tr>
-            </thead>
-            <tbody>
+
+          <StandingsCard
+            footerNote="Ties broken by wins, then podiums."
+            lastRound={lastSession?.name ?? null}
+            leagueName={league.name}
+            seasonName={displaySeason}
+            siteLabel={siteLabel}
+            title="Constructor Standings"
+            updatedAt={updatedAt}
+          >
+            <table className="hidden w-full md:table">
+              <thead>
+                <tr className="border-b border-f1-border bg-black/25 text-[10px] font-bold uppercase tracking-wider text-f1-muted">
+                  <th className="w-12 py-2 text-center" scope="col">Pos</th>
+                  <th className="w-5" aria-label="Change" scope="col" />
+                  <th className="py-2 pl-1 text-left" scope="col">Constructor</th>
+                  <th className="w-16 py-2 text-right" scope="col">Pts</th>
+                  <th className="w-[76px] py-2 pr-1 text-right" scope="col">Gap</th>
+                  <th className="w-10 py-2 text-right" scope="col">W</th>
+                  <th className="w-10 py-2 pr-4 text-right" scope="col">Pod</th>
+                </tr>
+              </thead>
+              <tbody>
+                {standings.map((row) => {
+                  const team = row.teams as unknown as TeamRow | null;
+                  const gap = formatGap(leaderPoints, row.total_points, row.position);
+                  return (
+                    <tr
+                      key={row.position}
+                      className={`h-[33px] border-b border-f1-border/50 transition-colors even:bg-white/[0.018] hover:bg-white/[0.05] ${
+                        row.position === 1
+                          ? "bg-[linear-gradient(90deg,rgba(245,196,81,0.15),transparent_46%)]"
+                          : ""
+                      }`}
+                      data-driver-name={team?.name.toLowerCase()}
+                    >
+                      <td className={`text-center font-mono text-[15px] font-bold ${podiumClass(row.position)}`}>
+                        {row.position}
+                      </td>
+                      <td>
+                        <div className="flex justify-center">
+                          <PositionDelta compact current={row.position} previous={row.previous_position} />
+                        </div>
+                      </td>
+                      <td className="pl-1">
+                        <div className="flex items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            className="h-[17px] w-1 shrink-0 ring-1 ring-white/25"
+                            style={{ backgroundColor: team?.color_hex ?? "#444" }}
+                          />
+                          {team ? (
+                            <Link
+                              className="flex h-[33px] items-center text-[14.5px] font-bold text-f1-white hover:text-f1-red-text"
+                              href={`/leagues/${league.slug}/teams/${team.id}`}
+                            >
+                              {team.name}
+                            </Link>
+                          ) : (
+                            <span className="text-[14.5px] font-bold text-f1-white">TBD</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="text-right font-mono text-[16.5px] font-bold text-f1-white">
+                        {row.total_points}
+                      </td>
+                      <td
+                        className={`pr-1 text-right font-mono text-xs ${
+                          row.position === 1 ? "font-bold text-podium-gold" : "text-f1-silver"
+                        }`}
+                      >
+                        {gap}
+                      </td>
+                      <td className={`text-right font-mono text-xs ${statClass(row.wins)}`}>{row.wins}</td>
+                      <td className={`pr-4 text-right font-mono text-xs ${statClass(row.podiums)}`}>
+                        {row.podiums}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <ul className="divide-y divide-f1-border/50 md:hidden">
               {standings.map((row) => {
                 const team = row.teams as unknown as TeamRow | null;
                 const gap = formatGap(leaderPoints, row.total_points, row.position);
                 return (
-                  <tr key={row.position} className="border-b border-f1-border/40 hover:bg-f1-dark" data-driver-name={team?.name.toLowerCase()}>
-                    <td className="py-2 pr-4 font-mono font-bold text-f1-white">{row.position}</td>
-                    <td className="py-2 pr-4">
-                      <PositionDelta current={row.position} previous={row.previous_position} />
-                    </td>
-                    <td className="py-2 pr-4">
-                      <div className="flex items-center gap-2">
-                        <span
-                          aria-hidden="true"
-                          className="h-3 w-1 shrink-0"
-                          style={{ backgroundColor: team?.color_hex ?? "#444" }}
-                        />
-                        {team ? (
-                          <Link
-                            className="font-bold text-f1-white hover:text-f1-red"
-                            href={`/leagues/${league.slug}/teams/${team.id}`}
-                          >
-                            {team.name}
-                          </Link>
-                        ) : (
-                          <span className="font-bold text-f1-white">TBD</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-2 pr-4 text-right font-mono font-bold text-f1-white">{row.total_points}</td>
-                    <td className="py-2 pr-4 text-right font-mono text-xs text-f1-muted">{gap}</td>
-                    <td className="py-2 pr-4 text-right font-mono text-xs text-f1-white">{row.wins}</td>
-                    <td className="py-2 text-right font-mono text-xs text-f1-white">{row.podiums}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          <ul className="space-y-2 md:hidden">
-            {standings.map((row) => {
-              const team = row.teams as unknown as TeamRow | null;
-              const gap = formatGap(leaderPoints, row.total_points, row.position);
-              return (
-                <li key={row.position} className="border border-f1-border bg-f1-dark p-3" data-driver-name={team?.name.toLowerCase()}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 font-mono text-lg font-bold text-f1-white">{row.position}</span>
-                      <PositionDelta current={row.position} previous={row.previous_position} />
-                      <div className="min-w-0 flex items-center gap-2">
-                        <span
-                          aria-hidden="true"
-                          className="h-4 w-1 shrink-0"
-                          style={{ backgroundColor: team?.color_hex ?? "#444" }}
-                        />
+                  <li
+                    key={row.position}
+                    className={`flex items-center gap-3 px-3 py-2.5 ${
+                      row.position === 1
+                        ? "bg-[linear-gradient(90deg,rgba(245,196,81,0.15),transparent_58%)]"
+                        : ""
+                    }`}
+                    data-driver-name={team?.name.toLowerCase()}
+                  >
+                    <span
+                      className={`w-6 shrink-0 text-center font-mono text-base font-bold ${podiumClass(row.position)}`}
+                    >
+                      {row.position}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="h-8 w-1 shrink-0 ring-1 ring-white/25"
+                      style={{ backgroundColor: team?.color_hex ?? "#444" }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
                         {team ? (
                           <Link
                             className="truncate font-bold text-f1-white"
@@ -231,24 +286,29 @@ export default async function ConstructorStandingsPage({
                         ) : (
                           <span className="font-bold text-f1-white">TBD</span>
                         )}
+                        <PositionDelta compact current={row.position} previous={row.previous_position} />
                       </div>
+                      <p className="truncate font-mono text-xs text-f1-muted">
+                        {row.wins}W · {row.podiums} Pod
+                      </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-mono font-bold text-f1-white">{row.total_points} pts</p>
-                      <p className="font-mono text-xs text-f1-muted">{gap}</p>
+                    <div className="shrink-0 text-right">
+                      <p className="font-mono text-lg font-bold leading-none text-f1-white">
+                        {row.total_points}
+                      </p>
+                      <p
+                        className={`mt-1 font-mono text-[11px] ${
+                          row.position === 1 ? "font-bold text-podium-gold" : "text-f1-silver"
+                        }`}
+                      >
+                        {gap}
+                      </p>
                     </div>
-                  </div>
-                  <div className="mt-2 flex gap-4 font-mono text-xs text-f1-muted">
-                    <span>{row.wins}W</span>
-                    <span>{row.podiums} Pod</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-
-          {/* Tiebreak note */}
-          <p className="text-xs text-f1-muted">Ties broken by wins, then podiums.</p>
+                  </li>
+                );
+              })}
+            </ul>
+          </StandingsCard>
         </>
       )}
     </div>
