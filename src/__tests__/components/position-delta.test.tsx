@@ -22,4 +22,22 @@ describe("PositionDelta", () => {
     render(<PositionDelta current={1} previous={null} />);
     expect(screen.getByLabelText("Position unchanged")).toBeInTheDocument();
   });
+
+  describe("compact (standings tables)", () => {
+    it("renders no marker when the position is unchanged", () => {
+      const { container } = render(<PositionDelta compact current={3} previous={3} />);
+      expect(screen.queryByLabelText("Position unchanged")).not.toBeInTheDocument();
+      expect(container).toBeEmptyDOMElement();
+    });
+
+    it("renders no marker on first appearance (previous is null)", () => {
+      const { container } = render(<PositionDelta compact current={1} previous={null} />);
+      expect(container).toBeEmptyDOMElement();
+    });
+
+    it("still marks real movement", () => {
+      render(<PositionDelta compact current={2} previous={5} />);
+      expect(screen.getByLabelText("Position gained")).toBeInTheDocument();
+    });
+  });
 });
