@@ -70,7 +70,9 @@ async function getConstructorStandingsData(
       .eq("league_id", leagueId)
       .eq("season_id", seasonId)
       .eq("status", "completed")
-      .order("published_at", { ascending: false })
+      .order("scheduled_at", { ascending: false })
+      // Sprint + feature share a start time; the feature (race_number 1) runs last.
+      .order("race_number", { ascending: true })
       .limit(1)
       .maybeSingle(),
     resolveLeagueSeasons(leagueId, { fallbackSeason }),
