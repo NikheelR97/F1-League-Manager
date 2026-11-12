@@ -80,7 +80,9 @@ export default async function LeagueStatsPage({
       .eq("league_id", league.id)
       .eq("season_id", league.season.id)
       .eq("status", "completed")
-      .order("published_at", { ascending: false })
+      .order("scheduled_at", { ascending: false })
+      // Sprint + feature share a start time; the feature (race_number 1) runs last.
+      .order("race_number", { ascending: true })
       .limit(1)
       .maybeSingle(),
     getDriverPenaltyTotals(db, league.id, league.season.id),
