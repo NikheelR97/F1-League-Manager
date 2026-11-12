@@ -68,7 +68,9 @@ export default async function ResultsIndexPage({
       .eq("league_id", league.id)
       .eq("season_id", seasonId)
       .eq("status", "completed")
-      .order("published_at", { ascending: false })
+      .order("scheduled_at", { ascending: false })
+      // Sprint + feature share a start time; the feature (race_number 1) runs last.
+      .order("race_number", { ascending: true })
       .limit(50),
     resolveLeagueSeasons(league.id, { fallbackSeason: league.season }),
   ]);
