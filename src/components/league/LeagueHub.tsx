@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PositionDelta } from "@/components/ui/PositionDelta";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { LEAGUE_ASSETS_BUCKET } from "@/lib/constants";
-import { formatDate } from "@/lib/format-date";
+import { formatDate, formatRaceDateTimeSAST } from "@/lib/format-date";
 import { formatGap } from "@/lib/format-gap";
 import type { PublicLeague } from "@/lib/public/resolve-league";
 
@@ -43,6 +43,12 @@ interface TopConstructor {
   teams: unknown;
 }
 
+interface PodiumEntry {
+  finishing_position: number | null;
+  points_awarded: number | null;
+  drivers: unknown;
+}
+
 interface PenaltyAlert {
   driver_id: string;
   penalty_points: number;
@@ -61,6 +67,7 @@ interface LeagueHubProps {
   league: PublicLeague;
   nextRace: NextRace | null;
   latestSession: LatestSession | null;
+  latestPodium?: PodiumEntry[];
   topDrivers: TopDriver[];
   topConstructors: TopConstructor[];
   penaltyAlerts: PenaltyAlert[];
@@ -85,6 +92,16 @@ function castPenaltyDriver(v: unknown): { display_name: string } | null {
   return v as { display_name: string } | null;
 }
 
+const PODIUM_TEXT = ["text-podium-gold", "text-podium-silver", "text-podium-bronze"];
+const PODIUM_BORDER = ["border-l-podium-gold", "border-l-podium-silver", "border-l-podium-bronze"];
+
+// Tie-break order is points -> wins -> podiums; flag the row that leads a tie.
+function tieNote(rows: { total_points: number; wins: number }[], i: number): string | null {
+  const next = rows[i + 1];
+  if (!next || next.total_points !== rows[i].total_points) return null;
+  return next.wins !== rows[i].wins ? "tied — leads on wins" : "tied — leads on podiums";
+}
+
 function getStoragePublicUrl(bucket: string, path: string | null): string | null {
   if (!path) return null;
   if (/^https?:\/\//u.test(path)) return path;
@@ -102,6 +119,7 @@ export function LeagueHub({
   league,
   nextRace,
   latestSession,
+  latestPodium = [],
   topDrivers,
   topConstructors,
   penaltyAlerts,
@@ -151,7 +169,12 @@ export function LeagueHub({
           ) : nextRace && nextRaceIsPast ? (
             <p className="font-mono text-sm text-f1-muted">{formatDate(nextRace.scheduled_at)}</p>
           ) : (
-            <RaceCountdown now={now} targetIso={nextRace?.scheduled_at ?? null} />
+            <div className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-f1-muted">
+              <span className="font-bold uppercase">
+                Next race in{nextRace ? ` · ${nextRaceCircuit?.name ?? nextRace.name}` : ""}
+              </span>
+              <RaceCountdown now={now} targetIso={nextRace?.scheduled_at ?? null} />
+            </div>
           )}
         </div>
       </div>
@@ -160,14 +183,6 @@ export function LeagueHub({
         <div className="flex flex-wrap items-center gap-4 border-b border-f1-border pb-4 text-xs text-f1-muted">
           <span className="font-bold uppercase text-f1-white">{league.name}</span>
           <span>{league.season?.name}</span>
-          {latestSession && (
-            <Link
-              className="inline-flex items-center min-h-11 text-f1-white underline-offset-2 hover:text-f1-red hover:underline"
-              href={`/leagues/${league.slug}/results/${latestSession.id}`}
-            >
-              Last result: {latestCircuit?.name ?? latestSession.name}
-            </Link>
-          )}
           <span className="uppercase">{league.format} format</span>
         </div>
 
@@ -181,12 +196,42 @@ export function LeagueHub({
               {nextRaceCircuit?.country && (
                 <p className="text-xs text-f1-muted">{nextRaceCircuit.country}</p>
               )}
-              <p className="mt-1 text-xs text-f1-muted">{formatDate(nextRace.scheduled_at)}</p>
+              <p className="mt-1 font-mono text-xs text-f1-silver">{formatRaceDateTimeSAST(nextRace.scheduled_at)}</p>
             </div>
           </section>
         )}
 
-        {isWheelLeague && (
+        {latestSession && (
+          <section className="space-y-2">
+            <h2 className="text-xs font-bold uppercase text-f1-muted">Last Result</h2>
+            <div className="border border-f1-border bg-f1-dark p-4">
+              <Link
+                className="inline-flex min-h-11 items-center font-bold text-f1-white underline-offset-2 hover:text-f1-red-text hover:underline"
+                href={`/leagues/${league.slug}/results/${latestSession.id}`}
+              >
+                Last result: {latestCircuit?.name ?? latestSession.name}
+              </Link>
+              {latestPodium.length > 0 && (
+                <ol className="mt-2 grid gap-1 sm:grid-cols-3">
+                  {latestPodium.slice(0, 3).map((p, i) => (
+                    <li
+                      key={i}
+                      className={`flex items-center gap-3 border-l-4 bg-f1-panel px-3 py-2 ${PODIUM_BORDER[i]}`}
+                    >
+                      <span className={`font-mono text-sm font-bold ${PODIUM_TEXT[i]}`}>P{i + 1}</span>
+                      <span className="flex-1 truncate text-sm text-f1-white">
+                        {castDriver(p.drivers)?.display_name ?? "TBD"}
+                      </span>
+                      <span className="font-mono text-xs text-f1-muted">{p.points_awarded ?? 0} pts</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </section>
+        )}
+
+        {isWheelLeague && wheelCircuit && (
           <section className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-xs font-bold uppercase text-f1-muted">
@@ -201,16 +246,10 @@ export function LeagueHub({
               </Link>
             </div>
             <div className="border border-f1-border bg-f1-dark p-4">
-              {wheelCircuit ? (
-                <>
-                  <p className="mb-1 text-xs font-bold uppercase text-f1-muted">Next circuit</p>
-                  <p className="font-bold text-f1-white">{wheelCircuit.name}</p>
-                  {wheelCircuit.country && (
-                    <p className="text-xs text-f1-muted">{wheelCircuit.country}</p>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-f1-muted">Awaiting spin</p>
+              <p className="mb-1 text-xs font-bold uppercase text-f1-muted">Next circuit</p>
+              <p className="font-bold text-f1-white">{wheelCircuit.name}</p>
+              {wheelCircuit.country && (
+                <p className="text-xs text-f1-muted">{wheelCircuit.country}</p>
               )}
               {wheelPoolRemaining !== null && (
                 <p className="mt-3 border-t border-f1-border pt-3 text-xs text-f1-muted">
@@ -235,14 +274,15 @@ export function LeagueHub({
             <EmptyState message="Standings will appear once results are published." title="No standings yet" />
           ) : (
             <ul className="space-y-1">
-              {topDrivers.map((row) => {
+              {topDrivers.map((row, i) => {
                 const driver = castDriver(row.drivers);
                 const team = castTeam(row.teams);
                 const gap = formatGap(leaderPoints, row.total_points, row.position);
+                const tie = tieNote(topDrivers, i);
                 return (
-                  <li key={row.position} className="flex items-center gap-3 border border-f1-border bg-f1-dark px-4 py-2">
-                    <span className="w-6 font-mono text-sm font-bold text-f1-white">{row.position}</span>
-                    <PositionDelta current={row.position} previous={row.previous_position} />
+                  <li key={row.position} className="flex flex-wrap items-center gap-x-3 border border-f1-border bg-f1-dark px-3 py-1">
+                    <span className={`w-6 font-mono text-sm font-bold ${PODIUM_TEXT[i] ?? "text-f1-white"}`}>{row.position}</span>
+                    <PositionDelta compact current={row.position} previous={row.previous_position} />
                     <span
                       aria-hidden="true"
                       className="h-4 w-1 shrink-0"
@@ -263,6 +303,7 @@ export function LeagueHub({
                     )}
                     <span className="font-mono text-sm text-f1-white">{row.total_points} pts</span>
                     <span className="w-16 text-right font-mono text-xs text-f1-muted">{gap}</span>
+                    {tie && <span className="basis-full pb-1 pl-9 text-[11px] text-f1-muted">{tie}</span>}
                   </li>
                 );
               })}
@@ -285,13 +326,14 @@ export function LeagueHub({
               <EmptyState message="Constructor standings will appear once results are published." title="No standings yet" />
             ) : (
               <ul className="space-y-1">
-                {topConstructors.map((row) => {
+                {topConstructors.map((row, i) => {
                   const team = castTeam(row.teams);
                   const gap = formatGap(constructorLeaderPoints, row.total_points, row.position);
+                  const tie = tieNote(topConstructors, i);
                   return (
-                    <li key={row.position} className="flex items-center gap-3 border border-f1-border bg-f1-dark px-4 py-2">
-                      <span className="w-6 font-mono text-sm font-bold text-f1-white">{row.position}</span>
-                      <PositionDelta current={row.position} previous={row.previous_position} />
+                    <li key={row.position} className="flex flex-wrap items-center gap-x-3 border border-f1-border bg-f1-dark px-3 py-1">
+                      <span className={`w-6 font-mono text-sm font-bold ${PODIUM_TEXT[i] ?? "text-f1-white"}`}>{row.position}</span>
+                      <PositionDelta compact current={row.position} previous={row.previous_position} />
                       <span
                         aria-hidden="true"
                         className="h-4 w-1 shrink-0"
@@ -309,6 +351,7 @@ export function LeagueHub({
                       )}
                       <span className="font-mono text-sm text-f1-white">{row.total_points} pts</span>
                       <span className="w-16 text-right font-mono text-xs text-f1-muted">{gap}</span>
+                      {tie && <span className="basis-full pb-1 pl-9 text-[11px] text-f1-muted">{tie}</span>}
                     </li>
                   );
                 })}

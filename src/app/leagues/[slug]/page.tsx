@@ -113,7 +113,18 @@ async function getLeagueHubData(leagueId: string, seasonId: string, isWheelLeagu
       .eq("status", "completed"),
   ]);
 
+  const { data: latestPodium } = latestSession
+    ? await db
+        .from("race_results")
+        .select("finishing_position, points_awarded, drivers(display_name)")
+        .eq("race_session_id", latestSession.id)
+        .not("finishing_position", "is", null)
+        .order("finishing_position")
+        .limit(3)
+    : { data: null };
+
   return {
+    latestPodium: latestPodium ?? [],
     latestSession: latestSession ?? null,
     latestWheelSpin: latestWheelSpin ?? null,
     nextRace: nextRace ?? null,
@@ -189,6 +200,7 @@ export default async function LeaguePage({ params }: LeaguePageProps) {
 
   return (
     <LeagueHub
+      latestPodium={data.latestPodium}
       latestSession={data.latestSession}
       latestWheelSpin={data.latestWheelSpin}
       league={league}

@@ -34,3 +34,16 @@ export function formatTime(iso: string | null | undefined): string {
     timeZone: SAST_TZ,
   });
 }
+
+// e.g. "Thu 3 Dec · 21:00 SAST"
+export function formatRaceDateTimeSAST(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: SAST_TZ,
+  });
+  return `${date.replace(",", "")} · ${formatTime(iso)} SAST`;
+}
