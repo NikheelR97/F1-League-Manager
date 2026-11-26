@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate, formatTime } from "@/lib/format-date";
 import { pageTitle } from "@/lib/public/page-title";
+import { groupRounds } from "@/lib/public/group-rounds";
 import { leagueRoundNumbers } from "@/lib/public/league-round-number";
 import { roundPrefix } from "@/lib/public/round-prefix";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
@@ -63,7 +64,11 @@ export default async function LeagueCalendarPage({
   const seasonName = league.season.name;
 
   const upcoming = sessions?.filter((s) => s.status !== "completed") ?? [];
-  const completed = sessions?.filter((s) => s.status === "completed") ?? [];
+  // Newest first; sprint + feature of one night merge into a single row.
+  const completed = groupRounds(
+    (sessions?.filter((s) => s.status === "completed") ?? []).reverse(),
+    roundNumbers,
+  );
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -144,7 +149,7 @@ export default async function LeagueCalendarPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-f1-border">
-                  {completed.map((session) => {
+                  {completed.map(({ main: session, extras }) => {
                     const circuit = session.circuits as unknown as { name: string; country: string; round_number: number | null } | null;
                     return (
                       <tr key={session.id} className="transition-colors hover:bg-black/20">
@@ -154,13 +159,16 @@ export default async function LeagueCalendarPage({
                         <td className="px-4 py-3 font-bold">
                           {roundPrefix(roundNumbers.get(session.id), session.name)}
                           {session.name}
+                          {extras.length > 0 && (
+                            <span className="ml-2 text-xs font-bold uppercase text-f1-muted">+ Sprint</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-f1-muted">
                           {circuit ? `${circuit.name}, ${circuit.country}` : "—"}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <Link
-                            href={`/leagues/${slug}/results?session=${session.id}`}
+                            href={`/leagues/${slug}/results/${session.id}`}
                             className="inline-flex items-center min-h-11 text-xs font-bold uppercase text-f1-red-text hover:text-white transition-colors"
                           >
                             View
@@ -174,7 +182,7 @@ export default async function LeagueCalendarPage({
             </div>
 
             <ul className="space-y-2 md:hidden">
-              {completed.map((session) => {
+              {completed.map(({ main: session, extras }) => {
                 const circuit = session.circuits as unknown as { name: string; country: string; round_number: number | null } | null;
                 return (
                   <li key={session.id} className="border border-f1-border bg-f1-dark p-3">
@@ -183,6 +191,9 @@ export default async function LeagueCalendarPage({
                         <p className="font-bold text-f1-white">
                           {roundPrefix(roundNumbers.get(session.id), session.name)}
                           {session.name}
+                          {extras.length > 0 && (
+                            <span className="ml-2 text-xs font-bold uppercase text-f1-muted">+ Sprint</span>
+                          )}
                         </p>
                         <p className="text-xs text-f1-muted">
                           {formatDate(session.scheduled_at)} · {circuit ? `${circuit.name}, ${circuit.country}` : "—"}
@@ -190,7 +201,7 @@ export default async function LeagueCalendarPage({
                       </div>
                       <div className="text-right">
                         <Link
-                          href={`/leagues/${slug}/results?session=${session.id}`}
+                          href={`/leagues/${slug}/results/${session.id}`}
                           className="text-xs font-bold uppercase text-f1-red-text hover:text-white transition-colors"
                         >
                           View
