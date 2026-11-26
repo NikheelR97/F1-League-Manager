@@ -356,14 +356,11 @@ function Test-BranchMapping {
     { $_ -like "feature/*" -or $_ -like "fix/*" } {
       Add-Pass "Current branch is $branchName. Treat it as dev-targeted work using local Supabase by default."
     }
-    "staging" {
-      Add-Pass "Current branch is staging. Use Supabase project f1-league-manager-nonprod."
-    }
     "prod" {
       Add-Warning "Current branch is prod. Use only production env vars and avoid local experiments."
     }
     default {
-      Add-Warning "Current branch is '$branchName'. Confirm whether it should target dev, staging, or prod before changing env vars, migrations, seeds, imports, or deploy settings."
+      Add-Warning "Current branch is '$branchName'. Confirm whether it should target dev or prod before changing env vars, migrations, seeds, imports, or deploy settings."
     }
   }
 }

@@ -376,14 +376,11 @@ test_branch_mapping() {
     feature/*|fix/*)
       add_pass "Current branch is $branch_name. Treat it as dev-targeted work using local Supabase by default."
       ;;
-    staging)
-      add_pass "Current branch is staging. Use Supabase project f1-league-manager-nonprod."
-      ;;
     prod)
       add_warning "Current branch is prod. Use only production env vars and avoid local experiments."
       ;;
     *)
-      add_warning "Current branch is '$branch_name'. Confirm whether it should target dev, staging, or prod before changing env vars, migrations, seeds, imports, or deploy settings."
+      add_warning "Current branch is '$branch_name'. Confirm whether it should target dev or prod before changing env vars, migrations, seeds, imports, or deploy settings."
       ;;
   esac
 }
