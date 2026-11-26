@@ -22,7 +22,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { MAX_DRIVERS_LIST, MAX_SEASONS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
-const MAX_SESSIONS_LIST = 20;
+const MAX_SESSIONS_LIST = 200;
 
 const searchParamsSchema = z.object({
   season_id: z.string().uuid().optional(),

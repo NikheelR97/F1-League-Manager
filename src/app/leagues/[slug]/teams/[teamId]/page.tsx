@@ -88,7 +88,7 @@ export default async function TeamProfilePage({
       .eq("league_id", league.id)
       .eq("season_id", league.season.id)
       .eq("status", "completed")
-      .limit(50),
+      .limit(200),
     db
       .from("race_sessions")
       .select("name, published_at")
@@ -134,7 +134,7 @@ export default async function TeamProfilePage({
           .eq("team_id", teamId)
           .in("race_session_id", sessionIds)
           .order("scheduled_at", { referencedTable: "race_sessions", ascending: true })
-          .limit(50)
+          .limit(500)
       : { data: [] },
     sessionIds.length > 0
       ? db
@@ -143,7 +143,7 @@ export default async function TeamProfilePage({
           .eq("team_id", teamId)
           .eq("is_pole", true)
           .in("race_session_id", sessionIds)
-          .limit(50)
+          .limit(500)
       : { count: 0 },
   ]);
 

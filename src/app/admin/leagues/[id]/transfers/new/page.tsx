@@ -10,7 +10,7 @@ import { MAX_DRIVERS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
 import { getCurrentSeason } from "@/lib/leagues/get-current-season";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
-const MAX_SESSIONS_LIST = 20;
+const MAX_SESSIONS_LIST = 200;
 
 export default async function NewTransferPage({
   params,

@@ -126,9 +126,9 @@ export default async function ResultsIndexPage({
                     </p>
                   </div>
                   <div className="text-right">
-                    {session.published_at && (
+                    {(session.scheduled_at ?? session.published_at) && (
                       <p className="text-xs text-f1-muted">
-                        {formatDate(session.published_at)}
+                        {formatDate((session.scheduled_at ?? session.published_at)!)}
                       </p>
                     )}
                     <p className="text-xs text-f1-red-text">View →</p>

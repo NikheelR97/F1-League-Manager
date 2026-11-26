@@ -92,7 +92,7 @@ export default async function DriverProfilePage({
       .eq("league_id", league.id)
       .eq("season_id", league.season.id)
       .eq("status", "completed")
-      .limit(50),
+      .limit(200),
     db
       .from("race_sessions")
       .select("name, published_at")
@@ -121,7 +121,7 @@ export default async function DriverProfilePage({
           .eq("driver_id", driverId)
           .in("race_session_id", sessionIds)
           .order("scheduled_at", { referencedTable: "race_sessions", ascending: true })
-          .limit(50)
+          .limit(200)
       : { data: [] },
     db
       .from("driver_team_stints")
