@@ -138,7 +138,7 @@ describe("LeagueHub", () => {
         }}
       />,
     );
-    expect(screen.getByText(/Last result: Monaco/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Monaco" })).toBeInTheDocument();
   });
 
   it("links the last result to its public result page", () => {
@@ -154,7 +154,7 @@ describe("LeagueHub", () => {
         }}
       />,
     );
-    expect(screen.getByRole("link", { name: /Last result: Monaco/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Monaco" })).toHaveAttribute(
       "href",
       "/leagues/standard/results/session-5",
     );

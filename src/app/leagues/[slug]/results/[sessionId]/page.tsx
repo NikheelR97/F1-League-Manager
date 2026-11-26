@@ -204,7 +204,7 @@ export default async function RaceResultPage({
       <div className="flex flex-col gap-8">
       {/* Qualifying */}
       {qualifying && qualifying.length > 0 && (
-        <section className="order-2 space-y-2 md:order-1">
+        <section className="order-2 space-y-2">
           <h2 className="text-xs font-bold uppercase text-f1-muted">Qualifying</h2>
           <table className="hidden w-full text-sm md:table">
             <thead>
@@ -275,7 +275,7 @@ export default async function RaceResultPage({
       )}
 
       {/* Race result */}
-      <section className="order-1 space-y-2 md:order-2">
+      <section className="order-1 space-y-2">
         <h2 className="text-xs font-bold uppercase text-f1-muted">Race Result</h2>
         {allResults.length === 0 ? (
           <div className="space-y-3">

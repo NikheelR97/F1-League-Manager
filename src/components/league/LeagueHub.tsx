@@ -209,7 +209,7 @@ export function LeagueHub({
                 className="inline-flex min-h-11 items-center font-bold text-f1-white underline-offset-2 hover:text-f1-red-text hover:underline"
                 href={`/leagues/${league.slug}/results/${latestSession.id}`}
               >
-                Last result: {latestCircuit?.name ?? latestSession.name}
+                {latestCircuit?.name ?? latestSession.name}
               </Link>
               {latestPodium.length > 0 && (
                 <ol className="mt-2 grid gap-1 sm:grid-cols-3">
