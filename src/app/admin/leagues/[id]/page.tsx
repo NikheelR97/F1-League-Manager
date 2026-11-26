@@ -20,13 +20,27 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { MAX_DRIVERS_LIST, MAX_SEASONS_LIST, MAX_TEAMS_PER_LEAGUE } from "@/lib/constants";
+import { formatDate, formatRaceDateTimeSAST } from "@/lib/format-date";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 const MAX_SESSIONS_LIST = 200;
 
+const TABS = [
+  { key: "sessions", label: "Sessions" },
+  { key: "drivers", label: "Drivers" },
+  { key: "teams", label: "Teams" },
+  { key: "settings", label: "Settings" },
+] as const;
+
 const searchParamsSchema = z.object({
   season_id: z.string().uuid().optional(),
+  tab: z.enum(["sessions", "drivers", "teams", "settings"]).catch("sessions"),
 });
+
+const secondaryLink =
+  "inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white";
+const primaryLink =
+  "inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black";
 
 export default async function LeagueDetailPage({
   params,
@@ -39,9 +53,12 @@ export default async function LeagueDetailPage({
   const rawSearch = await searchParams;
   const parsedSearch = searchParamsSchema.safeParse(rawSearch);
   const seasonIdParam = parsedSearch.success ? parsedSearch.data.season_id : undefined;
+  const tab = parsedSearch.success ? parsedSearch.data.tab : "sessions";
 
   const db = createSupabaseServiceRoleClient();
 
+  // League + seasons feed the header on every tab; teams / points systems are
+  // only fetched for the tab that renders them.
   const [
     { data: league, error: leagueError },
     { data: allSeasons, error: seasonsError },
@@ -59,17 +76,21 @@ export default async function LeagueDetailPage({
       .eq("league_id", leagueId)
       .order("starts_on", { ascending: false })
       .limit(MAX_SEASONS_LIST),
-    db
-      .from("teams")
-      .select("id, name, slug, kind, color_hex")
-      .eq("league_id", leagueId)
-      .order("name")
-      .limit(MAX_TEAMS_PER_LEAGUE),
-    db
-      .from("points_systems")
-      .select("id, name, fastest_lap_points, pole_position_points, max_positions")
-      .eq("league_id", leagueId)
-      .order("name"),
+    tab === "teams"
+      ? db
+          .from("teams")
+          .select("id, name, slug, kind, color_hex")
+          .eq("league_id", leagueId)
+          .order("name")
+          .limit(MAX_TEAMS_PER_LEAGUE)
+      : Promise.resolve({ data: [], error: null }),
+    tab === "settings"
+      ? db
+          .from("points_systems")
+          .select("id, name, fastest_lap_points, pole_position_points, max_positions")
+          .eq("league_id", leagueId)
+          .order("name")
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (leagueError && leagueError.code !== "PGRST116") {
@@ -95,31 +116,37 @@ export default async function LeagueDetailPage({
   const [{ data: entries, error: entriesError }, { data: sessions }, { data: banWatch }] =
     effectiveSeasonId
       ? await Promise.all([
-          db
-            .from("league_driver_entries")
-            .select("id, is_reserve, drivers(display_name, racing_number), driver_team_stints(team_id, ends_on, teams(name, color_hex))")
-            .eq("league_id", leagueId)
-            .eq("season_id", effectiveSeasonId)
-            .is("left_on", null)
-            .order("joined_on")
-            .limit(MAX_DRIVERS_LIST),
-          db
-            .from("race_sessions")
-            .select("id, name, session_code, scheduled_at, status, circuits(name, country)")
-            .eq("league_id", leagueId)
-            .eq("season_id", effectiveSeasonId)
-            .order("scheduled_at", { ascending: false })
-            .limit(MAX_SESSIONS_LIST),
+          tab === "drivers"
+            ? db
+                .from("league_driver_entries")
+                .select("id, is_reserve, drivers(display_name, racing_number), driver_team_stints(team_id, ends_on, teams(name, color_hex))")
+                .eq("league_id", leagueId)
+                .eq("season_id", effectiveSeasonId)
+                .is("left_on", null)
+                .order("joined_on")
+                .limit(MAX_DRIVERS_LIST)
+            : Promise.resolve({ data: [], error: null }),
+          tab === "sessions"
+            ? db
+                .from("race_sessions")
+                .select("id, name, session_code, scheduled_at, status, circuits(name, country)")
+                .eq("league_id", leagueId)
+                .eq("season_id", effectiveSeasonId)
+                .order("scheduled_at", { ascending: false })
+                .limit(MAX_SESSIONS_LIST)
+            : Promise.resolve({ data: [] }),
           // Mirrors the public hub's penalty-watch query (driver_penalty_totals,
           // ban_threshold_reached) so admin and public never disagree — see B2/B12.
-          db
-            .from("driver_penalty_totals")
-            .select("driver_id, penalty_points, drivers(display_name)")
-            .eq("league_id", leagueId)
-            .eq("season_id", effectiveSeasonId)
-            .eq("ban_threshold_reached", true)
-            .order("penalty_points", { ascending: false })
-            .limit(10),
+          tab === "drivers"
+            ? db
+                .from("driver_penalty_totals")
+                .select("driver_id, penalty_points, drivers(display_name)")
+                .eq("league_id", leagueId)
+                .eq("season_id", effectiveSeasonId)
+                .eq("ban_threshold_reached", true)
+                .order("penalty_points", { ascending: false })
+                .limit(10)
+            : Promise.resolve({ data: [] }),
         ])
       : [{ data: [], error: null }, { data: [] }, { data: [] }];
 
@@ -147,8 +174,14 @@ export default async function LeagueDetailPage({
   const effectiveSeasonName =
     seasons.find((s) => s.id === effectiveSeasonId)?.name ?? "No season yet";
 
+  const tabHref = (key: string) => {
+    const q = new URLSearchParams({ tab: key });
+    if (seasonIdParam) q.set("season_id", seasonIdParam);
+    return `/admin/leagues/${leagueId}?${q.toString()}`;
+  };
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <AdminPageHeader
           description={`${league.format} · ${effectiveSeasonName}`}
@@ -178,6 +211,51 @@ export default async function LeagueDetailPage({
         </div>
       </div>
 
+      {/* Quick actions — visible on every tab */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Link className={primaryLink} href={`/admin/leagues/${leagueId}/sessions/new`}>
+          <Plus aria-hidden="true" size={12} />
+          Add Session
+        </Link>
+        <Link className={secondaryLink} href={`/admin/leagues/${leagueId}/drivers/new`}>
+          <Plus aria-hidden="true" size={12} />
+          Add Driver
+        </Link>
+        {effectiveSeasonId && (
+          <Link className={secondaryLink} href={`/admin/leagues/${leagueId}/drivers/bulk`}>
+            Add multiple
+          </Link>
+        )}
+        <Link className={secondaryLink} href={`/admin/leagues/${leagueId}/transfers/new`}>
+          Record Transfer
+        </Link>
+        <Link className={secondaryLink} href={`/admin/leagues/${leagueId}/adjustments`}>
+          Adjustments
+        </Link>
+        <Link className={secondaryLink} href={`/admin/leagues/${leagueId}/wheel`}>
+          Digital Wheel
+        </Link>
+      </div>
+
+      <nav aria-label="League sections" className="flex gap-1 border-b border-f1-border">
+        {TABS.map((t) => (
+          <Link
+            aria-current={tab === t.key ? "page" : undefined}
+            className={`inline-flex items-center min-h-11 border-b-2 px-4 text-xs font-bold uppercase transition-colors ${
+              tab === t.key
+                ? "border-f1-red text-f1-white"
+                : "border-transparent text-f1-muted hover:text-f1-white"
+            }`}
+            href={tabHref(t.key)}
+            key={t.key}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "settings" && (
+        <div className="space-y-8">
       {/* Meta */}
       <section className="grid grid-cols-2 gap-4 border border-f1-border bg-f1-dark p-4 text-sm sm:grid-cols-4">
         <div>
@@ -201,7 +279,6 @@ export default async function LeagueDetailPage({
           </p>
         </div>
       </section>
-
       {/* Seasons */}
       <section className="space-y-4">
         <h2 className="text-sm font-bold uppercase text-f1-muted">
@@ -264,7 +341,6 @@ export default async function LeagueDetailPage({
           )}
         </div>
       </section>
-
       {/* Assets */}
       <section className="space-y-4">
         <h2 className="text-sm font-bold uppercase text-f1-muted">Assets</h2>
@@ -273,7 +349,6 @@ export default async function LeagueDetailPage({
           <LeagueAssetUpload kind="hero_image" label="Hero Image" leagueId={leagueId} />
         </div>
       </section>
-
       {/* Points Systems */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
@@ -314,98 +389,172 @@ export default async function LeagueDetailPage({
           </ul>
         )}
       </section>
-
-      {/* Sessions */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase text-f1-muted">
-            Race Sessions ({sessions?.length ?? 0})
-          </h2>
-          <div className="flex gap-2">
-            <Link
-              className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
-              href={`/admin/leagues/${leagueId}/wheel`}
-            >
-              Digital Wheel
-            </Link>
-            <Link
-              className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
-              href={`/admin/leagues/${leagueId}/sessions/new`}
-            >
-              <Plus aria-hidden="true" size={12} />
-              Add Session
-            </Link>
-          </div>
         </div>
-        {!effectiveSeasonId ? (
-          <p className="text-sm text-f1-muted">Create a season first to schedule race sessions.</p>
-        ) : !sessions?.length ? (
-          <p className="text-sm text-f1-muted">No sessions yet. Add one to start entering results.</p>
-        ) : (
-          <ul className="space-y-2">
-            {sessions.map((session) => {
-              const circuit = session.circuits as unknown as { country: string; name: string } | null;
-              const isPublishable = session.status !== "completed";
-              return (
-                <li key={session.id}>
-                  <div className="flex items-center justify-between border border-f1-border bg-f1-dark p-4">
-                    <div>
-                      <p className="font-bold text-f1-white">{session.name}</p>
-                      <p className="font-mono text-xs text-f1-muted">
-                        {session.session_code}
-                        {circuit ? ` · ${circuit.name}, ${circuit.country}` : ""}
-                        {" · "}
-                        {new Date(session.scheduled_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <StatusPill tone={session.status === "completed" ? "green" : "silver"}>
-                        {session.status === "completed" ? "Published" : "Scheduled"}
-                      </StatusPill>
-                      {isPublishable && (
-                        <Link
-                          className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
-                          href={`/admin/leagues/${leagueId}/sessions/${session.id}/publish`}
-                        >
-                          Enter Results
-                        </Link>
-                      )}
-                      {!isPublishable && (
-                        <Link
-                          className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
-                          href={`/admin/leagues/${leagueId}/sessions/${session.id}/penalties`}
-                        >
-                          Penalties
-                        </Link>
-                      )}
-                      {/* M9 — published results are no longer uncorrectable; the
-                          publish page reopens pre-filled for a republish. */}
-                      {!isPublishable && (
-                        <Link
-                          className="inline-flex items-center min-h-11 border border-f1-border px-3 py-1 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
-                          href={`/admin/leagues/${leagueId}/sessions/${session.id}/publish`}
-                        >
-                          Correct results
-                        </Link>
-                      )}
-                      <Link
-                        className="p-1 text-f1-muted transition-colors hover:text-f1-white"
-                        href={`/admin/leagues/${leagueId}/sessions/${session.id}/edit`}
-                        title="Edit Session"
-                      >
-                        <Pencil aria-hidden="true" size={16} />
-                      </Link>
-                      {isPublishable && <SessionDeleteButton sessionId={session.id} />}
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      )}
 
-      {/* Teams */}
+      {tab === "sessions" && (
+        <section className="space-y-6">
+          {!effectiveSeasonId ? (
+            <p className="text-sm text-f1-muted">Create a season first to schedule race sessions.</p>
+          ) : !sessions?.length ? (
+            <p className="text-sm text-f1-muted">No sessions yet. Add one to start entering results.</p>
+          ) : (
+            (() => {
+              const scheduled = sessions.filter((s) => s.status !== "completed");
+              const completed = sessions.filter((s) => s.status === "completed");
+              // Query is newest-first, so the next race is the earliest scheduled one.
+              const next = scheduled[scheduled.length - 1];
+              const nextCircuit = next?.circuits as unknown as { country: string; name: string } | null;
+              const otherScheduled = scheduled.filter((s) => s !== next);
+              return (
+                <>
+                  {next && (
+                    <div className="space-y-3 border border-f1-red bg-f1-dark p-4">
+                      <p className="text-xs font-bold uppercase text-f1-red-text">Next session</p>
+                      <div>
+                        <p className="text-lg font-bold text-f1-white">{next.name}</p>
+                        <p className="font-mono text-xs text-f1-muted">
+                          {next.session_code}
+                          {nextCircuit ? ` · ${nextCircuit.name}, ${nextCircuit.country}` : ""}
+                          {" · "}
+                          {formatRaceDateTimeSAST(next.scheduled_at)}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          className={primaryLink}
+                          href={`/admin/leagues/${leagueId}/sessions/${next.id}/publish`}
+                        >
+                          Publish results
+                        </Link>
+                        <Link
+                          className={secondaryLink}
+                          href={`/admin/leagues/${leagueId}/sessions/${next.id}/edit`}
+                          title="Edit Session"
+                        >
+                          <Pencil aria-hidden="true" size={14} />
+                          Edit
+                        </Link>
+                        <SessionDeleteButton sessionId={next.id} />
+                      </div>
+                    </div>
+                  )}
+
+                  {otherScheduled.length > 0 && (
+                    <div className="space-y-2">
+                      <h2 className="text-sm font-bold uppercase text-f1-muted">
+                        Also scheduled ({otherScheduled.length})
+                      </h2>
+                      <ul className="space-y-2">
+                        {otherScheduled.map((s) => (
+                          <li
+                            className="flex flex-wrap items-center justify-between gap-2 border border-f1-border bg-f1-dark p-3"
+                            key={s.id}
+                          >
+                            <div>
+                              <p className="font-bold text-f1-white">{s.name}</p>
+                              <p className="font-mono text-xs text-f1-muted">
+                                {formatRaceDateTimeSAST(s.scheduled_at)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Link
+                                className={secondaryLink}
+                                href={`/admin/leagues/${leagueId}/sessions/${s.id}/publish`}
+                              >
+                                Enter Results
+                              </Link>
+                              <Link
+                                className="p-1 text-f1-muted transition-colors hover:text-f1-white"
+                                href={`/admin/leagues/${leagueId}/sessions/${s.id}/edit`}
+                                title="Edit Session"
+                              >
+                                <Pencil aria-hidden="true" size={16} />
+                              </Link>
+                              <SessionDeleteButton sessionId={s.id} />
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <h2 className="text-sm font-bold uppercase text-f1-muted">
+                      Completed ({completed.length})
+                    </h2>
+                    {!completed.length ? (
+                      <p className="text-sm text-f1-muted">No published sessions yet.</p>
+                    ) : (
+                      <div className="overflow-x-auto border border-f1-border bg-f1-dark">
+                        <table className="w-full text-left text-sm">
+                          <thead className="text-xs uppercase text-f1-muted">
+                            <tr>
+                              <th className="px-3 py-2" scope="col">Date</th>
+                              <th className="px-3 py-2" scope="col">Session</th>
+                              <th className="px-3 py-2" scope="col">Status</th>
+                              <th className="px-3 py-2" scope="col">Results</th>
+                              <th className="px-3 py-2" scope="col">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {completed.map((s) => (
+                              <tr className="border-t border-f1-border" key={s.id}>
+                                <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-f1-muted">
+                                  {formatDate(s.scheduled_at)}
+                                </td>
+                                <td className="px-3 py-2 font-bold text-f1-white">{s.name}</td>
+                                <td className="px-3 py-2">
+                                  <StatusPill tone="green">Published</StatusPill>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <Link
+                                    className="text-xs font-bold uppercase text-f1-muted hover:text-f1-white"
+                                    href={`/leagues/${league.slug}/results/${s.id}`}
+                                  >
+                                    View
+                                  </Link>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center gap-3 text-xs font-bold uppercase text-f1-muted">
+                                    <Link
+                                      className="hover:text-f1-white"
+                                      href={`/admin/leagues/${leagueId}/sessions/${s.id}/penalties`}
+                                    >
+                                      Penalties
+                                    </Link>
+                                    {/* M9 — published results are no longer uncorrectable; the
+                                        publish page reopens pre-filled for a republish. */}
+                                    <Link
+                                      className="hover:text-f1-white"
+                                      href={`/admin/leagues/${leagueId}/sessions/${s.id}/publish`}
+                                    >
+                                      Correct results
+                                    </Link>
+                                    <Link
+                                      className="hover:text-f1-white"
+                                      href={`/admin/leagues/${leagueId}/sessions/${s.id}/edit`}
+                                      title="Edit Session"
+                                    >
+                                      <Pencil aria-hidden="true" size={16} />
+                                    </Link>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })()
+          )}
+        </section>
+      )}
+
+      {tab === "teams" && (
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase text-f1-muted">
@@ -456,9 +605,11 @@ export default async function LeagueDetailPage({
           </ul>
         )}
       </section>
+      )}
 
-      {/* Ban Watch */}
-      {!!banWatch?.length && (
+      {tab === "drivers" && (
+        <div className="space-y-8">
+        {!!banWatch?.length && (
         <section className="space-y-4">
           <h2 className="text-sm font-bold uppercase text-f1-muted">
             Ban Watch ({banWatch.length})
@@ -505,43 +656,10 @@ export default async function LeagueDetailPage({
           </ul>
         </section>
       )}
-
-      {/* Drivers */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase text-f1-muted">
             Drivers ({entries?.length ?? 0})
           </h2>
-          <div className="flex items-center gap-2">
-            <Link
-              className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
-              href={`/admin/leagues/${leagueId}/transfers/new`}
-            >
-              Record Transfer
-            </Link>
-            <Link
-              className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
-              href={`/admin/leagues/${leagueId}/adjustments`}
-            >
-              Adjustments
-            </Link>
-            {effectiveSeasonId && (
-              <Link
-                className="inline-flex items-center min-h-11 gap-2 border border-f1-border px-3 py-1.5 text-xs font-bold uppercase text-f1-muted transition-colors hover:border-f1-white hover:text-f1-white"
-                href={`/admin/leagues/${leagueId}/drivers/bulk`}
-              >
-                Add multiple
-              </Link>
-            )}
-            <Link
-              className="inline-flex items-center min-h-11 gap-2 border border-f1-red bg-f1-red px-3 py-1.5 text-xs font-bold uppercase text-white transition-colors hover:bg-white hover:text-f1-black"
-              href={`/admin/leagues/${leagueId}/drivers/new`}
-            >
-              <Plus aria-hidden="true" size={12} />
-              Add Driver
-            </Link>
-          </div>
-        </div>
 
         {!effectiveSeasonId ? (
           <p className="text-sm text-f1-muted">Create a season first to add drivers.</p>
@@ -588,6 +706,8 @@ export default async function LeagueDetailPage({
           </ul>
         )}
       </section>
+        </div>
+      )}
     </div>
   );
 }
