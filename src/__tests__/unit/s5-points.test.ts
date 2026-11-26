@@ -288,17 +288,17 @@ describe("buildTeamStandings", () => {
     finishing_position: opts.pos !== undefined ? opts.pos : 1,
     result_status: opts.status ?? "classified",
     points_awarded: opts.pts ?? 25,
-    manual_points_adjustment: opts.adj ?? 5, // intentionally non-zero to prove exclusion
+    manual_points_adjustment: opts.adj ?? 0,
     fastest_lap: false,
   });
 
-  it("constructor points use only points_awarded, not manual_points_adjustment", () => {
+  it("constructor points include manual_points_adjustment (race-day caps hit the team too)", () => {
     const standings = buildTeamStandings(
-      [mkResult("d1", "t1", { pts: 25, adj: 5 })],
+      [mkResult("d1", "t1", { pts: 25, adj: -7 })],
       [],
       new Map(),
     );
-    expect(standings[0].total_points).toBe(25); // not 30
+    expect(standings[0].total_points).toBe(18);
   });
 
   it("team championship adjustment adds to constructor total", () => {

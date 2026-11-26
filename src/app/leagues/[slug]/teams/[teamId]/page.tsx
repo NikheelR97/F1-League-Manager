@@ -194,8 +194,8 @@ export default async function TeamProfilePage({
   const fastestLapCount = (raceResults ?? []).filter((r) => r.fastest_lap).length;
 
   // F1 — this breakdown is constructor-context, so it must reconcile with
-  // the header's team_standings.total_points, which uses points_awarded
-  // only (see buildDriverPointsBreakdown / buildTeamStandings in standings.ts).
+  // the header's team_standings.total_points, which includes race-day
+  // adjustments (see buildDriverPointsBreakdown / buildTeamStandings).
   const driverBreakdown = buildDriverPointsBreakdown(
     (raceResults ?? []).flatMap((r) => {
       const driver = r.drivers as unknown as Driver | null;
@@ -331,7 +331,7 @@ export default async function TeamProfilePage({
                   const race = r.race_sessions as unknown as RaceSession | null;
                   const circuit = race?.circuits as unknown as Circuit | null;
                   const driver = r.drivers as unknown as Driver | null;
-                  const totalPts = r.points_awarded;
+                  const totalPts = r.points_awarded + r.manual_points_adjustment;
                   const note = driver ? rosterNote(driver.id) : null;
                   return (
                     <tr key={`${r.race_session_id}-${driver?.id}`} className="border-b border-f1-border/40 hover:bg-f1-dark">
@@ -371,7 +371,7 @@ export default async function TeamProfilePage({
                 const race = r.race_sessions as unknown as RaceSession | null;
                 const circuit = race?.circuits as unknown as Circuit | null;
                 const driver = r.drivers as unknown as Driver | null;
-                const totalPts = r.points_awarded;
+                const totalPts = r.points_awarded + r.manual_points_adjustment;
                 const note = driver ? rosterNote(driver.id) : null;
                 return (
                   <li
