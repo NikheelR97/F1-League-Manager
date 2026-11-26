@@ -6,36 +6,31 @@ import {
   type ResultForStandings,
 } from "@/lib/results/standings";
 
-// F1 — regression test for the team page's "Driver Points Breakdown" no
-// longer reconciling with the header's constructor total. Pre-fix, the page
-// summed `points_awarded + manual_points_adjustment` per driver while
-// team_standings.total_points (buildTeamStandings) sums points_awarded only
-// — any session with a non-zero manual adjustment made the breakdown rows
-// overshoot the header total. The fix extracts the breakdown aggregation
-// into buildDriverPointsBreakdown, which (like buildTeamStandings) uses
-// points_awarded only.
+// The team page's "Driver Points Breakdown" must reconcile with the header's
+// constructor total. Both sum points_awarded + manual_points_adjustment, so a
+// race-day adjustment (e.g. a per-race points cap) lands on driver and team.
 
 describe("buildDriverPointsBreakdown", () => {
-  it("ignores manual_points_adjustment even though it's present on the row", () => {
+  it("includes manual_points_adjustment", () => {
     const breakdown = buildDriverPointsBreakdown([
       {
         driver_id: "d1",
         driver_name: "Driver One",
         points_awarded: 25,
-        manual_points_adjustment: 5, // intentionally non-zero to prove exclusion
+        manual_points_adjustment: -7,
       },
     ]);
 
-    expect(breakdown).toEqual([{ driver_id: "d1", name: "Driver One", points: 25 }]);
+    expect(breakdown).toEqual([{ driver_id: "d1", name: "Driver One", points: 18 }]);
   });
 
-  it("sums a driver's points across multiple sessions, adjustments excluded", () => {
+  it("sums a driver's points across multiple sessions, adjustments included", () => {
     const breakdown = buildDriverPointsBreakdown([
       { driver_id: "d1", driver_name: "Driver One", points_awarded: 25, manual_points_adjustment: 5 },
       { driver_id: "d1", driver_name: "Driver One", points_awarded: 18, manual_points_adjustment: -3 },
     ]);
 
-    expect(breakdown).toEqual([{ driver_id: "d1", name: "Driver One", points: 43 }]);
+    expect(breakdown).toEqual([{ driver_id: "d1", name: "Driver One", points: 45 }]);
   });
 
   it("sorts drivers by points descending", () => {
@@ -84,6 +79,6 @@ describe("buildDriverPointsBreakdown", () => {
 
     const breakdownSum = breakdown.reduce((sum, d) => sum + d.points, 0);
     expect(breakdownSum).toBe(teamStandings.find((s) => s.team_id === "t1")!.total_points);
-    expect(breakdownSum).toBe(43); // 25 + 18, adjustments excluded from both
+    expect(breakdownSum).toBe(46); // 25 + 5 + 18 - 2, adjustments in both
   });
 });
