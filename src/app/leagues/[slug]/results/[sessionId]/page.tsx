@@ -132,9 +132,16 @@ export default async function RaceResultPage({
     .eq("status", "completed");
   const roundNumber = leagueRoundNumbers(siblings ?? []).get(session.id);
 
-  const sortedResults = [...(raceResults ?? [])].sort(comparePublicRaceResults);
+  const allResults = [...(raceResults ?? [])].sort(comparePublicRaceResults);
+  // DNS rows (drivers who didn't take part) go behind a disclosure; DNF/DSQ stay.
+  const sortedResults = allResults.filter((r) => r.result_status.toLowerCase() !== "dns");
+  const dnsResults = allResults.filter((r) => r.result_status.toLowerCase() === "dns");
+  const poleDriverId = qualifying?.find((q) => q.is_pole)?.driver_id;
+  const podium = sortedResults
+    .filter((r) => r.result_status === "classified" && r.finishing_position != null && r.finishing_position <= 3)
+    .slice(0, 3);
 
-  const fastestLapRow = sortedResults.find((r) => r.fastest_lap);
+  const fastestLapRow = allResults.find((r) => r.fastest_lap);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -159,9 +166,45 @@ export default async function RaceResultPage({
         )}
       </div>
 
+      {podium.length > 0 && (
+        <section aria-label="Podium" className="grid gap-2 sm:grid-cols-3">
+          {podium.map((r) => {
+            const driver = r.drivers as unknown as Driver | null;
+            const team = r.teams as unknown as Team | null;
+            const pos = r.finishing_position as number;
+            return (
+              <div
+                key={r.id}
+                className="border border-f1-border border-l-4 bg-f1-dark p-3"
+                style={{ borderLeftColor: team?.color_hex ?? "#444" }}
+              >
+                <div className="flex items-baseline justify-between">
+                  <span className={`font-mono text-2xl font-bold ${["", "text-podium-gold", "text-podium-silver", "text-podium-bronze"][pos]}`}>
+                    P{pos}
+                  </span>
+                  <span className="font-mono text-sm font-bold text-f1-white">
+                    {r.points_awarded + r.manual_points_adjustment} pts
+                  </span>
+                </div>
+                <p className={`font-bold text-f1-white ${pos === 1 ? "text-lg" : ""}`}>{driver?.display_name ?? "—"}</p>
+                <p className="text-xs text-f1-muted">{team?.name ?? "Free agent"}</p>
+                {(r.fastest_lap || driver?.id === poleDriverId) && (
+                  <p className="mt-1 flex gap-2 text-xs font-bold uppercase">
+                    {driver?.id === poleDriverId && <span className="text-f1-red-text">Pole</span>}
+                    {r.fastest_lap && <span className="text-team-mclaren">FL</span>}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {/* Mobile: race result first, then qualifying; desktop keeps qualifying first. */}
+      <div className="flex flex-col gap-8">
       {/* Qualifying */}
       {qualifying && qualifying.length > 0 && (
-        <section className="space-y-2">
+        <section className="order-2 space-y-2 md:order-1">
           <h2 className="text-xs font-bold uppercase text-f1-muted">Qualifying</h2>
           <table className="hidden w-full text-sm md:table">
             <thead>
@@ -232,9 +275,9 @@ export default async function RaceResultPage({
       )}
 
       {/* Race result */}
-      <section className="space-y-2">
+      <section className="order-1 space-y-2 md:order-2">
         <h2 className="text-xs font-bold uppercase text-f1-muted">Race Result</h2>
-        {sortedResults.length === 0 ? (
+        {allResults.length === 0 ? (
           <div className="space-y-3">
             <EmptyState
               message="Full finishing order wasn't recorded for this race. Championship points from this round are reflected in the standings."
@@ -323,11 +366,23 @@ export default async function RaceResultPage({
             </ul>
           </>
         )}
+        {dnsResults.length > 0 && (
+          <details className="border border-f1-border/40 bg-f1-dark px-3 py-2 text-sm">
+            <summary className="cursor-pointer text-xs font-bold uppercase text-f1-muted">
+              Did not start ({dnsResults.length})
+            </summary>
+            <ul className="mt-2 grid gap-1 text-f1-muted sm:grid-cols-2">
+              {dnsResults.map((r) => (
+                <li key={r.id}>{(r.drivers as unknown as Driver | null)?.display_name ?? "—"}</li>
+              ))}
+            </ul>
+          </details>
+        )}
       </section>
 
       {/* Race penalties — steward_notes and appeal_notes intentionally excluded */}
       {penalties && penalties.length > 0 && (
-        <section className="space-y-2">
+        <section className="order-3 space-y-2">
           <h2 className="text-xs font-bold uppercase text-f1-muted">Penalties</h2>
           <ul className="space-y-1">
             {penalties.map((p) => {
@@ -352,6 +407,7 @@ export default async function RaceResultPage({
           </ul>
         </section>
       )}
+      </div>
     </div>
   );
 }
