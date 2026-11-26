@@ -345,7 +345,7 @@ export default async function LeagueStatsPage({
           {biggestClimbers.length > 0 && (
             <section className="space-y-2">
               <h2 className="text-xs font-bold uppercase text-f1-muted">Biggest Single-Race Climbs</h2>
-              <ul className="grid gap-1 sm:grid-cols-2">
+              <ul className="space-y-1">
                 {biggestClimbers.map((row, i) => (
                   <li
                     key={row.driverId}

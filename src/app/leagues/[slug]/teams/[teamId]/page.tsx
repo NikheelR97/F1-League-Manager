@@ -114,46 +114,58 @@ export default async function TeamProfilePage({
   const entryIds = (entries ?? []).map((e) => e.id);
   const sessionIds = (completedSessions ?? []).map((s) => s.id);
 
-  const [{ data: activeStints }, { data: raceResults }, { count: poleCount }] = await Promise.all([
-    // Not scoped to this team: also used to tell whether an historically-
-    // attributed driver has since moved to another team (former driver) or
-    // has no current stint anywhere (free agent) — see rosterNote below.
-    entryIds.length > 0
-      ? db
-          .from("driver_team_stints")
-          .select("league_driver_entry_id, team_id")
-          .is("ends_on", null)
-          .in("league_driver_entry_id", entryIds)
-      : { data: [] },
-    sessionIds.length > 0
-      ? db
-          .from("race_results")
-          .select(
-            "race_session_id, finishing_position, result_status, raw_result, fastest_lap, points_awarded, manual_points_adjustment, drivers(id, display_name), race_sessions(name, scheduled_at, circuits(name, grand_prix_name))",
-          )
-          .eq("team_id", teamId)
-          .in("race_session_id", sessionIds)
-          .order("scheduled_at", { referencedTable: "race_sessions", ascending: true })
-          .limit(500)
-      : { data: [] },
-    sessionIds.length > 0
-      ? db
-          .from("qualifying_results")
-          .select("id", { count: "exact" })
-          .eq("team_id", teamId)
-          .eq("is_pole", true)
-          .in("race_session_id", sessionIds)
-          .limit(500)
-      : { count: 0 },
-  ]);
+  const [{ data: activeStints }, { data: raceResults }, { count: poleCount }] =
+    await Promise.all([
+      // Not scoped to this team: also used to tell whether an historically-
+      // attributed driver has since moved to another team (former driver) or
+      // has no current stint anywhere (free agent) — see rosterNote below.
+      entryIds.length > 0
+        ? db
+            .from("driver_team_stints")
+            .select("league_driver_entry_id, team_id")
+            .is("ends_on", null)
+            .in("league_driver_entry_id", entryIds)
+        : { data: [] },
+      sessionIds.length > 0
+        ? db
+            .from("race_results")
+            .select(
+              "race_session_id, finishing_position, result_status, raw_result, fastest_lap, points_awarded, manual_points_adjustment, drivers(id, display_name), race_sessions(name, scheduled_at, race_number, circuits(name, grand_prix_name))",
+            )
+            .eq("team_id", teamId)
+            .in("race_session_id", sessionIds)
+            .order("scheduled_at", {
+              referencedTable: "race_sessions",
+              ascending: true,
+            })
+            .limit(500)
+        : { data: [] },
+      sessionIds.length > 0
+        ? db
+            .from("qualifying_results")
+            .select("id", { count: "exact" })
+            .eq("team_id", teamId)
+            .eq("is_pole", true)
+            .in("race_session_id", sessionIds)
+            .limit(500)
+        : { count: 0 },
+    ]);
 
   // Derive current drivers from active stints
-  const currentTeamByEntryId = new Map((activeStints ?? []).map((s) => [s.league_driver_entry_id, s.team_id]));
+  const currentTeamByEntryId = new Map(
+    (activeStints ?? []).map((s) => [s.league_driver_entry_id, s.team_id]),
+  );
   const activeEntryIds = new Set(
-    [...currentTeamByEntryId.entries()].filter(([, tId]) => tId === teamId).map(([entryId]) => entryId),
+    [...currentTeamByEntryId.entries()]
+      .filter(([, tId]) => tId === teamId)
+      .map(([entryId]) => entryId),
   );
 
-  type DriverEntry = { id: string; display_name: string; racing_number: number | null };
+  type DriverEntry = {
+    id: string;
+    display_name: string;
+    racing_number: number | null;
+  };
   type EntryRow = { id: string; drivers: unknown };
 
   const currentDrivers = (entries ?? [])
@@ -175,23 +187,48 @@ export default async function TeamProfilePage({
   // error — see UAT M3 / Cluster B.
   function rosterNote(driverId: string): "former" | "free-agent" | null {
     const entryId = entryIdByDriverId.get(driverId);
-    const currentTeamId = entryId ? currentTeamByEntryId.get(entryId) : undefined;
+    const currentTeamId = entryId
+      ? currentTeamByEntryId.get(entryId)
+      : undefined;
     if (currentTeamId === teamId) return null;
     return currentTeamId ? "former" : "free-agent";
   }
 
-  type RaceSession = { name: string; circuits: unknown };
+  type RaceSession = {
+    name: string;
+    scheduled_at: string;
+    race_number: number;
+    circuits: unknown;
+  };
   type Circuit = { name: string; grand_prix_name: string };
   type Driver = { id: string; display_name: string };
 
-  const sortedResults = [...(raceResults ?? [])].sort(comparePublicRaceResults);
+  // Newest race first (feature, race_number 1, runs after the sprint); within a race, classification order.
+  const when = (r: NonNullable<typeof raceResults>[number]) =>
+    r.race_sessions as unknown as RaceSession | null;
+  const sortedResults = [...(raceResults ?? [])].sort((a, b) => {
+    const ra = when(a);
+    const rb = when(b);
+    return (
+      (rb?.scheduled_at ?? "").localeCompare(ra?.scheduled_at ?? "") ||
+      (ra?.race_number ?? 0) - (rb?.race_number ?? 0) ||
+      comparePublicRaceResults(a, b)
+    );
+  });
+  const startedResults = sortedResults.filter((r) => r.result_status !== "dns");
+  const dnsResults = sortedResults.filter((r) => r.result_status === "dns");
 
   // Season summary derived from the already-fetched race results — no extra queries
   const classifiedFinishes = (raceResults ?? [])
-    .filter((r) => r.result_status === "classified" && r.finishing_position !== null)
+    .filter(
+      (r) => r.result_status === "classified" && r.finishing_position !== null,
+    )
     .map((r) => r.finishing_position as number);
-  const bestFinish = classifiedFinishes.length > 0 ? Math.min(...classifiedFinishes) : null;
-  const fastestLapCount = (raceResults ?? []).filter((r) => r.fastest_lap).length;
+  const bestFinish =
+    classifiedFinishes.length > 0 ? Math.min(...classifiedFinishes) : null;
+  const fastestLapCount = (raceResults ?? []).filter(
+    (r) => r.fastest_lap,
+  ).length;
 
   // F1 — this breakdown is constructor-context, so it must reconcile with
   // the header's team_standings.total_points, which includes race-day
@@ -209,6 +246,122 @@ export default async function TeamProfilePage({
         },
       ];
     }),
+  );
+
+  const renderRows = (rows: typeof sortedResults) => (
+    <>
+      {/* Desktop table */}
+      <table className="hidden w-full text-sm md:table">
+        <thead>
+          <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
+            <th className="pb-2 pr-4">Race</th>
+            <th className="pb-2 pr-4">Driver</th>
+            <th className="pb-2 pr-4 text-right">Pos</th>
+            <th className="pb-2 text-right">Pts</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const race = r.race_sessions as unknown as RaceSession | null;
+            const circuit = race?.circuits as unknown as Circuit | null;
+            const driver = r.drivers as unknown as Driver | null;
+            const totalPts = r.points_awarded + r.manual_points_adjustment;
+            const note = driver ? rosterNote(driver.id) : null;
+            return (
+              <tr
+                key={`${r.race_session_id}-${driver?.id}`}
+                className="border-b border-f1-border/40 hover:bg-f1-dark"
+              >
+                <td className="py-2 pr-4">
+                  <div className="text-f1-white">
+                    {circuit?.grand_prix_name ?? "—"}
+                    {race?.name && (
+                      <span className="ml-2 text-xs text-f1-muted">
+                        {race.name}
+                      </span>
+                    )}
+                  </div>
+                  {r.fastest_lap && (
+                    <span className="ml-2 text-xs font-bold text-team-mclaren">
+                      FL
+                    </span>
+                  )}
+                </td>
+                <td className="py-2 pr-4 text-f1-muted">
+                  {driver?.display_name ?? "—"}
+                  {note && driver && (
+                    <Link
+                      className="ml-2 text-xs uppercase text-f1-muted hover:text-f1-white"
+                      href={`/leagues/${slug}/drivers/${driver.id}`}
+                    >
+                      {note === "former" ? "former driver" : "free agent"}
+                    </Link>
+                  )}
+                </td>
+                <td className="py-2 pr-4 text-right font-mono text-xs text-f1-muted">
+                  {formatPosition(r.result_status, r.finishing_position)}
+                </td>
+                <td className="py-2 text-right font-mono font-bold text-f1-white">
+                  {totalPts}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* Mobile cards */}
+      <ul className="space-y-1 md:hidden">
+        {rows.map((r) => {
+          const race = r.race_sessions as unknown as RaceSession | null;
+          const circuit = race?.circuits as unknown as Circuit | null;
+          const driver = r.drivers as unknown as Driver | null;
+          const totalPts = r.points_awarded + r.manual_points_adjustment;
+          const note = driver ? rosterNote(driver.id) : null;
+          return (
+            <li
+              key={`${r.race_session_id}-${driver?.id}`}
+              className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm"
+            >
+              <div>
+                <div className="text-f1-white">
+                  {circuit?.grand_prix_name ?? "—"}
+                  {race?.name && (
+                    <span className="ml-2 text-xs text-f1-muted">
+                      {race.name}
+                    </span>
+                  )}
+                </div>
+                {r.fastest_lap && (
+                  <span className="ml-2 text-xs font-bold text-team-mclaren">
+                    FL
+                  </span>
+                )}
+                <p className="text-xs text-f1-muted">
+                  {driver?.display_name ?? "—"}
+                  {note && driver && (
+                    <Link
+                      className="ml-2 text-xs uppercase text-f1-muted hover:text-f1-white"
+                      href={`/leagues/${slug}/drivers/${driver.id}`}
+                    >
+                      {note === "former" ? "former driver" : "free agent"}
+                    </Link>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="font-mono text-xs uppercase text-f1-muted">
+                  {formatPosition(r.result_status, r.finishing_position)}
+                </span>
+                <span className="font-mono text-sm font-bold text-f1-white">
+                  {totalPts} pts
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 
   return (
@@ -257,7 +410,11 @@ export default async function TeamProfilePage({
             <div className="space-y-0.5">
               {currentDrivers.map((d) => (
                 <p key={d.id} className="text-f1-white">
-                  {d.racing_number ? <span className="font-mono text-xs text-f1-muted">#{d.racing_number} </span> : null}
+                  {d.racing_number ? (
+                    <span className="font-mono text-xs text-f1-muted">
+                      #{d.racing_number}{" "}
+                    </span>
+                  ) : null}
                   {d.display_name}
                 </p>
               ))}
@@ -281,7 +438,9 @@ export default async function TeamProfilePage({
       {/* Driver points breakdown */}
       {driverBreakdown.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-xs font-bold uppercase text-f1-muted">Driver Points Breakdown</h2>
+          <h2 className="text-xs font-bold uppercase text-f1-muted">
+            Driver Points Breakdown
+          </h2>
           <ul className="grid gap-1 sm:grid-cols-2">
             {driverBreakdown.map((d) => {
               const note = rosterNote(d.driver_id);
@@ -301,7 +460,9 @@ export default async function TeamProfilePage({
                       </Link>
                     )}
                   </span>
-                  <span className="font-mono font-bold text-f1-white">{d.points} pts</span>
+                  <span className="font-mono font-bold text-f1-white">
+                    {d.points} pts
+                  </span>
                 </li>
               );
             })}
@@ -311,103 +472,22 @@ export default async function TeamProfilePage({
 
       {/* Race results */}
       <section className="space-y-2">
-        <h2 className="text-xs font-bold uppercase text-f1-muted">Race Results</h2>
+        <h2 className="text-xs font-bold uppercase text-f1-muted">
+          Race Results
+        </h2>
         {sortedResults.length === 0 ? (
           <EmptyState message="No results published yet." title="No results" />
         ) : (
           <>
-            {/* Desktop table */}
-            <table className="hidden w-full text-sm md:table">
-              <thead>
-                <tr className="border-b border-f1-border text-left text-xs font-bold uppercase text-f1-muted">
-                  <th className="pb-2 pr-4">Race</th>
-                  <th className="pb-2 pr-4">Driver</th>
-                  <th className="pb-2 pr-4 text-right">Pos</th>
-                  <th className="pb-2 text-right">Pts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedResults.map((r) => {
-                  const race = r.race_sessions as unknown as RaceSession | null;
-                  const circuit = race?.circuits as unknown as Circuit | null;
-                  const driver = r.drivers as unknown as Driver | null;
-                  const totalPts = r.points_awarded + r.manual_points_adjustment;
-                  const note = driver ? rosterNote(driver.id) : null;
-                  return (
-                    <tr key={`${r.race_session_id}-${driver?.id}`} className="border-b border-f1-border/40 hover:bg-f1-dark">
-                      <td className="py-2 pr-4">
-                        <div className="text-f1-white">
-                          {circuit?.grand_prix_name ?? "—"}
-                          {race?.name && <span className="ml-2 text-xs text-f1-muted">{race.name}</span>}
-                        </div>
-                        {r.fastest_lap && (
-                          <span className="ml-2 text-xs font-bold text-team-mclaren">FL</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-4 text-f1-muted">
-                        {driver?.display_name ?? "—"}
-                        {note && driver && (
-                          <Link
-                            className="ml-2 text-xs uppercase text-f1-muted hover:text-f1-white"
-                            href={`/leagues/${slug}/drivers/${driver.id}`}
-                          >
-                            {note === "former" ? "former driver" : "free agent"}
-                          </Link>
-                        )}
-                      </td>
-                      <td className="py-2 pr-4 text-right font-mono text-xs text-f1-muted">
-                        {formatPosition(r.result_status, r.finishing_position)}
-                      </td>
-                      <td className="py-2 text-right font-mono font-bold text-f1-white">{totalPts}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            {/* Mobile cards */}
-            <ul className="space-y-1 md:hidden">
-              {sortedResults.map((r) => {
-                const race = r.race_sessions as unknown as RaceSession | null;
-                const circuit = race?.circuits as unknown as Circuit | null;
-                const driver = r.drivers as unknown as Driver | null;
-                const totalPts = r.points_awarded + r.manual_points_adjustment;
-                const note = driver ? rosterNote(driver.id) : null;
-                return (
-                  <li
-                    key={`${r.race_session_id}-${driver?.id}`}
-                    className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm"
-                  >
-                    <div>
-                      <div className="text-f1-white">
-                        {circuit?.grand_prix_name ?? "—"}
-                        {race?.name && <span className="ml-2 text-xs text-f1-muted">{race.name}</span>}
-                      </div>
-                      {r.fastest_lap && (
-                        <span className="ml-2 text-xs font-bold text-team-mclaren">FL</span>
-                      )}
-                      <p className="text-xs text-f1-muted">
-                        {driver?.display_name ?? "—"}
-                        {note && driver && (
-                          <Link
-                            className="ml-2 text-xs uppercase text-f1-muted hover:text-f1-white"
-                            href={`/leagues/${slug}/drivers/${driver.id}`}
-                          >
-                            {note === "former" ? "former driver" : "free agent"}
-                          </Link>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="font-mono text-xs uppercase text-f1-muted">
-                        {formatPosition(r.result_status, r.finishing_position)}
-                      </span>
-                      <span className="font-mono text-sm font-bold text-f1-white">{totalPts} pts</span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            {renderRows(startedResults)}
+            {dnsResults.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs uppercase text-f1-muted hover:text-f1-white">
+                  Did not start ({dnsResults.length})
+                </summary>
+                <div className="mt-2">{renderRows(dnsResults)}</div>
+              </details>
+            )}
           </>
         )}
       </section>

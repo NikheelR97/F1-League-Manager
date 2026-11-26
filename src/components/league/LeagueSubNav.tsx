@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -10,6 +11,12 @@ interface LeagueSubNavProps {
 
 export function LeagueSubNav({ slug, isWheelLeague }: LeagueSubNavProps) {
   const pathname = usePathname();
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Bring the active tab into view on narrow screens (scroll only the strip, not the page).
+    const el = scroller.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (el && scroller.current) scroller.current.scrollLeft = el.offsetLeft - 16;
+  }, [pathname]);
   const base = `/leagues/${slug}`;
 
   const links = [
@@ -27,7 +34,10 @@ export function LeagueSubNav({ slug, isWheelLeague }: LeagueSubNavProps) {
       aria-label="League navigation"
       className="border-b border-f1-border bg-f1-black/95"
     >
-      <div className="mx-auto flex w-full max-w-7xl gap-0 overflow-x-auto px-4 sm:px-6 lg:px-8">
+      <div
+        className="mx-auto flex w-full max-w-7xl gap-0 overflow-x-auto px-4 [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)] [scrollbar-width:none] sm:px-6 md:[mask-image:none] lg:px-8 [&::-webkit-scrollbar]:hidden"
+        ref={scroller}
+      >
         {links.map((link) => {
           const isActive =
             link.activePath === base
@@ -36,6 +46,7 @@ export function LeagueSubNav({ slug, isWheelLeague }: LeagueSubNavProps) {
           return (
             <Link
               key={link.href}
+              aria-current={isActive ? "page" : undefined}
               href={link.href}
               className={`min-h-11 inline-flex shrink-0 items-center border-b-2 px-4 py-3 text-xs font-bold uppercase transition-colors ${
                 isActive
