@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { formatDate, formatTime } from "@/lib/format-date";
 import { pageTitle } from "@/lib/public/page-title";
+import { leagueRoundNumbers } from "@/lib/public/league-round-number";
 import { roundPrefix } from "@/lib/public/round-prefix";
 import { resolvePublicLeague } from "@/lib/public/resolve-league";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
@@ -52,11 +53,13 @@ export default async function LeagueCalendarPage({
     .from("race_sessions")
     .select("id, name, session_code, race_number, scheduled_at, status, circuits(name, country, round_number)")
     .eq("league_id", league.id)
+    .eq("season_id", league.season.id)
     .in("status", ["scheduled", "completed"])
     .order("scheduled_at", { ascending: true });
 
   if (sessionsError) return <ErrorState message="Failed to load calendar" />;
 
+  const roundNumbers = leagueRoundNumbers(sessions ?? []);
   const seasonName = league.season.name;
 
   const upcoming = sessions?.filter((s) => s.status !== "completed") ?? [];
@@ -90,7 +93,7 @@ export default async function LeagueCalendarPage({
                   <div key={session.id} className="flex flex-col border border-f1-border bg-f1-dark hover:border-f1-red transition-colors">
                     <div className="border-b border-f1-border p-4 bg-black/20">
                       <p className="text-xs font-bold uppercase text-f1-red-text mb-1">
-                        {circuit?.round_number ? `Round ${circuit.round_number}` : `Race ${session.race_number}`}
+                        {roundNumbers.get(session.id) ? `Round ${roundNumbers.get(session.id)}` : `Race ${session.race_number}`}
                       </p>
                       <h3 className="text-lg font-bold text-f1-white line-clamp-1">{session.name}</h3>
                       {circuit && (
@@ -149,7 +152,7 @@ export default async function LeagueCalendarPage({
                           {formatDate(session.scheduled_at)}
                         </td>
                         <td className="px-4 py-3 font-bold">
-                          {roundPrefix(circuit?.round_number, session.name)}
+                          {roundPrefix(roundNumbers.get(session.id), session.name)}
                           {session.name}
                         </td>
                         <td className="px-4 py-3 text-f1-muted">
@@ -178,7 +181,7 @@ export default async function LeagueCalendarPage({
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="font-bold text-f1-white">
-                          {roundPrefix(circuit?.round_number, session.name)}
+                          {roundPrefix(roundNumbers.get(session.id), session.name)}
                           {session.name}
                         </p>
                         <p className="text-xs text-f1-muted">
