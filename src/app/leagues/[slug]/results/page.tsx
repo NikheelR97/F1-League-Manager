@@ -71,7 +71,7 @@ export default async function ResultsIndexPage({
       .order("scheduled_at", { ascending: false })
       // Sprint + feature share a start time; the feature (race_number 1) runs last.
       .order("race_number", { ascending: true })
-      .limit(50),
+      .limit(200),
     resolveLeagueSeasons(league.id, { fallbackSeason: league.season }),
   ]);
 

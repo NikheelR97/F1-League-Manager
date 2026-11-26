@@ -34,7 +34,7 @@ export async function GET(
       .select("id, name, session_code, race_number, race_length_percent, scheduled_at, status, circuits(name, country)")
       .eq("league_id", leagueId)
       .order("scheduled_at", { ascending: false })
-      .limit(50);
+      .limit(200);
 
     if (error) return Response.json({ error: "Failed to load sessions" }, { status: 500 });
     return Response.json({ sessions: data });
