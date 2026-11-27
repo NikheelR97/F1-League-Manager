@@ -231,7 +231,7 @@ export function LeagueHub({
           <section className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-bold uppercase text-f1-muted">Last Result</h2>
-              <Link className="text-xs text-f1-muted hover:text-f1-white" href={`/leagues/${league.slug}/recap`}>
+              <Link className="inline-flex min-h-11 items-center text-xs text-f1-muted hover:text-f1-white" href={`/leagues/${league.slug}/recap`}>
                 Share recap -&gt;
               </Link>
             </div>
