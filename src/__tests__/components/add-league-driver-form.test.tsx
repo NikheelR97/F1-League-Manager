@@ -93,7 +93,7 @@ describe("AddLeagueDriverForm submit", () => {
         expect.objectContaining({ method: "POST" }),
       ),
     );
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/admin/leagues/league-1"));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/admin/leagues/league-1?tab=drivers"));
     expect(router.refresh).toHaveBeenCalled();
   });
 

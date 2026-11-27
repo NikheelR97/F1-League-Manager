@@ -3,7 +3,7 @@ import "@testing-library/jest-dom";
 
 import { LeagueHub } from "@/components/league/LeagueHub";
 import { RaceCountdown } from "@/components/league/RaceCountdown";
-import { formatDate } from "@/lib/format-date";
+import { formatRaceDateTimeSAST } from "@/lib/format-date";
 import type { PublicLeague } from "@/lib/public/resolve-league";
 
 const mockLeague: PublicLeague = {
@@ -55,7 +55,7 @@ describe("LeagueHub", () => {
         }}
       />,
     );
-    expect(screen.getByText(/Next Race/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^Next Race$/i })).toBeInTheDocument();
   });
 
   it("shows top 5 drivers section when drivers are present", () => {
@@ -138,7 +138,7 @@ describe("LeagueHub", () => {
         }}
       />,
     );
-    expect(screen.getByText(/Last result: Monaco/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Monaco" })).toBeInTheDocument();
   });
 
   it("links the last result to its public result page", () => {
@@ -154,7 +154,7 @@ describe("LeagueHub", () => {
         }}
       />,
     );
-    expect(screen.getByRole("link", { name: /Last result: Monaco/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Monaco" })).toHaveAttribute(
       "href",
       "/leagues/standard/results/session-5",
     );
@@ -173,7 +173,8 @@ describe("LeagueHub", () => {
         }}
       />,
     );
-    expect(screen.getAllByText(formatDate(scheduledAt)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(formatRaceDateTimeSAST(scheduledAt)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Next race in/).length).toBeGreaterThan(0);
   });
 
   it("does not show 'Race ready' for a past-dated next race", () => {
@@ -239,10 +240,47 @@ describe("LeagueHub", () => {
     expect(screen.getByText(/4 circuits remaining in pool/i)).toBeInTheDocument();
   });
 
-  it("shows 'Awaiting spin' when a wheel league has no confirmed spin yet", () => {
+  it("hides the wheel block when a wheel league has no confirmed spin yet", () => {
     render(<LeagueHub {...baseProps} league={{ ...mockLeague, format: "standard" }} />);
-    expect(screen.getByText("Wheel")).toBeInTheDocument();
-    expect(screen.getByText("Awaiting spin")).toBeInTheDocument();
+    expect(screen.queryByText("Wheel")).not.toBeInTheDocument();
+    expect(screen.queryByText("Awaiting spin")).not.toBeInTheDocument();
+  });
+
+  it("formats race time in SAST", () => {
+    expect(formatRaceDateTimeSAST("2026-12-03T19:00:00.000Z")).toBe("Thu 3 Dec · 21:00 SAST");
+  });
+
+  it("notes ties and renders the last-result podium", () => {
+    const row = (position: number, points: number, wins: number, name: string) => ({
+      position,
+      previous_position: position,
+      total_points: points,
+      wins,
+      drivers: { id: `d${position}`, display_name: name, racing_number: null },
+      teams: null,
+    });
+    render(
+      <LeagueHub
+        {...baseProps}
+        latestPodium={[
+          { finishing_position: 1, points_awarded: 25, drivers: { display_name: "Alpha" } },
+          { finishing_position: 2, points_awarded: 18, drivers: { display_name: "Bravo" } },
+          { finishing_position: 3, points_awarded: 15, drivers: { display_name: "Charlie" } },
+        ]}
+        latestSession={{
+          id: "s1",
+          name: "R1",
+          race_number: 1,
+          published_at: null,
+          circuits: { name: "Monaco" },
+        }}
+        topDrivers={[row(1, 50, 2, "Alpha"), row(2, 50, 1, "Bravo"), row(3, 40, 0, "Charlie")]}
+      />,
+    );
+    expect(screen.getAllByText("tied — leads on wins")).toHaveLength(1);
+    expect(screen.getByText("P3")).toBeInTheDocument();
+    expect(screen.getByText("18 pts")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Position unchanged")).not.toBeInTheDocument();
   });
 
   it("omits the wheel section for a non-wheel-format league", () => {

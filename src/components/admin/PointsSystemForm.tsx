@@ -146,7 +146,7 @@ export function PointsSystemForm({
       return;
     }
 
-    router.push(`/admin/leagues/${leagueId}`);
+    router.push(`/admin/leagues/${leagueId}?tab=settings`);
     router.refresh();
   }
 

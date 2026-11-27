@@ -83,20 +83,21 @@ export default async function RaceReportPage({
       )
       .eq("race_session_id", sessionId)
       .order("qualifying_position")
-      .limit(20),
+      .limit(100),
     db
       .from("race_results")
       .select(
         "id, finishing_position, result_status, fastest_lap, points_awarded, penalty_points, manual_points_adjustment, drivers(display_name, racing_number), teams(name, color_hex)",
       )
       .eq("race_session_id", sessionId)
-      .limit(20),
+      .order("finishing_position", { ascending: true, nullsFirst: false })
+      .limit(100),
     db
       .from("penalties")
       .select("id, penalty_points, reason, status, drivers(display_name)")
       .eq("race_session_id", sessionId)
       .order("penalty_points", { ascending: false })
-      .limit(20),
+      .limit(100),
   ]);
 
   if (!session) notFound();

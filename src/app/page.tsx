@@ -54,7 +54,7 @@ async function buildLeagueSummary(
           .maybeSingle(),
         db
           .from("race_sessions")
-          .select("name, circuits(name)")
+          .select("name, scheduled_at, circuits(name)")
           .eq("league_id", league.id)
           .eq("season_id", seasonId)
           .eq("status", "scheduled")
@@ -102,6 +102,7 @@ async function buildLeagueSummary(
     leader: driver?.display_name ?? "No results yet",
     name: league.name,
     nextRace: nextRaceDisplay,
+    nextRaceAt: nextRace?.scheduled_at ?? null,
     slug: league.slug,
     status: league.status.charAt(0).toUpperCase() + league.status.slice(1),
   };
@@ -140,8 +141,8 @@ export default async function Home() {
               F1 Esports League Manager
             </h1>
             <p className="mt-4 max-w-2xl text-lg leading-8 text-f1-silver">
-              League race hubs bring calendar readiness, standings status,
-              penalties, and wheel state into one race-weekend view.
+              Standings, race results, penalties and the next race night for your
+              F1 sim league, all in one place and updated after every round.
             </p>
           </div>
           <div className="grid gap-6">

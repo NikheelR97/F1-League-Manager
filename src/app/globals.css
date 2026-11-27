@@ -168,7 +168,7 @@ summary::-webkit-details-marker {
 
 .hero-band {
   display: grid;
-  min-height: 540px;
+  min-height: 168px;
   overflow: hidden;
   position: relative;
 }
@@ -184,25 +184,25 @@ summary::-webkit-details-marker {
   align-self: end;
   grid-area: 1 / 1;
   max-width: 920px;
-  padding: 48px clamp(16px, 5vw, 72px);
+  padding: 20px clamp(16px, 5vw, 72px) 24px;
   position: relative;
 }
 
 .hero-band__content h1 {
   color: var(--f1-white);
-  font-size: clamp(2.75rem, 8vw, 6.5rem);
+  font-size: clamp(1.875rem, 5vw, 3.25rem);
   font-weight: 900;
   letter-spacing: 0;
-  line-height: 0.92;
-  margin: 24px 0 0;
+  line-height: 0.95;
+  margin: 12px 0 0;
   text-transform: uppercase;
 }
 
 .hero-band__content p {
   color: var(--f1-silver);
-  font-size: 1.125rem;
-  line-height: 1.7;
-  margin: 24px 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  margin: 6px 0 0;
   max-width: 680px;
 }
 

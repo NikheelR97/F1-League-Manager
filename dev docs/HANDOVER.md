@@ -15,7 +15,7 @@ Current branch state:
 | Item | Current state |
 |------|---------------|
 | Integration branch | `dev` — all feature work merges here via PR. |
-| Production | **Live** at `league-manager.nikheelr.com` (← `prod`); staging at `staging.nikheelr.com` (← `staging`). Flow: feature → `dev` → `staging` → `prod`. |
+| Production | **Live** at `league-manager.nikheelr.com` (← `prod`). Flow: feature → `dev` → `prod` (staging removed Nov 2026). |
 | Pending PRs | #63 `render race times in SAST` → `dev`; this docs update → `dev`. |
 | Prior "latest merged PR" (may be stale) | PR #50, `Fix all findings from the full-season GUI/UAT` on `dev` |
 | Merge commit | `da4c56f` (squash) |
@@ -29,8 +29,8 @@ Current branch state:
 ### Production Launch + Live Season Ops (August 2026)
 
 Production is **live** at **https://league-manager.nikheelr.com** (Vercel production ← `prod` branch,
-prod Supabase project `piqhmsmagahalxbwwuea`). Staging is **https://staging.nikheelr.com** (← `staging`).
-Branch flow unchanged: feature → PR to `dev` → `staging` → `prod`.
+prod Supabase project `piqhmsmagahalxbwwuea`).
+Branch flow: feature → PR to `dev` → promote PR `dev` → `prod`. The `staging` branch was removed in Nov 2026.
 
 The first live season (the "Thursday League") was scored end-to-end through the admin API — Australia,
 Canada (sprint + feature), Netherlands (sprint + feature), Singapore (sprint + feature), and Mexico.
@@ -689,14 +689,13 @@ These decisions are confirmed and should not be changed without updating this do
 
 ## Branch And Environment Model
 
-This project uses three long-lived GitHub branches and two cloud Supabase projects.
+This project uses two long-lived GitHub branches and two cloud Supabase projects.
 
-Daily local development should use local Supabase when possible. Shared integration and staging testing use the non-production Supabase project. Production uses its own isolated Supabase project.
+Daily local development should use local Supabase when possible. Shared integration testing uses the non-production Supabase project. Production uses its own isolated Supabase project.
 
 | GitHub branch | Supabase target | Vercel target | Purpose |
 |---------------|-----------------|---------------|---------|
 | `dev` | Local Supabase by default. Dev previews may use `f1-league-manager-nonprod`. | Development/preview | Daily development and disposable integration testing. |
-| `staging` | `f1-league-manager-nonprod` | Staging/preview | Release candidate testing before production. |
 | `prod` | `f1-league-manager-prod` | Production | Real league data and public release. |
 
 Standing rules:
@@ -704,7 +703,7 @@ Standing rules:
 1. Normal local work happens on `dev` using local Supabase.
 2. Shared dev previews and release testing use `f1-league-manager-nonprod`.
 3. Production deploys happen from `prod` using `f1-league-manager-prod`.
-4. Never put production Supabase keys in dev or staging environments.
+4. Never put production Supabase keys in dev or preview environments.
 5. Never point local development at production unless a senior approves a controlled smoke test.
 6. Before running migrations, confirm the current Git branch and Supabase target match.
 7. Before deployment, confirm Vercel environment variables match the branch target.
@@ -716,16 +715,15 @@ Every developer and AI assistant must keep this mapping in mind when making code
 
 ## Pull Request And Review Model
 
-All project work must happen through branches and pull requests. Do not commit directly to `dev`, `staging`, or `prod`.
+All project work must happen through branches and pull requests. Do not commit directly to `dev` or `prod`.
 
 Branch flow:
 
 | Work type | Work branch | Pull request target | Required review |
 |-----------|-------------|---------------------|-----------------|
 | Normal feature or bug fix | `feature/short-description` or `fix/short-description` from `dev` | `dev` | Code review expected, but GitHub does not currently enforce approval on `dev`. |
-| Release candidate | `release/yyyy-mm-dd` from `dev` | `staging` | Code review plus QA checklist. |
-| Production release | `promote/yyyy-mm-dd` from `staging` | `prod` | Senior review, security check, deploy checklist. |
-| Hotfix | `hotfix/short-description` from `prod` | `prod`, then back-merge to `staging` and `dev` | Senior review. |
+| Production release | `promote/yyyy-mm-dd` (tree of `dev`) | `prod` | Owner review, security check, deploy checklist. |
+| Hotfix | `hotfix/short-description` from `prod` | `prod`, then back-merge to `dev` | Owner review. |
 
 Pull request rules:
 
@@ -733,10 +731,10 @@ Pull request rules:
 2. Every PR must describe what changed, why it changed, and how it was tested.
 3. Every PR must pass CI before merge.
 4. Every PR touching auth, RLS, migrations, secrets, deploy config, or production data needs senior review.
-5. PRs into `prod` must be small, already tested on `staging`, and linked to release notes.
+5. PRs into `prod` must be small, already merged and green on `dev`, and linked to release notes.
 6. `dev` PRs may be owner-merged after CI and documented Codex review when no second reviewer is available.
 7. Squash merge is preferred for feature branches unless a senior chooses otherwise.
-8. After hotfixes, back-merge into `staging` and `dev` so branches do not drift.
+8. After hotfixes, back-merge into `dev` so branches do not drift.
 
 AI assistant rule:
 
