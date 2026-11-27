@@ -63,10 +63,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
 
   const row = (pos: number, name: string, pts: number, color?: string | null) => (
     <div key={`${pos}-${name}`} style={{ alignItems: "center", display: "flex", fontSize: 26, height: 44 }}>
-      <div style={{ ...mono$, color: PODIUM[pos - 1] ?? C.silver, width: 46 }}>{pos}</div>
-      <div style={{ background: color ?? "#444", height: 24, marginRight: 12, width: 5 }} />
+      <div style={{ display: "flex", ...mono$, color: PODIUM[pos - 1] ?? C.silver, width: 46 }}>{pos}</div>
+      <div style={{ display: "flex", background: color ?? "#444", height: 24, marginRight: 12, width: 5 }} />
       <div style={{ display: "flex", flex: 1, overflow: "hidden", whiteSpace: "nowrap" }}>{name}</div>
-      <div style={{ ...mono$, color: C.white }}>{pts}</div>
+      <div style={{ display: "flex", ...mono$, color: C.white }}>{pts}</div>
     </div>
   );
   const heading = (text: string) => (
@@ -143,7 +143,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
                   {heading("MOVERS")}
                   {[...summary.movers.up, ...summary.movers.down].map((m) => (
                     <div key={m.name} style={{ display: "flex", fontSize: 24, height: 38 }}>
-                      <div style={{ ...mono$, color: m.delta > 0 ? C.up : C.down, width: 70 }}>
+                      <div style={{ display: "flex", ...mono$, color: m.delta > 0 ? C.up : C.down, width: 70 }}>
                         {`${m.delta > 0 ? "▲" : "▼"}${Math.abs(m.delta)}`}
                       </div>
                       <div style={{ display: "flex" }}>{m.name}</div>
