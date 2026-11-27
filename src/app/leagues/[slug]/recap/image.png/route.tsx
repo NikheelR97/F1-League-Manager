@@ -183,7 +183,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
       { data: titillium, name: "Titillium", weight: 700 },
       { data: mono, name: "Mono", weight: 700 },
     ],
-    headers: { "Cache-Control": "public, max-age=60" },
+    // Regenerated per request: a same-round republish must never serve a stale PNG.
+    headers: { "Cache-Control": "no-store" },
     height: SIZE,
     width: SIZE,
   });

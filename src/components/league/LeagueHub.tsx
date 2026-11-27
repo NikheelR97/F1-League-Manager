@@ -145,6 +145,22 @@ export function LeagueHub({
   const nextRaceIsPast = nextRace ? new Date(nextRace.scheduled_at).getTime() < now.getTime() : false;
   const seasonComplete = !nextRace && publishedRaceCount > 0;
 
+  // Leader vs P2 headline; tie wording reuses tieNote.
+  const [p1, p2] = topDrivers;
+  const titleFight =
+    p1 && p2
+      ? {
+          chaser: castDriver(p2.drivers)?.display_name ?? "TBD",
+          chaserPts: p2.total_points,
+          leader: castDriver(p1.drivers)?.display_name ?? "TBD",
+          leaderPts: p1.total_points,
+          note:
+            p1.total_points === p2.total_points
+              ? `Level on points — ${castDriver(p1.drivers)?.display_name ?? "P1"} ${(tieNote(topDrivers, 0) ?? "tied").replace("tied — ", "")}.`
+              : `${p1.total_points - p2.total_points} pts between them.`,
+        }
+      : null;
+
   return (
     <section>
       <div className="hero-band">
@@ -180,12 +196,22 @@ export function LeagueHub({
       </div>
 
       <div className="mx-auto w-full max-w-7xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center gap-4 border-b border-f1-border pb-4 text-xs text-f1-muted">
-          <span className="font-bold uppercase text-f1-white">{league.name}</span>
-          <span>{league.season?.name}</span>
-          <span className="uppercase">{league.format} format</span>
-        </div>
+        {titleFight && (
+          <section aria-label="Title fight" className="border border-f1-border bg-f1-dark p-4">
+            <h2 className="text-xs font-bold uppercase text-f1-muted">Title fight</h2>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-lg font-bold text-podium-gold">{titleFight.leader}</span>
+              <span className="font-mono text-sm text-f1-white">{titleFight.leaderPts}</span>
+              <span className="text-sm text-f1-muted">vs</span>
+              <span className="text-lg font-bold text-podium-silver">{titleFight.chaser}</span>
+              <span className="font-mono text-sm text-f1-white">{titleFight.chaserPts}</span>
+            </div>
+            <p className="mt-1 text-sm text-f1-silver">{titleFight.note}</p>
+          </section>
+        )}
 
+        <div className="grid gap-10 lg:grid-cols-2">
+        <div className="space-y-10">
         {nextRace && (
           <section className="space-y-2">
             <h2 className="text-xs font-bold uppercase text-f1-muted">Next Race</h2>
@@ -265,12 +291,39 @@ export function LeagueHub({
           </section>
         )}
 
+        {penaltyAlerts.length > 0 && (
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold uppercase text-f1-muted">Penalty Watch</h2>
+              <Link
+                className="inline-flex items-center min-h-11 text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
+                href={`/leagues/${league.slug}/penalties`}
+              >
+                View all -&gt;
+              </Link>
+            </div>
+            <ul className="space-y-1">
+              {penaltyAlerts.map((alert) => {
+                const driver = castPenaltyDriver(alert.drivers);
+                return (
+                  <li key={alert.driver_id} className="flex items-center justify-between border border-f1-red/30 bg-f1-dark px-4 py-2">
+                    <span className="text-sm text-f1-white">{driver?.display_name ?? "TBD"}</span>
+                    <span className="font-mono text-xs text-f1-red">{alert.penalty_points} penalty pts - threshold reached</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+        </div>
+
+        <div className="space-y-10">
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase text-f1-muted">Drivers</h2>
             <Link
               className="inline-flex items-center min-h-11 text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
-              href={`/leagues/${league.slug}/standings/drivers`}
+              href={`/leagues/${league.slug}/standings`}
             >
               Full standings -&gt;
             </Link>
@@ -322,7 +375,7 @@ export function LeagueHub({
               <h2 className="text-xs font-bold uppercase text-f1-muted">Constructors</h2>
               <Link
                 className="inline-flex items-center min-h-11 text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
-                href={`/leagues/${league.slug}/standings/constructors`}
+                href={`/leagues/${league.slug}/standings`}
               >
                 Full standings -&gt;
               </Link>
@@ -365,30 +418,8 @@ export function LeagueHub({
           </section>
         )}
 
-        {penaltyAlerts.length > 0 && (
-          <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase text-f1-muted">Penalty Watch</h2>
-              <Link
-                className="inline-flex items-center min-h-11 text-xs text-f1-muted underline-offset-2 hover:text-f1-white hover:underline"
-                href={`/leagues/${league.slug}/penalties`}
-              >
-                View all -&gt;
-              </Link>
-            </div>
-            <ul className="space-y-1">
-              {penaltyAlerts.map((alert) => {
-                const driver = castPenaltyDriver(alert.drivers);
-                return (
-                  <li key={alert.driver_id} className="flex items-center justify-between border border-f1-red/30 bg-f1-dark px-4 py-2">
-                    <span className="text-sm text-f1-white">{driver?.display_name ?? "TBD"}</span>
-                    <span className="font-mono text-xs text-f1-red">{alert.penalty_points} penalty pts - threshold reached</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
+        </div>
+        </div>
 
         {topDrivers.length === 0 && topConstructors.length === 0 && !nextRace && (
           <EmptyState

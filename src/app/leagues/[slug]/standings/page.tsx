@@ -115,7 +115,8 @@ export default async function StandingsOverviewPage({
   const { drivers, nextSession, seasons, summary, teams } = await unstable_cache(
     getOverviewData,
     ["standings-overview"],
-    { revalidate: 300, tags: [cacheTag.standings(league.id)] },
+    // results tag: session create/edit/delete refreshes the "Next:" strip too.
+    { revalidate: 300, tags: [cacheTag.standings(league.id), cacheTag.results(league.id)] },
   )(league.id, seasonId, league.season);
 
   const driverPts = new Map(summary?.driverRoundPoints ?? []);
