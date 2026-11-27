@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { SeasonSelector } from "@/components/league/SeasonSelector";
+import { StandingsTabs } from "@/components/league/StandingsTabs";
 import { StandingsCard } from "@/components/league/StandingsCard";
 import { StandingsSearch } from "@/components/league/StandingsSearch";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -151,6 +152,7 @@ export default async function DriverStandingsPage({
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-8 sm:px-6 lg:px-8">
+      <StandingsTabs active="drivers" seasonId={seasonId} slug={slug} />
       <SeasonSelector
         currentSeasonId={seasonId}
         pathname={`/leagues/${slug}/standings/drivers`}
