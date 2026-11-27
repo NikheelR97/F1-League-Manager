@@ -102,7 +102,8 @@ export function buildDriverStandings(
   }));
 }
 
-// Constructor points use only points_awarded (not manual_points_adjustment).
+// Constructor points = points_awarded + manual_points_adjustment, so race-day
+// adjustments (e.g. a per-race points cap) hit the team as well as the driver.
 // Tie-break order: total_points → wins → podiums
 export function buildTeamStandings(
   results: ResultForStandings[],
@@ -123,7 +124,7 @@ export function buildTeamStandings(
     // standings row keyed by null.
     if (!r.team_id) continue;
     const t = ensure(r.team_id);
-    t.points += r.points_awarded;
+    t.points += r.points_awarded + r.manual_points_adjustment;
     if (r.result_status === "classified" && r.finishing_position === 1) t.wins++;
     if (
       r.result_status === "classified" &&
@@ -155,10 +156,7 @@ export function buildTeamStandings(
 
 // F1 — a team page's per-driver points breakdown must reconcile with the
 // header's constructor total (buildTeamStandings above), which sums
-// points_awarded only. This intentionally ignores manual_points_adjustment
-// even though the input rows carry it, so a caller can pass full race-result
-// rows without a separate DTO — and can't silently reintroduce the
-// adjustment by tweaking this function's inputs.
+// points_awarded + manual_points_adjustment — the breakdown uses the same sum.
 export interface DriverPointsBreakdownRow {
   driver_id: string;
   driver_name: string;
@@ -181,7 +179,7 @@ export function buildDriverPointsBreakdown(
     byDriver.set(r.driver_id, {
       driver_id: r.driver_id,
       name: r.driver_name,
-      points: (existing?.points ?? 0) + r.points_awarded,
+      points: (existing?.points ?? 0) + r.points_awarded + r.manual_points_adjustment,
     });
   }
   return [...byDriver.values()].sort((a, b) => b.points - a.points);

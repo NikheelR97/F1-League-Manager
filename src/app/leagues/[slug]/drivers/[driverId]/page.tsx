@@ -3,6 +3,7 @@ import "server-only";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { FormStrip } from "@/components/league/FormStrip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PublicPageHeader } from "@/components/league/PublicPageHeader";
 import { formatDate } from "@/lib/format-date";
@@ -92,7 +93,7 @@ export default async function DriverProfilePage({
       .eq("league_id", league.id)
       .eq("season_id", league.season.id)
       .eq("status", "completed")
-      .limit(50),
+      .limit(200),
     db
       .from("race_sessions")
       .select("name, published_at")
@@ -116,12 +117,12 @@ export default async function DriverProfilePage({
       ? db
           .from("race_results")
           .select(
-            "race_session_id, finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, race_sessions(name, scheduled_at, circuits(name))",
+            "race_session_id, finishing_position, result_status, fastest_lap, points_awarded, manual_points_adjustment, race_sessions(name, scheduled_at, race_number, circuits(name))",
           )
           .eq("driver_id", driverId)
           .in("race_session_id", sessionIds)
           .order("scheduled_at", { referencedTable: "race_sessions", ascending: true })
-          .limit(50)
+          .limit(200)
       : { data: [] },
     db
       .from("driver_team_stints")
@@ -133,7 +134,7 @@ export default async function DriverProfilePage({
 
   const penaltyPoints = penaltyTotals.get(driverId)?.penaltyPoints ?? 0;
 
-  type RaceSession = { name: string; circuits: unknown };
+  type RaceSession = { name: string; scheduled_at: string; race_number: number; circuits: unknown };
   type Circuit = { name: string };
   type StintTeam = { id: string; name: string; color_hex: string };
 
@@ -143,6 +144,47 @@ export default async function DriverProfilePage({
   // transfer.
   const currentStint = (stints ?? []).find((s) => s.ends_on === null) ?? null;
   const currentTeam = currentStint ? (currentStint.teams as unknown as StintTeam | null) : null;
+
+  // Newest first; sprint + feature share a start time and the feature (race_number 1) runs last.
+  const when = (r: NonNullable<typeof results>[number]) => r.race_sessions as unknown as RaceSession | null;
+  const byNewest = [...(results ?? [])].sort((a, b) => {
+    const ra = when(a);
+    const rb = when(b);
+    return (
+      (rb?.scheduled_at ?? "").localeCompare(ra?.scheduled_at ?? "") ||
+      (ra?.race_number ?? 0) - (rb?.race_number ?? 0)
+    );
+  });
+  const started = byNewest.filter((r) => r.result_status !== "dns");
+  const dnsRows = byNewest.filter((r) => r.result_status === "dns");
+  const form = started.slice(0, 8).map((r) => ({ status: r.result_status, position: r.finishing_position }));
+
+  const renderRow = (r: NonNullable<typeof results>[number]) => {
+    const race = when(r);
+    const circuit = race?.circuits as unknown as Circuit | null;
+    const totalPts = r.points_awarded + r.manual_points_adjustment;
+    return (
+      <li
+        key={r.race_session_id}
+        className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm"
+      >
+        <div>
+          <div className="text-f1-white">
+            {circuit?.name ?? "—"}
+            {race?.name && <span className="ml-2 text-xs text-f1-muted">{race.name}</span>}
+            {r.fastest_lap && <span className="ml-2 text-xs font-bold text-team-mclaren">FL</span>}
+          </div>
+          <div className="text-xs text-f1-muted">{race?.scheduled_at ? formatDate(race.scheduled_at) : ""}</div>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="font-mono text-xs uppercase text-f1-muted">
+            {formatPosition(r.result_status, r.finishing_position)}
+          </span>
+          <span className="font-mono text-sm font-bold text-f1-white">{totalPts} pts</span>
+        </div>
+      </li>
+    );
+  };
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -208,6 +250,8 @@ export default async function DriverProfilePage({
         )}
       </div>
 
+      <FormStrip results={form} />
+
       {/* Team history */}
       {stints && stints.length > 0 && (
         <section className="space-y-2">
@@ -245,35 +289,17 @@ export default async function DriverProfilePage({
         {!results || results.length === 0 ? (
           <EmptyState message="No results published yet." title="No results" />
         ) : (
-          <ul className="space-y-1">
-            {results.map((r) => {
-              const race = r.race_sessions as unknown as RaceSession | null;
-              const circuit = race?.circuits as unknown as Circuit | null;
-              const totalPts = r.points_awarded + r.manual_points_adjustment;
-              return (
-                <li
-                  key={r.race_session_id}
-                  className="flex items-center justify-between border border-f1-border/40 bg-f1-dark px-4 py-2 text-sm"
-                >
-                  <div>
-                    <div className="text-f1-white">
-                      {circuit?.name ?? "—"}
-                      {race?.name && <span className="ml-2 text-xs text-f1-muted">{race.name}</span>}
-                    </div>
-                    {r.fastest_lap && (
-                      <span className="ml-2 text-xs font-bold text-team-mclaren">FL</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="font-mono text-xs uppercase text-f1-muted">
-                      {formatPosition(r.result_status, r.finishing_position)}
-                    </span>
-                    <span className="font-mono text-sm font-bold text-f1-white">{totalPts} pts</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <ul className="space-y-1">{started.map(renderRow)}</ul>
+            {dnsRows.length > 0 && (
+              <details className="group">
+                <summary className="cursor-pointer text-xs uppercase text-f1-muted hover:text-f1-white">
+                  Did not start ({dnsRows.length})
+                </summary>
+                <ul className="mt-2 space-y-1">{dnsRows.map(renderRow)}</ul>
+              </details>
+            )}
+          </>
         )}
       </section>
     </div>

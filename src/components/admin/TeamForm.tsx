@@ -122,7 +122,7 @@ export function TeamForm({ initialTeam, leagueId, officialTemplates = [] }: Team
       return;
     }
 
-    router.push(`/admin/leagues/${leagueId}`);
+    router.push(`/admin/leagues/${leagueId}?tab=teams`);
     router.refresh();
   }
 

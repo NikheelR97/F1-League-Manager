@@ -76,7 +76,7 @@ export function AddLeagueDriverForm({ drivers, leagueId, teams }: AddLeagueDrive
       return;
     }
 
-    router.push(`/admin/leagues/${leagueId}`);
+    router.push(`/admin/leagues/${leagueId}?tab=drivers`);
     router.refresh();
   }
 

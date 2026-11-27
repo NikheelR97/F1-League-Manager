@@ -76,7 +76,7 @@ export default async function QualifyingResultsPage({
       )
       .eq("race_session_id", sessionId)
       .order("qualifying_position")
-      .limit(20),
+      .limit(100),
   ]);
 
   if (!session) notFound();
