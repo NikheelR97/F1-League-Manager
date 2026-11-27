@@ -53,6 +53,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
+  // Recap PNG reads its TTFs from disk at runtime; ship them with the function.
+  outputFileTracingIncludes: {
+    "/leagues/[slug]/recap/image.png": ["./src/assets/fonts/*.ttf"],
+  },
   images: {
     remotePatterns: getSupabaseRemotePatterns(),
   },
