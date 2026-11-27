@@ -92,7 +92,7 @@ describe("PointsSystemForm submit", () => {
         expect.objectContaining({ method: "POST" }),
       ),
     );
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/admin/leagues/league-1"));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/admin/leagues/league-1?tab=settings"));
     expect(router.refresh).toHaveBeenCalled();
   });
 
