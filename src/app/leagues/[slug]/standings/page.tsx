@@ -170,7 +170,7 @@ export default async function StandingsOverviewPage({
                   <th className={`${th} pl-1 text-left`} scope="col">Driver</th>
                   <th className={`${th} w-12 text-right`} scope="col">+Rnd</th>
                   <th className={`${th} w-12 text-right`} scope="col">Pts</th>
-                  <th className={`${th} w-16 pr-3 text-right`} scope="col">Gap</th>
+                  <th className={`${th} w-20 pr-3 text-right`} scope="col">Gap</th>
                 </tr>
               </thead>
               <tbody>

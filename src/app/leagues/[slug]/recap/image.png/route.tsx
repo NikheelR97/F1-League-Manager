@@ -95,7 +95,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
       </div>
 
       {summary ? (
-        <>
+        <div style={{ display: "flex", flex: 1, flexDirection: "column" }}>
           <div style={{ display: "flex", gap: 20, marginTop: 40 }}>
             {summary.podium.map((p) => (
               <div
@@ -153,7 +153,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
               ) : null}
             </div>
           </div>
-        </>
+        </div>
       ) : (
         <div style={{ display: "flex", flex: 1 }} />
       )}

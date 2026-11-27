@@ -48,7 +48,9 @@ describe("recap image route", () => {
     const res = await GET(new Request("http://x"), { params: Promise.resolve({ slug: "x" }) });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("image/png");
-    expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(1000);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (process.env.RECAP_OUT) (await import("node:fs")).writeFileSync(process.env.RECAP_OUT, buf);
+    expect(buf.byteLength).toBeGreaterThan(1000);
   });
 
   it("404s for an unknown league", async () => {
