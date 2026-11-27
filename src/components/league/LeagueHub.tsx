@@ -243,7 +243,7 @@ export function LeagueHub({
                 {latestCircuit?.name ?? latestSession.name}
               </Link>
               {latestPodium.length > 0 && (
-                <ol className="mt-2 grid gap-1 sm:grid-cols-3">
+                <ol className="mt-2 grid gap-1 sm:grid-cols-3 lg:grid-cols-1">
                   {latestPodium.slice(0, 3).map((p, i) => (
                     <li
                       key={i}
