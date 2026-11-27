@@ -5,7 +5,7 @@
 //   $env:VERCEL_TOKEN="..."
 //   node scripts/vercel-alias.mjs [project] [branch] [domain] [teamSlug]
 //   node scripts/vercel-alias.mjs --assign-branch [project] [branch] [domain] [teamSlug]
-// Defaults: f1-league-manager  staging  staging.nikheelr.com  nikheel-rajmans-projects
+// Defaults: f1-league-manager  prod  league-manager.nikheelr.com  nikheel-rajmans-projects
 //
 // Get a token at: https://vercel.com/account/tokens
 //
@@ -25,8 +25,8 @@ if (assignBranch) rawArgs.shift();
 
 const [
   project = "f1-league-manager",
-  branch = "staging",
-  domain = "staging.nikheelr.com",
+  branch = "prod",
+  domain = "league-manager.nikheelr.com",
   teamSlug = "nikheel-rajmans-projects",
 ] = rawArgs;
 
