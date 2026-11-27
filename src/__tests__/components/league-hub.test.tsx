@@ -281,6 +281,20 @@ describe("LeagueHub", () => {
     expect(screen.getByText("P3")).toBeInTheDocument();
     expect(screen.getByText("18 pts")).toBeInTheDocument();
     expect(screen.queryByLabelText("Position unchanged")).not.toBeInTheDocument();
+    expect(screen.getByText("Level on points — Alpha leads on wins.")).toBeInTheDocument();
+  });
+
+  it("shows the points gap in the title fight", () => {
+    const row = (position: number, points: number, name: string) => ({
+      position,
+      previous_position: position,
+      total_points: points,
+      wins: 0,
+      drivers: { id: `d${position}`, display_name: name, racing_number: null },
+      teams: null,
+    });
+    render(<LeagueHub {...baseProps} topDrivers={[row(1, 60, "Alpha"), row(2, 48, "Bravo")]} />);
+    expect(screen.getByRole("region", { name: "Title fight" })).toHaveTextContent("12 pts between them.");
   });
 
   it("omits the wheel section for a non-wheel-format league", () => {
