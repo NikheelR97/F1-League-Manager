@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 import { ImageResponse } from "next/og";
 
@@ -25,9 +26,10 @@ const C = {
 };
 const PODIUM = [C.gold, C.silver, C.bronze];
 
+const FONT_DIR = join(process.cwd(), "src/assets/fonts");
 const fonts = Promise.all([
-  readFile(new URL("../fonts/TitilliumWeb-Bold.ttf", import.meta.url)),
-  readFile(new URL("../fonts/JetBrainsMono-Bold.ttf", import.meta.url)),
+  readFile(join(FONT_DIR, "TitilliumWeb-Bold.ttf")),
+  readFile(join(FONT_DIR, "JetBrainsMono-Bold.ttf")),
 ]);
 
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
