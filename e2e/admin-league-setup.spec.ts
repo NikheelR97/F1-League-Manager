@@ -66,7 +66,7 @@ test.describe.serial("Admin league setup flow", () => {
   });
 
   test("admin can add a team to a league", async ({ page }) => {
-    await page.goto(createdLeagueUrl);
+    await page.goto(`${createdLeagueUrl.split("?")[0]}?tab=teams`);
 
     // Add a team
     await page.getByRole("link", { name: /Add Team/i }).click();

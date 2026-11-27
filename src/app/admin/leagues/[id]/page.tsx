@@ -1,7 +1,7 @@
 import "server-only";
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
 import { z } from "zod";
 
@@ -107,6 +107,9 @@ export default async function LeagueDetailPage({
   // A brand-new league has zero seasons — effectiveSeasonId is then null and
   // season-scoped sections below degrade to their empty states.
   const seasons = allSeasons ?? [];
+  // A league with no season can't schedule anything yet — open on Settings,
+  // where the "Create the First Season" form lives.
+  if (seasons.length === 0 && !rawSearch.tab) redirect(`/admin/leagues/${leagueId}?tab=settings`);
   const currentSeason = seasons.find((s) => s.is_current);
   const effectiveSeasonId =
     (seasonIdParam && seasons.some((s) => s.id === seasonIdParam) ? seasonIdParam : null) ??
